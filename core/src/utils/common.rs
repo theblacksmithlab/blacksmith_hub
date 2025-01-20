@@ -191,8 +191,8 @@ pub async fn get_user_avatar(
 ) -> Result<Json<AvatarResponse>, StatusCode> {
     let user_id = params.user_id.to_string();
 
-    let bot_token =
-        env::var("TELOXIDE_TOKEN").expect("TELOXIDE_TOKEN must be set in the environment");
+    let bot_token = env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM")
+        .expect("TELOXIDE_TOKEN_THE_VIPER_ROOM must be set in the environment");
 
     let url = format!(
         "https://api.telegram.org/bot{}/getUserProfilePhotos?user_id={}",

@@ -14,8 +14,6 @@ use core::utils::common::run_bot_dispatcher;
 use crate::utils::check_username;
 
 pub async fn start_request_app_bot(app_state: Arc<BotAppState>) -> Result<()> {
-    info!("Starting Request App bot...");
-    
     let bot = Bot::new(env::var("TELOXIDE_TOKEN_REQUEST_APP")?);
     
     let cmd_handler = Update::filter_message()

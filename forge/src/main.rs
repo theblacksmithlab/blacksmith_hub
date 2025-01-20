@@ -20,12 +20,12 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    info!("Initializing system components...");
-
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::new("info"))
         .init();
 
+    info!("Initializing system components...");
+    
     dotenv().ok();
 
     let config_builder = Config::builder().add_source(File::with_name("config.yaml"));

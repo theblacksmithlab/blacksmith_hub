@@ -13,8 +13,6 @@ use tracing::info;
 use core::utils::common::run_bot_dispatcher;
 
 pub async fn start_the_viper_room_bot(app_state: Arc<BotAppState>) -> Result<()> {
-    info!("Starting The Viper Room bot...");
-    
     let bot = Bot::new(env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM")?);
     
     let cmd_handler = Update::filter_message()

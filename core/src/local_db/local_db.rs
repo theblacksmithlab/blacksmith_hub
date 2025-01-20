@@ -19,16 +19,13 @@ struct DbUserProfile {
 
 pub(crate) async fn initialize_database() -> Result<(), Error> {
     if !Path::new("user_profiles.db").exists() {
-        info!("Creating new database file...");
         std::fs::File::create("user_profiles.db")?;
     }
     Ok(())
 }
 
 pub async fn create_db_pool() -> Result<Pool<Sqlite>, Error> {
-    info!("Initializing database...");
     initialize_database().await?;
-    info!("Initializing local_db pool...");
     let pool = sqlx::SqlitePool::connect("sqlite:user_profiles.db").await?;
     Ok(pool)
 }
