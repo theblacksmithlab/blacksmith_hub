@@ -26,7 +26,7 @@ pub async fn start_the_viper_room_bot(app_state: Arc<BotAppState>) -> Result<()>
         .branch(cmd_handler)
         .branch(chat_handler);
 
-    run_bot_dispatcher(bot, handler, app_state).await;
+    run_bot_dispatcher(bot, handler, app_state).await?;
     
     Ok(())
 }

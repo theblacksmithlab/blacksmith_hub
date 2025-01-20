@@ -252,7 +252,6 @@ pub(crate) async fn get_latest_messages<T: LlmProcessing + Send + Sync>(
             .await?;
 
             if llm_response.trim() == "skip" {
-                info!("Message passed after processing via LLM");
                 continue;
             }
 

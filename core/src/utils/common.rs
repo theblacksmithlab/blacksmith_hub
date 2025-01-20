@@ -14,6 +14,7 @@ use teloxide::{dptree, Bot};
 use teloxide::prelude::ChatId;
 use teloxide::dispatching::{Dispatcher, UpdateHandler};
 use teloxide::error_handlers::LoggingErrorHandler;
+use tracing::error;
 use crate::state::tg_bot::app_state::BotAppState;
 
 pub enum SystemRoleType {
@@ -176,7 +177,18 @@ pub async fn get_message(app_name: &str, message_name: &str) -> Result<String> {
         .join(app_name)
         .join(format!("{}.txt", message_name));
 
+    if !path.exists() {
+        error!("Message file not found: {}", path.display());
+        return Err(anyhow::anyhow!(
+            "Message file '{}' for app '{}' does not exist at path: {}",
+            message_name,
+            app_name,
+            path.display()
+        ));
+    }
+
     read_to_string(&path).map_err(|e| {
+        error!("Failed to read message file {}: {}", path.display(), e);
         anyhow::anyhow!(
             "Failed to read message '{}' for app '{}': {}",
             message_name,
@@ -241,7 +253,7 @@ pub async fn run_bot_dispatcher(
     bot: Bot,
     handler: UpdateHandler<anyhow::Error>,
     app_state: Arc<BotAppState>
-) {
+) -> Result<()> {
     Dispatcher::builder(bot.clone(), handler)
         .dependencies(dptree::deps![app_state])
         .enable_ctrlc_handler()
@@ -251,4 +263,5 @@ pub async fn run_bot_dispatcher(
             LoggingErrorHandler::with_custom_text("Dispatcher: an error from the update listener"),
         )
         .await;
+    Ok(())
 }

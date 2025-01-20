@@ -39,7 +39,7 @@ pub(crate) async fn handle_the_viper_room_user_action(
     let api_hash = env::var("TELEGRAM_API_HASH").expect("API_HASH not set");
 
     info!(
-        "The Viper Room | Received user action from @{} [id: {}], action: {:?} and/or action step: {:?}",
+        "Received user action from @{} [id: {}], action: {:?} and/or action step: {:?}",
         username,
         user_id,
         action,

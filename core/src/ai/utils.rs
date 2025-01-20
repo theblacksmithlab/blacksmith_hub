@@ -102,7 +102,7 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
 ) -> Result<PathBuf> {
-    info!("fn: text_to_speech | Starting recording podcast...");
+    info!("Starting recording podcast...");
 
     let now = Utc::now();
     let utc_plus_3 = now + Duration::hours(3);
@@ -163,7 +163,7 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
 //     user_tmp_dir: String,
 //     app_state: Arc<T>
 // ) -> Result<PathBuf> {
-//     info!("fn: text_to_speech | Starting recording podcast...");
+//     info!("Starting recording podcast...");
 //
 //     let api_key = env::var("ELEVEN_LABS_API_TOKEN")
 //         .map_err(|_| anyhow::anyhow!("ELEVEN_LABS_API_TOKEN not found in environment"))?;

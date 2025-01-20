@@ -29,7 +29,7 @@ pub async fn start_request_app_bot(app_state: Arc<BotAppState>) -> Result<()> {
         .branch(cmd_handler)
         .branch(chat_handler);
 
-    run_bot_dispatcher(bot, handler, app_state).await;
+    run_bot_dispatcher(bot, handler, app_state).await?;
 
     Ok(())
 }
