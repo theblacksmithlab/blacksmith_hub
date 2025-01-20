@@ -1,0 +1,15 @@
+[package]
+name = "the_viper_room_bot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+tracing.workspace = true
+teloxide.workspace = true
+tokio.workspace = true
+chrono.workspace = true
+grammers-client.workspace = true
+
+core = { path = "../../core" }
+server = { path = "../../server" }

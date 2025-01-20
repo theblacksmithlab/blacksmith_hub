@@ -1,0 +1,14 @@
+Тебе предоставлено сообщение пользователя, твоя задача - извлечь из него максимум о пользователе и выдать ответ в виде json:
+Пример твоего ответа (обязательно сохрани иерархию и ключи, впиши только значения, если ты не видишь нужно информации просто впиши None): 
+{
+    "registration_info": {
+        "first_name": "string or None",
+        "last_name": "string or None",
+        "age": "number or None",
+        "gender": "string or None",
+        "city_of_residence": "string or None"
+    },
+    "additional_info": {
+        "interests": ["string"] or None
+    }
+}

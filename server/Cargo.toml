@@ -1,0 +1,19 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+tracing.workspace = true
+http.workspace = true
+tower-http.workspace = true
+axum-server.workspace = true
+lazy_static.workspace = true
+teloxide.workspace = true
+grammers-client.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+
+core = { path = "../core" }

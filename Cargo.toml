@@ -1,0 +1,51 @@
+[workspace]
+members = [
+    "core",
+    "server",
+    "forge",
+    "app/request_app_bot",
+    "app/the_viper_room_bot"
+]
+
+resolver = "2"
+
+[workspace.dependencies]
+# Async Runtime & Web Framework
+tokio = { version = "1.38.0", features = ["full"] }
+axum = "0.7.9"
+tower = "0.5.1"
+tower-http = { version = "0.6.1", features = ["trace", "cors"] }
+http = "1.1.0"
+axum-server = { version = "0.7.1", features = ["tls-rustls-no-provider"] }
+
+# Telegram Client Libraries
+teloxide = { version = "0.13.0", features = ["macros"] }
+grammers = "0.1.0"
+grammers-client = "0.7.0"
+grammers-session = "0.7.0"
+grammers-tl-types = "0.7.0"
+
+# Database & Storage
+sqlx = { version = "0.8.2", features = ["sqlite", "runtime-tokio-native-tls"] }
+qdrant-client = "1.10.1"
+
+# AI Services
+async-openai = "0.26.0"
+
+# Serialization & Data Handling
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.117"
+config = "0.14.1"
+
+# HTTP Client
+reqwest = "0.12.5"
+
+# Logging & Tracing
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+# Utilities
+anyhow = "1.0.86"
+dotenv = "0.15"
+lazy_static = "1.5.0"
+chrono = "0.4"
