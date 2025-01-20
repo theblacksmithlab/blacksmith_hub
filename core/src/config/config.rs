@@ -5,7 +5,6 @@ pub struct AppConfig {
     pub server: ServerConfig,
     pub tls: TlsConfig,
     pub cors: CorsConfig,
-    pub qdrant: QdrantConfig,
 }
 
 #[derive(Deserialize, Debug)]
@@ -23,9 +22,4 @@ pub struct TlsConfig {
 #[derive(Deserialize, Debug)]
 pub struct CorsConfig {
     pub allowed_origins: Vec<String>,
-}
-
-#[derive(Deserialize)]
-pub struct QdrantConfig {
-    pub collection_name: String,
 }
