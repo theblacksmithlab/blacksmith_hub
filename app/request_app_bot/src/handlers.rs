@@ -45,7 +45,7 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
     
     add_llm_response_to_cache(app_state.clone(), user_id, llm_response).await;
 
-    let current_cache = get_cache_as_string(app_state.clone(), user_id).await;
+    let current_cache_2 = get_cache_as_string(app_state.clone(), user_id).await;
 
     let bot_msg = format!("Текущий кэш после LLM response:\n{}", current_cache);
 
