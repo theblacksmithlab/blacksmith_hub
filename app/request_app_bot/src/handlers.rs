@@ -16,11 +16,8 @@ pub(crate) async fn command_handler(
 ) -> anyhow::Result<()> {
     let BotCommands::Start = cmd;
 
-    bot.send_message(
-        msg.chat.id,
-        "Welcome to the reQuest App!\nНажмите кнопку 'reQuest' чтобы запустить приложение",
-    )
-        .await?;
+    let bot_msg = get_message("request_app", "start_message").await?;
+    bot.send_message(msg.chat.id, bot_msg).await?;
 
     Ok(())
 }

@@ -263,5 +263,6 @@ pub async fn run_bot_dispatcher(
             LoggingErrorHandler::with_custom_text("Dispatcher: an error from the update listener"),
         )
         .await;
-    Ok(())
+    
+    Err(anyhow::anyhow!("Bot dispatcher unexpectedly stopped"))
 }
