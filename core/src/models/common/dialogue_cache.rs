@@ -34,9 +34,17 @@ impl DialogueCache {
     }
 
     pub(crate) fn add_llm_response_to_cache(&mut self, llm_response: String) {
-        if let Some(last_interaction) = self.messages.back_mut() {
-            last_interaction.role = "assistant".to_string();
-            last_interaction.content = llm_response;
+        let timestamp = Utc::now().to_rfc3339();
+        let entry = UserInteraction {
+            timestamp,
+            role: "assistant".to_string(),
+            content: llm_response,
+        };
+
+        self.messages.push_back(entry);
+
+        if self.messages.len() > self.max_size {
+            self.messages.pop_front();
         }
     }
 
