@@ -13,13 +13,15 @@ use async_openai::types::{
 use chrono::{Duration, Utc};
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::Arc;
 // use reqwest::Client as ReqwestClient;
 // use serde_json::json;
 use crate::local_db::local_db::save_user_profile;
 use crate::utils::common::{get_system_role_file_path, read_system_role, LlmModel, SystemRoleType};
 use teloxide::prelude::ChatId;
-use tracing::info;
+use tracing::{info, warn};
+use crate::utils::common::split_text_into_chunks;
 
 pub async fn raw_llm_processing_json(
     system_role: String,
@@ -68,7 +70,7 @@ pub async fn raw_llm_processing<T: LlmProcessing + Send + Sync>(
     let llm_client = app_state.get_llm_client().clone();
 
     let llm_request = CreateChatCompletionRequestArgs::default()
-        .max_tokens(4045u32)
+        .max_tokens(4095u32)
         .model(model.as_str())
         .temperature(0.2)
         .messages([
@@ -103,30 +105,78 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
     app_state: Arc<T>,
 ) -> Result<PathBuf> {
     info!("Starting recording podcast...");
-
+    
     let now = Utc::now();
     let utc_plus_3 = now + Duration::hours(3);
     let date_only = utc_plus_3.date_naive();
+    let file_name = format!("The_Viper_Podcast_({})", date_only);
 
     let llm_client = app_state.get_llm_client().clone();
 
-    let request = CreateSpeechRequestArgs::default()
-        .input(&text)
-        .voice(Voice::Onyx)
-        .model(SpeechModel::Tts1Hd)
-        .speed(1.3)
-        .build()?;
+    let char_count = text.chars().count();
 
-    let response = llm_client.audio().speech(request).await?;
+    if char_count <= MAX_TTS_CHARS {
+        let char_count = text.chars().count();
+        info!("Podcast text length is: {} characters. There is not need to split text into chunks.", char_count);
+        let request = CreateSpeechRequestArgs::default()
+            .input(&text)
+            .voice(Voice::Onyx)
+            .model(SpeechModel::Tts1Hd)
+            .speed(1.3)
+            .build()?;
 
-    let file_name = format!("The_Viper_Podcast_({})", date_only);
+        let response = llm_client.audio().speech(request).await?;
+        let audio_file_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
+        response.save(&audio_file_path).await?;
 
-    let audio_file_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
-    response.save(audio_file_path.clone()).await?;
+        info!("Podcast generated as single file");
+        return Ok(PathBuf::from(audio_file_path));
+    }
+    
+    const MAX_TTS_CHARS: usize = 4095;
 
-    info!("fn: text_to_speech | Podcast is ready");
+    let chunks = split_text_into_chunks(&text, MAX_TTS_CHARS);
+    info!("Text split into {} chunks", chunks.len());
 
-    Ok(PathBuf::from(audio_file_path))
+    let mut audio_parts = Vec::new();
+
+    for (i, chunk) in chunks.iter().enumerate() {
+        info!("Processing podcast chunk: {}/{}, podcast length: {} chars", i + 1, chunks.len(), chunk.chars().count());
+
+        let request = CreateSpeechRequestArgs::default()
+            .input(chunk)
+            .voice(Voice::Onyx)
+            .model(SpeechModel::Tts1Hd)
+            .speed(1.3)
+            .build()?;
+
+        let response = llm_client.audio().speech(request).await?;
+        let part_path = format!("{}/part_{}.mp3", user_tmp_dir, i);
+        response.save(&part_path).await?;
+        audio_parts.push(part_path);
+    }
+
+    let final_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
+
+    let mut command = Command::new("ffmpeg");
+    command.arg("-i").arg(format!("concat:{}", audio_parts.join("|")))
+        .arg("-acodec").arg("copy")
+        .arg(&final_path);
+    
+    let status = command.status()?;
+    if !status.success() {
+        return Err(anyhow::anyhow!("Failed to merge audio files"));
+    }
+
+    // for part in audio_parts {
+    //     if let Err(e) = fs::remove_file(&part) {
+    //         warn!("Could not delete temporary file {}: {}", part, e);
+    //     }
+    // }
+    
+    info!("Complete podcast successfully generated");
+    
+    Ok(PathBuf::from(final_path))
 }
 
 // async fn generate_speech(text: &str, api_key: &str) -> Result<Vec<u8>> {

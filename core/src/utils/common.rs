@@ -266,3 +266,25 @@ pub async fn run_bot_dispatcher(
     
     Err(anyhow::anyhow!("Bot dispatcher unexpectedly stopped"))
 }
+
+pub fn split_text_into_chunks(text: &str, max_chars: usize) -> Vec<String> {
+    let mut chunks = Vec::new();
+    let mut current_pos = 0;
+    let text_len = text.len();
+
+    while current_pos < text_len {
+        let max_end_pos = std::cmp::min(current_pos + max_chars, text_len);
+
+        let substring = &text[current_pos..max_end_pos];
+        let end_pos = if let Some(period_pos) = substring.rfind(|c| c == '.' || c == '!' || c == '?') {
+            current_pos + period_pos + 1
+        } else {
+            max_end_pos
+        };
+
+        chunks.push(text[current_pos..end_pos].to_string());
+        current_pos = end_pos;
+    }
+
+    chunks
+}
