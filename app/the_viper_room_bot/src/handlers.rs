@@ -16,6 +16,7 @@ use tracing::info;
 pub enum BotCommands {
     Start,
     Podcast,
+    Test,
     Schedule,
     Stop,
 }
@@ -81,8 +82,24 @@ pub(crate) async fn command_handler(
                 app_state.clone(),
                 app_tg_account_id,
                 nickname,
+                "the_viper_room"
             )
             .await?;
+        }
+
+        BotCommands::Test if user_id.0 == lord_admin_id => {
+            bot.send_message(user_id, "Starting test podcast generation by /test cmd...")
+                .await?;
+            generate_podcast(
+                g_client,
+                bot.clone(),
+                user_id,
+                app_state.clone(),
+                app_tg_account_id,
+                nickname,
+                "nervosettestchat",
+            )
+                .await?;
         }
 
         BotCommands::Schedule if user_id.0 == lord_admin_id => {

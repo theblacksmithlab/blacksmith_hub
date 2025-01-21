@@ -23,6 +23,7 @@ pub(crate) async fn generate_podcast(
     app_state: Arc<BotAppState>,
     app_tg_account_id: ChatId,
     nickname: String,
+    chat_username: &str,
 ) -> anyhow::Result<()> {
     info!("Starting podcast generation by /podcast cmd...");
 
@@ -60,7 +61,7 @@ pub(crate) async fn generate_podcast(
         });
 
     let chat = g_client
-        .resolve_username("the_viper_room")
+        .resolve_username(chat_username)
         .await?
         .ok_or_else(|| anyhow!("Channel for broadcasting not found"))?;
 
@@ -95,7 +96,9 @@ pub(crate) async fn schedule_podcast(
         }
         *is_running = true;
     }
-
+    
+    let chat_username = "the_viper_room".to_string();
+    
     let offset = FixedOffset::east_opt(3 * 3600).unwrap();
     let now: DateTime<FixedOffset> = Utc::now().with_timezone(&offset);
     let podcast_time = offset
@@ -140,12 +143,13 @@ pub(crate) async fn schedule_podcast(
                     };
 
                     if let Err(e) = generate_podcast(
-                         g_client,
-                         bot.clone(),
-                         user_id,
-                         app_state.clone(),
-                         app_tg_account_id,
-                         nickname.clone()
+                        g_client,
+                        bot.clone(),
+                        user_id,
+                        app_state.clone(),
+                        app_tg_account_id,
+                        nickname.clone(),
+                        &chat_username
                      ).await {
                         error!("Error in podcast generation: {:?}", e);
                     }
