@@ -18,10 +18,10 @@ use std::sync::Arc;
 // use reqwest::Client as ReqwestClient;
 // use serde_json::json;
 use crate::local_db::local_db::save_user_profile;
+use crate::utils::common::split_text_into_chunks;
 use crate::utils::common::{get_system_role_file_path, read_system_role, LlmModel, SystemRoleType};
 use teloxide::prelude::ChatId;
 use tracing::{info, warn};
-use crate::utils::common::split_text_into_chunks;
 
 pub async fn raw_llm_processing_json(
     system_role: String,
@@ -105,7 +105,7 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
     app_state: Arc<T>,
 ) -> Result<PathBuf> {
     info!("Starting recording podcast...");
-    
+
     let now = Utc::now();
     let utc_plus_3 = now + Duration::hours(3);
     let date_only = utc_plus_3.date_naive();
@@ -117,7 +117,10 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
 
     if char_count <= MAX_TTS_CHARS {
         let char_count = text.chars().count();
-        info!("Podcast text length is: {} characters. There is not need to split text into chunks.", char_count);
+        info!(
+            "Podcast text length is: {} characters. There is not need to split text into chunks.",
+            char_count
+        );
         let request = CreateSpeechRequestArgs::default()
             .input(&text)
             .voice(Voice::Onyx)
@@ -132,7 +135,7 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
         info!("Podcast generated as single file");
         return Ok(PathBuf::from(audio_file_path));
     }
-    
+
     const MAX_TTS_CHARS: usize = 4095;
 
     let chunks = split_text_into_chunks(&text, MAX_TTS_CHARS);
@@ -141,7 +144,12 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
     let mut audio_parts = Vec::new();
 
     for (i, chunk) in chunks.iter().enumerate() {
-        info!("Processing podcast chunk: {}/{}, podcast length: {} chars", i + 1, chunks.len(), chunk.chars().count());
+        info!(
+            "Processing podcast chunk: {}/{}, podcast length: {} chars",
+            i + 1,
+            chunks.len(),
+            chunk.chars().count()
+        );
 
         let request = CreateSpeechRequestArgs::default()
             .input(chunk)
@@ -159,23 +167,26 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
     let final_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
 
     let mut command = Command::new("ffmpeg");
-    command.arg("-i").arg(format!("concat:{}", audio_parts.join("|")))
-        .arg("-acodec").arg("copy")
+    command
+        .arg("-i")
+        .arg(format!("concat:{}", audio_parts.join("|")))
+        .arg("-acodec")
+        .arg("copy")
         .arg(&final_path);
-    
+
     let status = command.status()?;
     if !status.success() {
         return Err(anyhow::anyhow!("Failed to merge audio files"));
     }
 
-    // for part in audio_parts {
-    //     if let Err(e) = fs::remove_file(&part) {
-    //         warn!("Could not delete temporary file {}: {}", part, e);
-    //     }
-    // }
-    
+    for part in audio_parts {
+        if let Err(e) = fs::remove_file(&part) {
+            warn!("Could not delete temporary file {}: {}", part, e);
+        }
+    }
+
     info!("Complete podcast successfully generated");
-    
+
     Ok(PathBuf::from(final_path))
 }
 

@@ -1,5 +1,5 @@
-use teloxide::Bot;
 use teloxide::prelude::{Message, Requester};
+use teloxide::Bot;
 
 pub(crate) async fn check_username(bot: Bot, msg: Message) -> bool {
     if let Some(_username) = msg.chat.username() {

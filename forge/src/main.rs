@@ -9,14 +9,13 @@ use core::state::tg_bot::app_state::BotAppState;
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;
-use request_app_bot::start_request_app_bot as start_request_app_bot;
+use request_app_bot::start_request_app_bot;
 use server::start_server;
 use std::env;
 use std::sync::Arc;
-use the_viper_room_bot::start_the_viper_room_bot as start_the_viper_room_bot;
+use the_viper_room_bot::start_the_viper_room_bot;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
-
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -25,7 +24,7 @@ async fn main() -> Result<()> {
         .init();
 
     info!("Initializing system components...");
-    
+
     dotenv().ok();
 
     let config_builder = Config::builder().add_source(File::with_name("config.yaml"));
@@ -72,7 +71,7 @@ async fn main() -> Result<()> {
 
     let request_app_bot_state = bot_app_state.clone();
     let viper_room_bot_state = bot_app_state.clone();
-    
+
     info!("Starting Request App bot...");
     tokio::spawn(async move {
         if let Err(e) = start_request_app_bot(request_app_bot_state).await {
@@ -89,10 +88,9 @@ async fn main() -> Result<()> {
         info!("The Viper Room bot started successfully");
     });
 
-
     info!("All system components initialized successfully");
 
     tokio::signal::ctrl_c().await?;
-    
+
     Ok(())
 }

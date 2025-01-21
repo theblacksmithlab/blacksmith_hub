@@ -5,7 +5,7 @@ use crate::routes::request_app::utils::{
 use core::ai::utils::{process_users_request, process_users_self_description};
 use core::grammers::grammers_functionality::create_chat;
 use core::state::request_app::app_state::RequestAppState;
-use core::utils::common::{determine_user_request, update_user_state};
+use core::utils::common::{determine_user_request, update_request_app_user_state};
 
 use core::models::request_app::request_app::{ServerResponse, UserAction};
 
@@ -45,7 +45,7 @@ pub(crate) async fn handle_user_action(
 
     if action == "Mini-app initialized" {
         info!("Mini-app initialized by user: {} ({})!", username, user_id);
-        update_user_state(app_state, user_id, |state| {
+        update_request_app_user_state(app_state, user_id, |state| {
             state.start_window = true;
             state.main_menu = false;
             state.profile_menu = false;
@@ -118,8 +118,8 @@ pub(crate) async fn handle_user_action(
             return handle_state_creating_profile_process(app_state.clone(), user_id, action).await;
         }
     }
-    
-    update_user_state(app_state, user_id, |state| {
+
+    update_request_app_user_state(app_state, user_id, |state| {
         state.main_menu = true;
     })
     .await;
@@ -139,7 +139,7 @@ pub(crate) async fn handle_start_window(
 ) -> Json<ServerResponse> {
     match action.as_str() {
         "Start" => {
-            update_user_state(app_state, user_id, |state| {
+            update_request_app_user_state(app_state, user_id, |state| {
                 state.start_window = false;
                 state.main_menu = true;
             })
@@ -194,7 +194,7 @@ async fn handle_main_menu(
 ) -> Json<ServerResponse> {
     match action.as_str() {
         "Управление профилем" => {
-            update_user_state(app_state, user_id, |state| {
+            update_request_app_user_state(app_state, user_id, |state| {
                 state.main_menu = false;
                 state.profile_menu = true;
             })
@@ -203,7 +203,7 @@ async fn handle_main_menu(
             send_profile_menu_response().await
         }
         "Управление запросом" => {
-            update_user_state(app_state, user_id, |state| {
+            update_request_app_user_state(app_state, user_id, |state| {
                 state.main_menu = false;
                 state.request_menu = true;
             })
@@ -212,7 +212,7 @@ async fn handle_main_menu(
             send_request_menu_response().await
         }
         "Выполнить поиск по запросу" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.main_menu = false;
                 state.request_search_result = true;
             })
@@ -227,7 +227,7 @@ async fn handle_main_menu(
             })
         }
         "Выход" => {
-            update_user_state(app_state, user_id, |state| {
+            update_request_app_user_state(app_state, user_id, |state| {
                 state.main_menu = false;
                 state.start_window = true;
             })
@@ -289,7 +289,7 @@ async fn handle_state_profile_menu(
             })
         }
         "Создать профиль" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.profile_menu = false;
                 state.creating_profile = true;
             })
@@ -306,7 +306,7 @@ async fn handle_state_profile_menu(
             })
         }
         "Назад" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.profile_menu = false;
                 state.main_menu = true;
             })
@@ -315,7 +315,7 @@ async fn handle_state_profile_menu(
             send_main_menu_response().await
         }
         "Главное меню" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.profile_menu = false;
                 state.main_menu = true;
             })
@@ -368,7 +368,7 @@ pub(crate) async fn handle_state_request_menu(
                 }
             };
 
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.request_menu = false;
                 state.editing_request = true;
             })
@@ -389,7 +389,7 @@ pub(crate) async fn handle_state_request_menu(
             })
         }
         "Создать запрос" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.request_menu = false;
                 state.creating_request = true;
             })
@@ -420,7 +420,7 @@ pub(crate) async fn handle_state_request_menu(
             })
         }
         "Назад" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.request_menu = false;
                 state.main_menu = true;
             })
@@ -429,7 +429,7 @@ pub(crate) async fn handle_state_request_menu(
             send_main_menu_response().await
         }
         "Главное меню" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.request_menu = false;
                 state.main_menu = true;
             })
@@ -458,7 +458,7 @@ pub(crate) async fn handle_state_creating_profile_menu(
 ) -> Json<ServerResponse> {
     match action.as_str() {
         "Поехали!" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_profile = false;
                 state.creating_profile_process = true;
             })
@@ -475,7 +475,7 @@ pub(crate) async fn handle_state_creating_profile_menu(
             })
         }
         "Назад" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_profile = false;
                 state.profile_menu = true;
             })
@@ -484,7 +484,7 @@ pub(crate) async fn handle_state_creating_profile_menu(
             send_profile_menu_response().await
         }
         "Главное меню" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_profile = false;
                 state.main_menu = true;
             })
@@ -513,7 +513,7 @@ pub(crate) async fn handle_state_creating_profile_process(
 ) -> Json<ServerResponse> {
     match action.as_str() {
         "Назад" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_request_process = false;
                 state.creating_request = true;
             })
@@ -527,7 +527,7 @@ pub(crate) async fn handle_state_creating_profile_process(
             })
         }
         "Главное меню" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_request_process = false;
                 state.main_menu = true;
             })
@@ -540,7 +540,7 @@ pub(crate) async fn handle_state_creating_profile_process(
                 .await
                 .unwrap();
 
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_request_process = false;
                 state.profile_menu = true;
             })
@@ -563,7 +563,7 @@ pub(crate) async fn handle_state_creating_request_menu(
 ) -> Json<ServerResponse> {
     match action.as_str() {
         "Готов!" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_request = false;
                 state.creating_request_process = true;
             })
@@ -580,7 +580,7 @@ pub(crate) async fn handle_state_creating_request_menu(
             })
         }
         "Назад" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_request = false;
                 state.request_menu = true;
             })
@@ -589,7 +589,7 @@ pub(crate) async fn handle_state_creating_request_menu(
             send_request_menu_response().await
         }
         "Главное меню" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_request = false;
                 state.main_menu = true;
             })
@@ -619,7 +619,7 @@ pub(crate) async fn handle_state_creating_request_process(
 ) -> Json<ServerResponse> {
     match action.as_str() {
         "Назад" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_request_process = false;
                 state.creating_request = true;
             })
@@ -633,7 +633,7 @@ pub(crate) async fn handle_state_creating_request_process(
             })
         }
         "Главное меню" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_request_process = false;
                 state.main_menu = true;
             })
@@ -648,7 +648,7 @@ pub(crate) async fn handle_state_creating_request_process(
             {
                 tracing::error!("Failed to process user's request: {}", e);
 
-                update_user_state(app_state.clone(), user_id, |state| {
+                update_request_app_user_state(app_state.clone(), user_id, |state| {
                     state.creating_request_process = false;
                     state.main_menu = true;
                 })
@@ -661,7 +661,7 @@ pub(crate) async fn handle_state_creating_request_process(
                     can_input: false,
                 })
             } else {
-                update_user_state(app_state.clone(), user_id, |state| {
+                update_request_app_user_state(app_state.clone(), user_id, |state| {
                     state.creating_request_process = false;
                     state.request_menu = true;
                 })
@@ -684,7 +684,7 @@ pub(crate) async fn handle_state_editing_request(
 ) -> Json<ServerResponse> {
     match action.as_str() {
         "Готов!" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.editing_request = false;
                 state.editing_request_process = true;
             })
@@ -701,7 +701,7 @@ pub(crate) async fn handle_state_editing_request(
             })
         }
         "Назад" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.editing_request = false;
                 state.request_menu = true;
             })
@@ -710,7 +710,7 @@ pub(crate) async fn handle_state_editing_request(
             send_request_menu_response().await
         }
         "Главное меню" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.editing_request = false;
                 state.main_menu = true;
             })
@@ -740,7 +740,7 @@ pub(crate) async fn handle_state_editing_request_process(
 ) -> Json<ServerResponse> {
     match action.as_str() {
         "Назад" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.editing_request_process = false;
                 state.editing_request = true;
             })
@@ -757,7 +757,7 @@ pub(crate) async fn handle_state_editing_request_process(
             })
         }
         "Главное меню" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.editing_request_process = false;
                 state.main_menu = true;
             })
@@ -772,7 +772,7 @@ pub(crate) async fn handle_state_editing_request_process(
             {
                 tracing::error!("Failed to process user's request: {}", e);
 
-                update_user_state(app_state.clone(), user_id, |state| {
+                update_request_app_user_state(app_state.clone(), user_id, |state| {
                     state.creating_request_process = false;
                     state.main_menu = true;
                 })
@@ -785,7 +785,7 @@ pub(crate) async fn handle_state_editing_request_process(
                     can_input: false,
                 })
             } else {
-                update_user_state(app_state.clone(), user_id, |state| {
+                update_request_app_user_state(app_state.clone(), user_id, |state| {
                     state.creating_request_process = false;
                     state.main_menu = true;
                 })
@@ -840,7 +840,7 @@ pub(crate) async fn handle_state_request_search_result(
 
                         let _x = create_chat(&username, &recipient_user_username).await;
 
-                        update_user_state(app_state.clone(), user_id, |state| {
+                        update_request_app_user_state(app_state.clone(), user_id, |state| {
                             state.request_search_result = false;
                             state.main_menu = true;
                         })
@@ -856,7 +856,7 @@ pub(crate) async fn handle_state_request_search_result(
                 }
             }
 
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.request_search_result = false;
                 state.main_menu = true;
             })
@@ -875,7 +875,7 @@ pub(crate) async fn handle_state_request_search_result(
             Json(next_result_option)
         }
         "Главное меню" => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.request_search_result = false;
                 state.main_menu = true;
             })

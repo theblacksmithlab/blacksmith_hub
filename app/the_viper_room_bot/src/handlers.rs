@@ -36,7 +36,7 @@ pub(crate) async fn command_handler(
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let user_id = msg.chat.id;
-    
+
     let lord_admin_id: i64 = env::var("LORD_ADMIN_ID")
         .expect("LORD_ADMIN_ID environment variable must be set")
         .parse()
@@ -46,23 +46,26 @@ pub(crate) async fn command_handler(
         env::var("APP_TG_ACCOUNT_ID")
             .expect("APP_TG_ACCOUNT_ID must be set in environment")
             .parse()
-            .expect("APP_TG_ACCOUNT_ID must be a valid integer")
+            .expect("APP_TG_ACCOUNT_ID must be a valid integer"),
     );
-   
-    let session_path = format!("common_res/grammers_system_sessions/{}.session", app_tg_account_id.0);
+
+    let session_path = format!(
+        "common_res/grammers_system_sessions/{}.session",
+        app_tg_account_id.0
+    );
 
     if !Path::new(&session_path).exists() {
         return Err(anyhow::anyhow!(
-        "System session file not found: {}. Please ensure the session file exists", 
-        session_path
-    ));
+            "System session file not found: {}. Please ensure the session file exists",
+            session_path
+        ));
     }
-    
+
     let session_data = fs::read(Path::new(&session_path))
         .map_err(|e| anyhow::anyhow!("Failed to read session file {}: {}", session_path, e))?;
 
     let nickname = "Public".to_string();
-    
+
     let g_client = initialize_grammers_client(session_data.clone()).await?;
 
     match cmd {
@@ -82,7 +85,7 @@ pub(crate) async fn command_handler(
                 app_state.clone(),
                 app_tg_account_id,
                 nickname,
-                "the_viper_room"
+                "the_viper_room",
             )
             .await?;
         }
@@ -99,7 +102,7 @@ pub(crate) async fn command_handler(
                 nickname,
                 "nervosettestchat",
             )
-                .await?;
+            .await?;
         }
 
         BotCommands::Schedule if user_id.0 == lord_admin_id => {

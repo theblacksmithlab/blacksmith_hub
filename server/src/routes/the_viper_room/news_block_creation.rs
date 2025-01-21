@@ -91,10 +91,10 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
         .map(|entry| entry.path())
         .collect();
 
-    // for file_path in &txt_files {
-    //     remove_file(file_path)?;
-    //     info!("File {} has been deleted.", file_path.display());
-    // }
+    for file_path in &txt_files {
+        remove_file(file_path)?;
+        info!("File {} has been deleted.", file_path.display());
+    }
 
     if need_caption {
         let system_role_path = ai_utils_dir.join("system_role_caption_generation.txt");

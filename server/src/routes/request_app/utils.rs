@@ -5,7 +5,7 @@ use core::models::request_app::request_app::ServerResponse;
 use core::state::request_app::app_state::RequestAppState;
 use core::utils::common::{
     determine_user_request, extract_user_profile_from_app_state, format_user_profile,
-    update_user_state,
+    update_request_app_user_state,
 };
 use lazy_static::lazy_static;
 use std::sync::Arc;
@@ -71,7 +71,7 @@ pub(crate) async fn search_by_users_request_server(
     let user_request = match determine_user_request(user_id, app_state.clone()).await? {
         Some(request) => request,
         None => {
-            update_user_state(app_state.clone(), user_id, |state| {
+            update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.request_search_result = false;
                 state.request_menu = true;
             })
@@ -97,7 +97,7 @@ pub(crate) async fn search_by_users_request_server(
     );
 
     if search_manager_job_result == "No results found".to_string() {
-        update_user_state(app_state.clone(), user_id, |state| {
+        update_request_app_user_state(app_state.clone(), user_id, |state| {
             state.request_search_result = false;
             state.request_menu = true;
         })
@@ -121,7 +121,7 @@ pub(crate) async fn search_by_users_request_server(
                     "Fn: search_by_users_request_server | First result index: {}",
                     first_result_index
                 );
-                update_user_state(app_state.clone(), user_id, |state| {
+                update_request_app_user_state(app_state.clone(), user_id, |state| {
                     state.current_result_index = Some(first_result_index);
                 })
                 .await;
@@ -147,7 +147,7 @@ pub(crate) async fn search_by_users_request_server(
         }
 
         // Should never get here if the logic is correct;
-        update_user_state(app_state.clone(), user_id, |state| {
+        update_request_app_user_state(app_state.clone(), user_id, |state| {
             state.request_search_result = false;
             state.main_menu = true;
             state.current_result_index = None;

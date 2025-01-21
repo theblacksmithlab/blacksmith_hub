@@ -40,10 +40,7 @@ pub(crate) async fn handle_the_viper_room_user_action(
 
     info!(
         "Received user action from @{} [id: {}], action: {:?} and/or action step: {:?}",
-        username,
-        user_id,
-        action,
-        action_step
+        username, user_id, action, action_step
     );
 
     if let Some(step) = action_step {

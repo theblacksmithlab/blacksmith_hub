@@ -28,9 +28,11 @@ pub(crate) async fn generate_podcast(
     info!("Starting podcast generation by /podcast cmd...");
 
     if !g_client.is_authorized().await? {
-        bot.send_message(user_id, "System g_Client is NOT okay!").await?;
+        bot.send_message(user_id, "System g_Client is NOT okay!")
+            .await?;
     } else {
-        bot.send_message(user_id, "System g_Client is okay!").await?;
+        bot.send_message(user_id, "System g_Client is okay!")
+            .await?;
     }
 
     let podcast = news_block_creation(
@@ -91,14 +93,14 @@ pub(crate) async fn schedule_podcast(
         let mut is_running = app_state.podcast_manager.state.is_running.lock().await;
         if *is_running {
             return Err(anyhow::anyhow!(
-            "Podcast generation task is already running"
-        ));
+                "Podcast generation task is already running"
+            ));
         }
         *is_running = true;
     }
-    
+
     let chat_username = "the_viper_room".to_string();
-    
+
     let offset = FixedOffset::east_opt(3 * 3600).unwrap();
     let now: DateTime<FixedOffset> = Utc::now().with_timezone(&offset);
     let podcast_time = offset
