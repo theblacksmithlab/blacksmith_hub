@@ -40,7 +40,7 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
     let bot_msg = format!("Текущий кэш:\n{}", current_cache);
 
     bot.send_message(user_id, bot_msg)
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+        .parse_mode(teloxide::types::ParseMode::Html)
         .await?;
     
     add_llm_response_to_cache(app_state.clone(), user_id, llm_response).await;
@@ -50,7 +50,7 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
     let bot_msg = format!("Текущий кэш после LLM response:\n{}", current_cache);
 
     bot.send_message(user_id, bot_msg)
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+        .parse_mode(teloxide::types::ParseMode::Html)
         .await?;
     
     // let bot_msg = get_message("request_app", "auto_reply").await?;
