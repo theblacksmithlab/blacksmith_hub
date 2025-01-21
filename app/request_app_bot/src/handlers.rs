@@ -47,9 +47,9 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
 
     let current_cache_2 = get_cache_as_string(app_state.clone(), user_id).await;
 
-    let bot_msg = format!("Текущий кэш после LLM response:\n{}", current_cache);
+    let bot_msg_2 = format!("Текущий кэш после LLM response:\n{}", current_cache_2);
 
-    bot.send_message(user_id, bot_msg)
+    bot.send_message(user_id, bot_msg_2)
         .parse_mode(teloxide::types::ParseMode::Html)
         .await?;
     
