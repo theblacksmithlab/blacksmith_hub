@@ -27,7 +27,7 @@ grammers-tl-types = "0.7.0"
 
 # Database & Storage
 sqlx = { version = "0.8.2", features = ["sqlite", "runtime-tokio-native-tls"] }
-qdrant-client = "1.10.1"
+qdrant-client = "1.13.0"
 
 # AI Services
 async-openai = "0.26.0"

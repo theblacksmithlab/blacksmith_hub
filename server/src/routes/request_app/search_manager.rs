@@ -1,5 +1,5 @@
 use anyhow::Result;
-use core::ai::utils::{raw_llm_processing_json, vectorize};
+use core::ai::ai::{raw_llm_processing_json, vectorize};
 use core::state::request_app::app_state::RequestAppState;
 use core::utils::common::{get_system_role_file_path, read_system_role, SystemRoleType};
 use core::vector_db::vector_db::{

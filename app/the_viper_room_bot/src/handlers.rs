@@ -1,4 +1,4 @@
-use crate::utils::{generate_podcast, schedule_podcast, stop_daily_podcasts};
+use crate::local_utils::{generate_podcast, schedule_podcast, stop_daily_podcasts};
 use anyhow::Result;
 use core::grammers::grammers_functionality::initialize_grammers_client;
 use core::state::tg_bot::app_state::BotAppState;
@@ -16,6 +16,7 @@ use tracing::info;
 pub enum BotCommands {
     Start,
     Podcast,
+    Test,
     Schedule,
     Stop,
 }
@@ -35,7 +36,7 @@ pub(crate) async fn command_handler(
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let user_id = msg.chat.id;
-    
+
     let lord_admin_id: i64 = env::var("LORD_ADMIN_ID")
         .expect("LORD_ADMIN_ID environment variable must be set")
         .parse()
@@ -45,23 +46,26 @@ pub(crate) async fn command_handler(
         env::var("APP_TG_ACCOUNT_ID")
             .expect("APP_TG_ACCOUNT_ID must be set in environment")
             .parse()
-            .expect("APP_TG_ACCOUNT_ID must be a valid integer")
+            .expect("APP_TG_ACCOUNT_ID must be a valid integer"),
     );
-   
-    let session_path = format!("common_res/grammers_system_sessions/{}.session", app_tg_account_id.0);
+
+    let session_path = format!(
+        "common_res/grammers_system_sessions/{}.session",
+        app_tg_account_id.0
+    );
 
     if !Path::new(&session_path).exists() {
         return Err(anyhow::anyhow!(
-        "System session file not found: {}. Please ensure the session file exists", 
-        session_path
-    ));
+            "System session file not found: {}. Please ensure the session file exists",
+            session_path
+        ));
     }
-    
+
     let session_data = fs::read(Path::new(&session_path))
         .map_err(|e| anyhow::anyhow!("Failed to read session file {}: {}", session_path, e))?;
 
     let nickname = "Public".to_string();
-    
+
     let g_client = initialize_grammers_client(session_data.clone()).await?;
 
     match cmd {
@@ -81,6 +85,22 @@ pub(crate) async fn command_handler(
                 app_state.clone(),
                 app_tg_account_id,
                 nickname,
+                "the_viper_room",
+            )
+            .await?;
+        }
+
+        BotCommands::Test if user_id.0 == lord_admin_id => {
+            bot.send_message(user_id, "Starting test podcast generation by /test cmd...")
+                .await?;
+            generate_podcast(
+                g_client,
+                bot.clone(),
+                user_id,
+                app_state.clone(),
+                app_tg_account_id,
+                nickname,
+                "nervosettestchat",
             )
             .await?;
         }
