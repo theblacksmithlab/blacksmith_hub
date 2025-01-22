@@ -30,6 +30,6 @@ pub async fn get_cache_as_string(
     let cache = app_state.temp_cache.lock().await;
     cache
         .get(&user_id)
-        .map(|chat_cache| chat_cache.to_string())
+        .map(|chat_cache| chat_cache.get_cache_as_string())
         .unwrap_or_else(|| "[]".to_string())
 }

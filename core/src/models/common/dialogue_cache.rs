@@ -34,7 +34,7 @@ impl DialogueCache {
     }
 
     pub(crate) fn add_llm_response_to_cache(&mut self, llm_response: String) {
-        let timestamp = Utc::now().to_rfc3339();
+        let timestamp = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
         let entry = UserInteraction {
             timestamp,
             role: "assistant".to_string(),
@@ -48,7 +48,7 @@ impl DialogueCache {
         }
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    pub(crate) fn get_cache_as_string(&self) -> String {
         let formatted_messages: Vec<_> = self
             .messages
             .iter()
@@ -61,8 +61,10 @@ impl DialogueCache {
             })
             .collect();
 
-        serde_json::to_string_pretty(&formatted_messages)
-            .unwrap_or_else(|_| "[]".to_string())
+        serde_json::to_string_pretty(&formatted_messages).unwrap_or_else(|e| {
+            eprintln!("Error serializing temp cache: {}", e);
+            "[]".to_string()
+        })
     }
 }
 
