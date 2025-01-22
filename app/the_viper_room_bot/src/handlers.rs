@@ -50,7 +50,7 @@ pub(crate) async fn command_handler(
     );
 
     let session_path = format!(
-        "common_res/grammers_system_sessions/{}.session",
+        "common_res/the_viper_room/grammers_system_session/{}.session",
         app_tg_account_id.0
     );
 
