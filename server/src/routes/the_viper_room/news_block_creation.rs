@@ -2,7 +2,7 @@ use crate::routes::the_viper_room::news_block_creation_utils::{
     get_dialogs, mix_podcast_with_music, processing_dialogs, summarize_updates,
     updates_file_creation,
 };
-use core::ai::utils::{raw_llm_processing, text_to_speech};
+use core::ai::ai::{raw_llm_processing, text_to_speech};
 use core::state::llm_processing_trait::LlmProcessing;
 use core::utils::common::{get_message, LlmModel};
 use grammers_client::Client as g_Client;

@@ -1,6 +1,6 @@
 mod handlers;
 mod search_manager;
-mod utils;
+mod local_utils;
 
 pub use handlers::*;
-pub(crate) use utils::*;
+pub(crate) use local_utils::*;

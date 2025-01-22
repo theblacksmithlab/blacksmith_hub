@@ -1,6 +1,6 @@
 use chrono::Duration as ChronoDuration;
 use chrono::Utc;
-use core::ai::utils::raw_llm_processing;
+use core::ai::ai::raw_llm_processing;
 use core::state::llm_processing_trait::LlmProcessing;
 use core::utils::common::LlmModel;
 use grammers_client::types::Chat::{Channel, Group, User};

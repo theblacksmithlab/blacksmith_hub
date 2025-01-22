@@ -4,7 +4,7 @@ use teloxide::macros::BotCommands;
 use teloxide::prelude::{Message, Requester};
 use teloxide::Bot;
 use teloxide::payloads::SendMessageSetters;
-use core::utils::tg_bot::temp_cache_operations::{add_user_message_to_cache, get_cache_as_string, add_llm_response_to_cache};
+use core::utils::tg_bot::tg_bot::{add_user_message_to_cache, get_cache_as_string, add_llm_response_to_cache};
 use core::state::tg_bot::app_state::BotAppState;
 
 #[derive(BotCommands, Clone)]

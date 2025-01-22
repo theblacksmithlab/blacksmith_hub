@@ -1,4 +1,4 @@
-use crate::utils::{generate_podcast, schedule_podcast, stop_daily_podcasts};
+use crate::local_utils::{generate_podcast, schedule_podcast, stop_daily_podcasts};
 use anyhow::Result;
 use core::grammers::grammers_functionality::initialize_grammers_client;
 use core::state::tg_bot::app_state::BotAppState;

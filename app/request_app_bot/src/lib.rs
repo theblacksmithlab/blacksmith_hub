@@ -1,17 +1,15 @@
 pub mod handlers;
-pub mod utils;
 
 use crate::handlers::{command_handler, message_handler, BotCommands};
-use crate::utils::check_username;
+use core::utils::tg_bot::tg_bot::check_username;
 use anyhow::Result;
 use core::state::tg_bot::app_state::BotAppState;
-use core::utils::common::run_bot_dispatcher;
+use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use std::env;
 use std::sync::Arc;
 use teloxide::dispatching::{HandlerExt, UpdateFilterExt};
 use teloxide::prelude::Update;
 use teloxide::{dptree, Bot};
-use tracing::info;
 
 pub async fn start_request_app_bot(app_state: Arc<BotAppState>) -> Result<()> {
     let bot = Bot::new(env::var("TELOXIDE_TOKEN_REQUEST_APP")?);

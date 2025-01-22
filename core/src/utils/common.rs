@@ -1,6 +1,5 @@
 use crate::models::request_app::request_app::{AvatarRequest, AvatarResponse};
 use crate::state::request_app::app_state::{RequestAppState, UserProfile, UserStates};
-use crate::state::tg_bot::app_state::BotAppState;
 use crate::state::the_viper_room::app_state::{AuthStages, TheViperRoomAppState, UserData};
 use crate::vector_db::vector_db::restore_request_from_qdrant;
 use anyhow::Result;
@@ -11,10 +10,7 @@ use std::env;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::sync::Arc;
-use teloxide::dispatching::{Dispatcher, UpdateHandler};
-use teloxide::error_handlers::LoggingErrorHandler;
 use teloxide::prelude::ChatId;
-use teloxide::{dptree, Bot};
 use tracing::error;
 
 pub enum SystemRoleType {
@@ -250,24 +246,6 @@ pub async fn get_user_avatar(
     }
 
     Ok(Json(AvatarResponse { avatar_url: None }))
-}
-
-pub async fn run_bot_dispatcher(
-    bot: Bot,
-    handler: UpdateHandler<anyhow::Error>,
-    app_state: Arc<BotAppState>,
-) -> Result<()> {
-    Dispatcher::builder(bot.clone(), handler)
-        .dependencies(dptree::deps![app_state])
-        .enable_ctrlc_handler()
-        .build()
-        .dispatch_with_listener(
-            teloxide::update_listeners::polling_default(bot).await,
-            LoggingErrorHandler::with_custom_text("Dispatcher: an error from the update listener"),
-        )
-        .await;
-
-    Err(anyhow::anyhow!("Bot dispatcher unexpectedly stopped"))
 }
 
 pub fn split_text_into_chunks(text: &str, max_chars: usize) -> Vec<String> {

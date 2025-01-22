@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_openai::Client as LLM_Client;
 use config::{Config, File};
-use core::config::config::AppConfig;
+use core::config::server_config::AppConfig;
 use core::local_db::local_db::{create_db_pool, create_table};
 use core::state::request_app::app_state::RequestAppState;
 use core::state::server::app_state::ServerAppState;

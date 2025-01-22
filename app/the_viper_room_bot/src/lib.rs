@@ -1,16 +1,15 @@
 pub mod handlers;
-pub mod utils;
+pub mod local_utils;
 
 use crate::handlers::{command_handler, message_handler, BotCommands};
 use anyhow::Result;
 use core::state::tg_bot::app_state::BotAppState;
-use core::utils::common::run_bot_dispatcher;
+use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use std::env;
 use std::sync::Arc;
 use teloxide::dispatching::{HandlerExt, UpdateFilterExt};
 use teloxide::prelude::Update;
 use teloxide::{dptree, Bot};
-use tracing::info;
 
 pub async fn start_the_viper_room_bot(app_state: Arc<BotAppState>) -> Result<()> {
     let bot = Bot::new(env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM")?);

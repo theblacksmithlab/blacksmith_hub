@@ -1,4 +1,4 @@
-use core::ai::utils::raw_llm_processing;
+use core::ai::ai::raw_llm_processing;
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
 use core::utils::common::LlmModel;
 use std::fs::read_to_string;
