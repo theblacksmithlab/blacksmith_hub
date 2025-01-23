@@ -341,6 +341,10 @@ pub async fn vectorize(data: String, app_state: Arc<RequestAppState>) -> Result<
 }
 
 pub async fn speech_to_text(file_path: &str) -> Result<String> {
+    if !std::path::Path::new(file_path).exists() {
+        return Err(anyhow::anyhow!("Voice message file not found: {}", file_path));
+    }
+    
     let output = Command::new("whisper")
         .arg(file_path)
         .arg("--model")

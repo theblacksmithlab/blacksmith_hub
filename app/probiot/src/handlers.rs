@@ -25,11 +25,7 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
     
     if msg.chat.is_private() {
         if let Some(voice) = msg.voice() {
-            info!("Current working directory: {:?}", std::env::current_dir()?);
-            let file_path = format!("tmp/{}.ogg", voice.file.id);
-            println!("File path: {}", file_path);
-            download_voice(&bot, &voice.file.id, &file_path).await?;
-            info!("Passing file path to speech_to_text: {}", file_path);
+            let file_path = download_voice(&bot, &voice.file.id, &format!("tmp/{}.ogg", voice.file.id)).await?;
             let user_voice_transcribed = speech_to_text(&file_path).await?;
             process_user_message(bot.clone(), chat_id, user_voice_transcribed, msg, app_state).await?;
         } else if let Some(text) = msg.text() {

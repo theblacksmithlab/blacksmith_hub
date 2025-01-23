@@ -1,5 +1,4 @@
 use std::env;
-use std::path::Path;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::state::tg_bot::app_state::BotAppState;
 use std::sync::Arc;
@@ -8,9 +7,9 @@ use teloxide::error_handlers::LoggingErrorHandler;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::{dptree, Bot};
 use teloxide::net::Download;
-use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use anyhow::Result;
 
 pub async fn check_username(bot: Bot, msg: Message) -> bool {
     if let Some(_username) = msg.chat.username() {
@@ -72,17 +71,19 @@ pub async fn get_cache_as_string(app_state: Arc<BotAppState>, user_id: ChatId) -
         .unwrap_or_else(|| "[]".to_string())
 }
 
-pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> anyhow::Result<()> {
-    if let Some(parent_dir) = Path::new(save_path).parent() {
-        fs::create_dir_all(parent_dir).await?;
+pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> Result<String> {
+    let base_path = env::current_dir()?.join(save_path);
+
+    if let Some(parent_dir) = base_path.parent() {
+        tokio::fs::create_dir_all(parent_dir).await?;
     }
 
-    let mut destination = File::create(save_path).await?;
+    let mut destination = File::create(&base_path).await?;
 
     let file = bot.get_file(file_id).await?;
     bot.download_file(&file.path, &mut destination).await?;
 
     destination.flush().await?;
 
-    Ok(())
+    Ok(base_path.to_str().unwrap().to_string())
 }
