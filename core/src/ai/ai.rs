@@ -352,14 +352,13 @@ pub async fn speech_to_text(file_path: &str) -> Result<String> {
         .arg(file_path)
         .arg("-l")
         .arg("ru")
+        .arg("--no-timestamps")
         .output();
 
     match output {
         Ok(output) if output.status.success() => {
             let stdout = String::from_utf8(output.stdout)?;
-            let stderr = String::from_utf8_lossy(&output.stderr);
             info!("TEMP: stdout: {}", stdout);
-            info!("TEMP: stderr: {}", stderr);
             
             if stdout.trim().is_empty() {
                 Ok("Empty text".to_string())
