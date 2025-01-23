@@ -25,7 +25,7 @@ pub async fn run_bot_dispatcher(
     bot: Bot,
     handler: UpdateHandler<anyhow::Error>,
     app_state: Arc<BotAppState>,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     Dispatcher::builder(bot.clone(), handler)
         .dependencies(dptree::deps![app_state])
         .enable_ctrlc_handler()
