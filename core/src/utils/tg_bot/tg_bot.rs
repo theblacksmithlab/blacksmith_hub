@@ -1,5 +1,4 @@
 use std::env;
-use std::process::Command;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::state::tg_bot::app_state::BotAppState;
 use std::sync::Arc;
@@ -87,46 +86,4 @@ pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> Result
     destination.flush().await?;
 
     Ok(base_path.to_str().unwrap().to_string())
-}
-
-pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
-    let output = Command::new("whisper-cli")
-        .arg("--help")
-        .output();
-
-    match output {
-        Ok(output) if output.status.success() => Ok(()),
-        Ok(output) => Err(anyhow::anyhow!(
-            "Whisper CLI failed to respond correctly: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )),
-        Err(err) => Err(anyhow::anyhow!(
-            "Whisper CLI not found: {}",
-            err
-        )),
-    }
-}
-
-pub fn convert_to_wav(file_path: &str) -> Result<String, anyhow::Error> {
-    let wav_path = format!("{}.wav", file_path);
-
-    let output = Command::new("ffmpeg")
-        .arg("-i")
-        .arg(file_path)
-        .arg("-ar")
-        .arg("16000")
-        .arg(&wav_path)
-        .output();
-
-    match output {
-        Ok(output) if output.status.success() => Ok(wav_path),
-        Ok(output) => Err(anyhow::anyhow!(
-            "FFmpeg conversion failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )),
-        Err(err) => Err(anyhow::anyhow!(
-            "Failed to execute FFmpeg: {}",
-            err
-        )),
-    }
 }

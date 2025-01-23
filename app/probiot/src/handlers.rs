@@ -7,12 +7,12 @@ use teloxide::Bot;
 use anyhow::Result;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::types::ReplyParameters;
-use tracing::{error, info};
+use tracing::error;
 use crate::user_message_processing::process_user_message;
 use core::utils::tg_bot::tg_bot::download_voice;
 use core::ai::ai::speech_to_text;
-use core::utils::tg_bot::tg_bot::check_whisper_installed;
-use core::utils::tg_bot::tg_bot::convert_to_wav;
+use core::utils::common::check_whisper_installed;
+use core::utils::common::convert_to_wav;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -27,11 +27,18 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
 
     if msg.chat.is_private() {
         if let Some(voice) = msg.voice() {
-            let file_path = download_voice(&bot, &voice.file.id, &format!("tmp/{}.ogg", voice.file.id)).await?;
+            let file_path = match download_voice(&bot, &voice.file.id, &format!("tmp/{}.ogg", voice.file.id)).await {
+                Ok(path) => path,
+                Err(err) => {
+                    error!("Failed to download voice message: {}", err);
+                    bot.send_message(chat_id, "Не удалось скачать голосовое сообщение. Попробуйте позже.").await?;
+                    return Ok(());
+                }
+            };
 
             if let Err(err) = check_whisper_installed() {
                 error!("Whisper CLI not installed: {}", err);
-                bot.send_message(chat_id, "Извини, я не могу обработать голосовое сообщение в данный момент.").await?;
+                bot.send_message(chat_id, "Извините, я временно не могу обработать голосовые сообщения.").await?;
                 return Ok(());
             }
 
@@ -39,7 +46,7 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
                 Ok(wav) => wav,
                 Err(err) => {
                     error!("Failed to convert to WAV: {}", err);
-                    bot.send_message(chat_id, "Извините, не удалось обработать ваше голосовое сообщение.").await?;
+                    bot.send_message(chat_id, "Не удалось обработать голосовое сообщение. Попробуйте позже.").await?;
                     return Ok(());
                 }
             };
@@ -47,17 +54,17 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
             match speech_to_text(&wav_path).await {
                 Ok(user_voice_transcribed) => {
                     if let Err(err) = std::fs::remove_file(&file_path) {
-                        eprintln!("Failed to delete original file: {}", err);
+                        error!("Failed to delete original file: {}", err);
                     }
                     if let Err(err) = std::fs::remove_file(&wav_path) {
-                        eprintln!("Failed to delete WAV file: {}", err);
+                        error!("Failed to delete WAV file: {}", err);
                     }
-                    
+
                     process_user_message(bot.clone(), chat_id, user_voice_transcribed, msg, app_state).await?;
                 }
                 Err(err) => {
                     error!("Error during speech-to-text conversion: {}", err);
-                    bot.send_message(chat_id, "Извини, я тебя не понял.").await?;
+                    bot.send_message(chat_id, "Извините, я не смог распознать ваше сообщение. Попробуйте ещё раз.").await?;
                 }
             }
         } else if let Some(text) = msg.text() {

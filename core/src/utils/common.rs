@@ -9,6 +9,7 @@ use axum::Json;
 use std::env;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tracing::error;
@@ -288,4 +289,49 @@ pub fn split_text_into_chunks(text: &str, max_chars: usize) -> Vec<String> {
     }
 
     chunks
+}
+
+pub fn convert_to_wav(file_path: &str) -> Result<String, anyhow::Error> {
+    let mut path = std::path::PathBuf::from(file_path);
+    path.set_extension("wav");
+
+    let wav_path = path.to_str().unwrap();
+
+    let output = Command::new("ffmpeg")
+        .arg("-i")
+        .arg(file_path)
+        .arg("-ar")
+        .arg("16000")
+        .arg(&wav_path)
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => Ok(wav_path.to_string()),
+        Ok(output) => Err(anyhow::anyhow!(
+            "FFmpeg conversion failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )),
+        Err(err) => Err(anyhow::anyhow!(
+            "Failed to execute FFmpeg: {}",
+            err
+        )),
+    }
+}
+
+pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
+    let output = Command::new("whisper-cli")
+        .arg("--help")
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => Ok(()),
+        Ok(output) => Err(anyhow::anyhow!(
+            "Whisper CLI failed to respond correctly: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )),
+        Err(err) => Err(anyhow::anyhow!(
+            "Whisper CLI not found: {}",
+            err
+        )),
+    }
 }
