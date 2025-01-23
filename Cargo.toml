@@ -2,10 +2,12 @@
 members = [
     "core",
     "server",
-    "forge",
+    "ai_forge",
     "app/request_app_bot",
-    "app/the_viper_room_bot"
+    "app/the_viper_room_bot",
+    "app/probiot"
 ]
+default-members = ["ai_forge"]
 
 resolver = "2"
 
@@ -49,3 +51,4 @@ anyhow = "1.0.86"
 dotenv = "0.15"
 lazy_static = "1.5.0"
 chrono = "0.4"
+async-trait = "0.1.85"

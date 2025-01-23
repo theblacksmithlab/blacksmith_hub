@@ -1,0 +1,16 @@
+[package]
+name = "probiot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+teloxide.workspace = true
+tokio.workspace = true
+async-openai.workspace = true
+dotenv.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
+qdrant-client.workspace = true
+
+core = { path = "../../core" }

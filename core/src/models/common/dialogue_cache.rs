@@ -1,7 +1,7 @@
-use std::collections::VecDeque;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::VecDeque;
 
 #[derive(Default)]
 pub struct DialogueCache {
@@ -27,7 +27,7 @@ impl DialogueCache {
         };
 
         self.messages.push_back(entry);
-        
+
         if self.messages.len() > self.max_size {
             self.messages.pop_front();
         }

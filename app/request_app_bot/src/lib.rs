@@ -1,9 +1,9 @@
 pub mod handlers;
 
-use crate::handlers::{command_handler, message_handler, BotCommands};
-use core::utils::tg_bot::tg_bot::check_username;
+use crate::handlers::{command_handler, message_handler, RequestAppBotCommands};
 use anyhow::Result;
 use core::state::tg_bot::app_state::BotAppState;
+use core::utils::tg_bot::tg_bot::check_username;
 use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use std::env;
 use std::sync::Arc;
@@ -15,7 +15,7 @@ pub async fn start_request_app_bot(app_state: Arc<BotAppState>) -> Result<()> {
     let bot = Bot::new(env::var("TELOXIDE_TOKEN_REQUEST_APP")?);
 
     let cmd_handler = Update::filter_message()
-        .filter_command::<BotCommands>()
+        .filter_command::<RequestAppBotCommands>()
         .filter_async(check_username)
         .endpoint(command_handler);
 
