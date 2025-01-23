@@ -1,7 +1,8 @@
+use core::models::request_app::request_app::RequestAppSystemRoleType;
 use anyhow::Result;
 use core::ai::ai::{raw_llm_processing_json, vectorize};
 use core::state::request_app::app_state::RequestAppState;
-use core::utils::common::{get_system_role_file_path, read_system_role, SystemRoleType};
+use core::utils::common::get_system_role_or_fallback;
 use core::vector_db::vector_db::{
     get_llm_order_from_response, prepare_search_results_for_llm, qdrant_search,
     store_search_results, update_search_results_order, ExecutionMode, QdrantSearchResult,
@@ -51,13 +52,11 @@ pub(crate) async fn activate_search_manager(
     let message_for_llm = format!("User's query: {}\nA list of search results from the Qdrant vector database based on the user's query: {}", user_request, search_results_string);
     info!("Fn: activate_search_manager | message: {}", message_for_llm);
 
-    let role_type = SystemRoleType::ReorderingResults;
-    let file_path = get_system_role_file_path(role_type);
-
-    let system_role = read_system_role(file_path).unwrap_or_else(|err| {
-        eprintln!("Failed to load system role: {}", err);
-        "You are a helpful assistant.".to_string()
-    });
+    let system_role = get_system_role_or_fallback(
+        "request_app",
+        RequestAppSystemRoleType::ReorderingResults,
+        None
+    );
 
     let llm_order_processing =
         raw_llm_processing_json(system_role, message_for_llm, app_state.clone()).await;

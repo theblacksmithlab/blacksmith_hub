@@ -7,10 +7,12 @@ use core::state::llm_client_init_trait::LlmProcessing;
 use core::utils::common::{get_message, LlmModel};
 use grammers_client::Client as g_Client;
 use std::fs;
-use std::fs::{create_dir_all, read_dir, read_to_string, remove_file, rename};
+use std::fs::{create_dir_all, read_dir, remove_file, rename};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{error, info};
+use core::utils::common::get_system_role_or_fallback;
+use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
 
 pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
     client: &g_Client,
@@ -97,13 +99,10 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
     }
 
     if need_caption {
-        let system_role_path = ai_utils_dir.join("system_role_caption_generation.txt");
-        let system_role = read_to_string(&system_role_path).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to read 'system role for podcast caption generation': {}",
-                e
-            )
-        })?;
+        let system_role = get_system_role_or_fallback(
+            "the_viper_room",
+            TheViperRoomRoleType::CaptionGeneration,
+            None);
 
         let mut caption = raw_llm_processing(
             system_role,
@@ -112,7 +111,7 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
             LlmModel::Light,
         )
         .await?;
-        caption.push_str(&get_message("the_viper_room", "donation_footer", true).await?);
+        caption.push_str(&get_message(Some("the_viper_room"), "donation_footer", false).await?);
 
         let caption_path = audio_path.with_extension("txt");
         fs::write(caption_path, caption)?;

@@ -1,5 +1,5 @@
 use crate::models::common::dialogue_cache::DialogueCache;
-use crate::models::tg_bot::tg_bot::PodcastManager;
+use crate::models::tg_bot::the_viper_room_bot::podcast_manager::PodcastManager;
 use async_openai::config::OpenAIConfig;
 use async_openai::Client as LLM_Client;
 use std::collections::HashMap;

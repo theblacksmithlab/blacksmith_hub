@@ -1,1 +1,2 @@
-pub mod tg_bot;
+pub mod probiot;
+pub mod the_viper_room_bot;

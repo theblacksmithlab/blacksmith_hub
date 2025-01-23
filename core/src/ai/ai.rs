@@ -18,10 +18,11 @@ use std::sync::Arc;
 // use reqwest::Client as ReqwestClient;
 // use serde_json::json;
 use crate::local_db::local_db::save_user_profile;
-use crate::utils::common::split_text_into_chunks;
-use crate::utils::common::{get_system_role_file_path, read_system_role, LlmModel, SystemRoleType};
+use crate::utils::common::{get_system_role_or_fallback, split_text_into_chunks};
+use crate::utils::common::LlmModel;
 use teloxide::prelude::ChatId;
 use tracing::{info, warn};
+use crate::models::request_app::request_app::RequestAppSystemRoleType;
 
 pub async fn raw_llm_processing_json(
     system_role: String,
@@ -256,14 +257,13 @@ pub async fn process_users_self_description(
     app_state: Arc<RequestAppState>,
 ) -> Result<()> {
     let pool = &app_state.local_db_pool;
-
-    let role_type = SystemRoleType::ProcessingUserStoryForProfile;
-    let file_path = get_system_role_file_path(role_type);
-
-    let system_role = read_system_role(file_path).unwrap_or_else(|err| {
-        eprintln!("Failed to load system role: {}", err);
-        "Return the text provided to you without additional remarks or design.".to_string()
-    });
+    
+    let fallback_system_role = "Return the text provided to you without additional remarks or design.".to_string();
+    let system_role = get_system_role_or_fallback(
+        "request_app",
+        RequestAppSystemRoleType::ProcessingUsersBioText,
+        Some(&fallback_system_role)
+    );
 
     let users_about_text_str = raw_llm_processing_json(
         system_role,
