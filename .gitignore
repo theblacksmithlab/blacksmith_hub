@@ -19,3 +19,4 @@ common_res/nginx_config.conf
 common_res/the_viper_room/users_count/users_count.txt
 common_res/the_viper_room/grammers_system_session/
 common_res/the_viper_room/background_music.mp3
+DEV_NOTE.md

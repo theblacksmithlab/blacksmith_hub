@@ -173,7 +173,7 @@ pub async fn update_the_viper_room_user_data<F>(
 
 pub async fn get_message(app_name: &str, message_name: &str, is_common: bool) -> Result<String> {
     let base_path: PathBuf = if is_common {
-        Path::new("common_res/messages").to_path_buf()
+        Path::new("common_res/messages").join(app_name)
     } else {
         Path::new("app").join(app_name).join("messages")
     };

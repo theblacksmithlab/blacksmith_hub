@@ -38,7 +38,6 @@ async fn main() -> anyhow::Result<()> {
 }
 
 pub async fn start_probiot(app_state: Arc<BotAppState>) -> anyhow::Result<()> {
-    // TODO: Add to .env
     let bot = Bot::new(env::var("TELOXIDE_TOKEN_PROBIOT")?);
 
     let cmd_handler = Update::filter_message()
