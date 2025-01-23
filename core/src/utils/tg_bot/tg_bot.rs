@@ -1,4 +1,5 @@
 use std::env;
+use std::path::Path;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::state::tg_bot::app_state::BotAppState;
 use std::sync::Arc;
@@ -72,14 +73,13 @@ pub async fn get_cache_as_string(app_state: Arc<BotAppState>, user_id: ChatId) -
 }
 
 pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> anyhow::Result<()> {
-    let file = bot.get_file(file_id).await?;
-
-    let base_path = env::current_dir()?.join(save_path);
-    let parent_dir = base_path.parent().unwrap();
-    
-    fs::create_dir_all(parent_dir).await?;
+    if let Some(parent_dir) = Path::new(save_path).parent() {
+        fs::create_dir_all(parent_dir).await?;
+    }
 
     let mut destination = File::create(save_path).await?;
+
+    let file = bot.get_file(file_id).await?;
     bot.download_file(&file.path, &mut destination).await?;
 
     destination.flush().await?;
