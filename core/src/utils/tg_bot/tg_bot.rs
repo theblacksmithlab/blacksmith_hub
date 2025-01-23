@@ -106,3 +106,25 @@ pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
         )),
     }
 }
+
+pub fn convert_to_wav(file_path: &str) -> Result<String, anyhow::Error> {
+    let wav_path = format!("{}.wav", file_path);
+
+    let output = Command::new("ffmpeg")
+        .arg("-i")
+        .arg(file_path)
+        .arg(&wav_path)
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => Ok(wav_path),
+        Ok(output) => Err(anyhow::anyhow!(
+            "FFmpeg conversion failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )),
+        Err(err) => Err(anyhow::anyhow!(
+            "Failed to execute FFmpeg: {}",
+            err
+        )),
+    }
+}
