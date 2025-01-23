@@ -6,6 +6,7 @@ use teloxide::error_handlers::LoggingErrorHandler;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::{dptree, Bot};
 use teloxide::net::Download;
+use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
@@ -71,6 +72,11 @@ pub async fn get_cache_as_string(app_state: Arc<BotAppState>, user_id: ChatId) -
 
 pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> anyhow::Result<()> {
     let file = bot.get_file(file_id).await?;
+
+    if let Some(parent_dir) = std::path::Path::new(save_path).parent() {
+        fs::create_dir_all(parent_dir).await?;
+    }
+
     let mut destination = File::create(save_path).await?;
     bot.download_file(&file.path, &mut destination).await?;
 
