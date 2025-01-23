@@ -5,6 +5,9 @@ use teloxide::dispatching::{Dispatcher, UpdateHandler};
 use teloxide::error_handlers::LoggingErrorHandler;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::{dptree, Bot};
+use teloxide::net::Download;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 pub async fn check_username(bot: Bot, msg: Message) -> bool {
     if let Some(_username) = msg.chat.username() {
@@ -64,4 +67,14 @@ pub async fn get_cache_as_string(app_state: Arc<BotAppState>, user_id: ChatId) -
         .get(&user_id)
         .map(|chat_cache| chat_cache.get_cache_as_string())
         .unwrap_or_else(|| "[]".to_string())
+}
+
+pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> anyhow::Result<()> {
+    let file = bot.get_file(file_id).await?;
+    let mut destination = File::create(save_path).await?;
+    bot.download_file(&file.path, &mut destination).await?;
+
+    destination.flush().await?;
+
+    Ok(())
 }

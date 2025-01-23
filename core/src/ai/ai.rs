@@ -339,3 +339,23 @@ pub async fn vectorize(data: String, app_state: Arc<RequestAppState>) -> Result<
 
     Ok(embedding)
 }
+
+pub async fn speech_to_text(file_path: &str) -> Result<String> {
+    let output = Command::new("whisper")
+        .arg(file_path)
+        .arg("--model")
+        .arg("base")
+        .arg("--output_format")
+        .arg("plain_text")
+        .output()?;
+
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "Whisper failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    
+    let result = String::from_utf8(output.stdout)?;
+    Ok(result)
+}

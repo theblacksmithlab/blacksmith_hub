@@ -7,6 +7,9 @@ use teloxide::Bot;
 use anyhow::Result;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::types::ReplyParameters;
+use crate::user_message_processing::process_user_message;
+use core::utils::tg_bot::tg_bot::download_voice;
+use core::ai::ai::speech_to_text;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -14,29 +17,35 @@ pub enum ProbiotBotCommands {
     Start,
 }
 
-pub(crate) async fn message_handler(bot: Bot, msg: Message) -> Result<()> {
+pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAppState>) -> Result<()> {
     let chat_id = msg.chat.id;
-
-    let bot_user = bot.get_me().await?.user;
+    let bot_data = bot.get_me().await?;
+    let user_raw_request = msg.text().unwrap_or("Empty request").to_string();
     
     if msg.chat.is_private() {
-        let user_raw_request = msg.text().unwrap_or("Empty request").to_string();
-        
-        let bot_msg = get_message(Some("probiot"), "auto_reply", false).await?;
-        bot.send_message(chat_id, bot_msg).await?;
+        if let Some(voice) = msg.voice() {
+            let file_path = format!("/tmp/{}.ogg", voice.file.id);
+            download_voice(&bot, &voice.file.id, &file_path).await?;
+            let user_voice_transcribed = speech_to_text(&file_path).await?;
+            process_user_message(bot.clone(), chat_id, user_voice_transcribed, msg, app_state).await?;
+        } else if let Some(text) = msg.text() {
+            process_user_message(bot.clone(), chat_id, text.to_string(), msg, app_state).await?;
+        } else {
+            bot.send_message(chat_id, "Извините, я могу работать только с текстом или голосовыми сообщениями.")
+                .await?;
+        }
     } else {
-        if msg.text().unwrap_or("").contains(&format!("@{}", bot_user.username.unwrap_or_default()))
+        if user_raw_request.contains(&format!("@{}", bot_data.user.clone().username.unwrap_or_default()))
             || (msg.reply_to_message().is_some()
             && msg
             .reply_to_message()
             .and_then(|reply| reply.from.as_ref())
-            .map(|user| user.id == bot_user.id)
+            .map(|user| user.id == bot_data.id)
             .unwrap_or(false))
         {
             bot.send_message(chat_id, "Пожалуйста, напишите мне в приватный чат.")
                 .reply_parameters(ReplyParameters::new(msg.id))
                 .await?;
-            
         }
     }
 
