@@ -113,6 +113,8 @@ pub fn convert_to_wav(file_path: &str) -> Result<String, anyhow::Error> {
     let output = Command::new("ffmpeg")
         .arg("-i")
         .arg(file_path)
+        .arg("-ar")
+        .arg("16000")
         .arg(&wav_path)
         .output();
 
