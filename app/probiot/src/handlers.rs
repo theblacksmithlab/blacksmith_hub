@@ -23,12 +23,12 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
     let chat_id = msg.chat.id;
     let bot_data = bot.get_me().await?;
     let user_raw_request = msg.text().unwrap_or("Empty request").to_string();
-    
+
     if msg.chat.is_private() {
         if let Some(voice) = msg.voice() {
             let file_path = download_voice(&bot, &voice.file.id, &format!("tmp/{}.ogg", voice.file.id)).await?;
             info!("Passing file path to speech_to_text: {}", file_path);
-            
+
             if let Err(err) = check_whisper_installed() {
                 error!("Whisper CLI not installed: {}", err);
                 bot.send_message(chat_id, "Извини, я не могу обработать голосовое сообщение в данный момент.").await?;
@@ -37,6 +37,10 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
 
             match speech_to_text(&file_path).await {
                 Ok(user_voice_transcribed) => {
+                    if let Err(err) = std::fs::remove_file(file_path) {
+                        eprintln!("Failed to delete file: {}", err);
+                    }
+                    
                     process_user_message(bot.clone(), chat_id, user_voice_transcribed, msg, app_state).await?;
                 }
                 Err(err) => {

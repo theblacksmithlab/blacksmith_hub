@@ -356,6 +356,7 @@ pub async fn speech_to_text(file_path: &str) -> Result<String> {
     match output {
         Ok(output) if output.status.success() => {
             let result = String::from_utf8(output.stdout)?;
+            info!("Result: {}", result);
             if result.trim().is_empty() {
                 Ok("Empty text".to_string())
             } else {
