@@ -21,7 +21,7 @@ use crate::local_db::local_db::save_user_profile;
 use crate::utils::common::{get_system_role_or_fallback, split_text_into_chunks};
 use crate::utils::common::LlmModel;
 use teloxide::prelude::ChatId;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use crate::models::request_app::request_app::RequestAppSystemRoleType;
 
 pub async fn raw_llm_processing_json(
@@ -354,21 +354,28 @@ pub async fn speech_to_text(file_path: &str) -> Result<String> {
 
     match output {
         Ok(output) if output.status.success() => {
-            let result = String::from_utf8(output.stdout)?;
-            info!("TEMP: Result: {}", result);
-            if result.trim().is_empty() {
+            let stdout = String::from_utf8(output.stdout)?;
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            info!("TEMP: stdout: {}", stdout);
+            info!("TEMP: stderr: {}", stderr);
+            
+            if stdout.trim().is_empty() {
                 Ok("Empty text".to_string())
             } else {
-                Ok(result)
+                Ok(stdout)
             }
         }
-        Ok(output) => Err(anyhow::anyhow!(
-            "Whisper CLI failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )),
-        Err(err) => Err(anyhow::anyhow!(
-            "Failed to execute Whisper CLI: {}",
-            err
-        )),
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            error!("Whisper CLI failed: {}", stderr);
+            Err(anyhow::anyhow!("Whisper CLI failed: {}", stderr))
+        }
+        Err(err) => {
+            error!("Failed to execute Whisper CLI: {}", err);
+            Err(anyhow::anyhow!(
+                "Failed to execute Whisper CLI: {}",
+                err
+            ))
+        }
     }
 }
