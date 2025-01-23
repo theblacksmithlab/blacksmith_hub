@@ -350,6 +350,8 @@ pub async fn speech_to_text(file_path: &str) -> Result<String> {
         .arg("/root/projects/whisper.cpp/models/ggml-base.bin")
         .arg("-f")
         .arg(file_path)
+        .arg("-l")
+        .arg("ru")
         .output();
 
     match output {
