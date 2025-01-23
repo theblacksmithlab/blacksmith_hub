@@ -1,4 +1,4 @@
-use crate::state::llm_processing_trait::LlmProcessing;
+use crate::state::llm_client_init_trait::LlmProcessing;
 use crate::state::request_app::app_state::RequestAppState;
 use crate::state::request_app::app_state::UserProfile;
 use crate::vector_db::vector_db::qdrant_upsert;

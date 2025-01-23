@@ -3,7 +3,7 @@ use crate::routes::the_viper_room::news_block_creation_utils::{
     updates_file_creation,
 };
 use core::ai::ai::{raw_llm_processing, text_to_speech};
-use core::state::llm_processing_trait::LlmProcessing;
+use core::state::llm_client_init_trait::LlmProcessing;
 use core::utils::common::{get_message, LlmModel};
 use grammers_client::Client as g_Client;
 use std::fs;
@@ -112,7 +112,7 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
             LlmModel::Light,
         )
         .await?;
-        caption.push_str(&get_message("the_viper_room", "donation_footer").await?);
+        caption.push_str(&get_message("the_viper_room", "donation_footer", true).await?);
 
         let caption_path = audio_path.with_extension("txt");
         fs::write(caption_path, caption)?;

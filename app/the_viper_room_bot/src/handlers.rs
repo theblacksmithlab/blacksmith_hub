@@ -13,7 +13,7 @@ use tracing::info;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
-pub enum BotCommands {
+pub enum TheViperRoomBotCommands {
     Start,
     Podcast,
     Test,
@@ -23,7 +23,7 @@ pub enum BotCommands {
 
 pub(crate) async fn message_handler(bot: Bot, msg: Message) -> Result<()> {
     let user_id = msg.chat.id;
-    let bot_msg = get_message("the_viper_room", "auto_reply").await?;
+    let bot_msg = get_message("the_viper_room", "auto_reply", true).await?;
     bot.send_message(user_id, bot_msg).await?;
 
     Ok(())
@@ -32,7 +32,7 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message) -> Result<()> {
 pub(crate) async fn command_handler(
     bot: Bot,
     msg: Message,
-    cmd: BotCommands,
+    cmd: TheViperRoomBotCommands,
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let user_id = msg.chat.id;
@@ -69,13 +69,13 @@ pub(crate) async fn command_handler(
     let g_client = initialize_grammers_client(session_data.clone()).await?;
 
     match cmd {
-        BotCommands::Start => {
+        TheViperRoomBotCommands::Start => {
             info!("Healthy user starts the App... Ok");
-            let bot_msg = get_message("the_viper_room", "start_message").await?;
+            let bot_msg = get_message("the_viper_room", "start_message", true).await?;
             bot.send_message(user_id, bot_msg).await?;
         }
 
-        BotCommands::Podcast if user_id.0 == lord_admin_id => {
+        TheViperRoomBotCommands::Podcast if user_id.0 == lord_admin_id => {
             bot.send_message(user_id, "Starting podcast generation by /podcast cmd...")
                 .await?;
             generate_podcast(
@@ -90,7 +90,7 @@ pub(crate) async fn command_handler(
             .await?;
         }
 
-        BotCommands::Test if user_id.0 == lord_admin_id => {
+        TheViperRoomBotCommands::Test if user_id.0 == lord_admin_id => {
             bot.send_message(user_id, "Starting test podcast generation by /test cmd...")
                 .await?;
             generate_podcast(
@@ -105,7 +105,7 @@ pub(crate) async fn command_handler(
             .await?;
         }
 
-        BotCommands::Schedule if user_id.0 == lord_admin_id => {
+        TheViperRoomBotCommands::Schedule if user_id.0 == lord_admin_id => {
             schedule_podcast(
                 bot.clone(),
                 user_id,
@@ -122,14 +122,15 @@ pub(crate) async fn command_handler(
             .await?;
         }
 
-        BotCommands::Stop if user_id.0 == lord_admin_id => {
+        TheViperRoomBotCommands::Stop if user_id.0 == lord_admin_id => {
             stop_daily_podcasts(app_state.clone()).await?;
             bot.send_message(user_id, "Daily podcast generation stopped by /stop cmd")
                 .await?;
         }
 
         _ => {
-            let bot_msg = get_message("the_viper_room", "wrong_cmd_or_no_rights_message").await?;
+            let bot_msg =
+                get_message("the_viper_room", "wrong_cmd_or_no_rights_message", true).await?;
             bot.send_message(user_id, bot_msg).await?;
         }
     }

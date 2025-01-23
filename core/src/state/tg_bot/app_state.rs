@@ -1,16 +1,16 @@
-use std::collections::HashMap;
+use crate::models::common::dialogue_cache::DialogueCache;
 use crate::models::tg_bot::tg_bot::PodcastManager;
 use async_openai::config::OpenAIConfig;
 use async_openai::Client as LLM_Client;
+use std::collections::HashMap;
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tokio::sync::Mutex;
-use crate::models::common::dialogue_cache::DialogueCache;
 
 pub struct BotAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,
     pub podcast_manager: Arc<PodcastManager>,
-    pub temp_cache: Mutex<HashMap<ChatId, DialogueCache>>
+    pub temp_cache: Mutex<HashMap<ChatId, DialogueCache>>,
 }
 
 impl BotAppState {
@@ -20,7 +20,7 @@ impl BotAppState {
         Self {
             llm_client,
             podcast_manager,
-            temp_cache
+            temp_cache,
         }
     }
 }

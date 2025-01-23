@@ -20,3 +20,4 @@ grammers-session.workspace = true
 grammers-tl-types.workspace = true
 axum.workspace = true
 reqwest.workspace = true
+async-trait.workspace = true

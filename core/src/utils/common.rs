@@ -2,13 +2,13 @@ use crate::models::request_app::request_app::{AvatarRequest, AvatarResponse};
 use crate::state::request_app::app_state::{RequestAppState, UserProfile, UserStates};
 use crate::state::the_viper_room::app_state::{AuthStages, TheViperRoomAppState, UserData};
 use crate::vector_db::vector_db::restore_request_from_qdrant;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
 use std::env;
 use std::fs::read_to_string;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tracing::error;
@@ -171,14 +171,18 @@ pub async fn update_the_viper_room_user_data<F>(
     update_fn(data);
 }
 
-pub async fn get_message(app_name: &str, message_name: &str) -> Result<String> {
-    let path = Path::new("common_res/messages")
-        .join(app_name)
-        .join(format!("{}.txt", message_name));
+pub async fn get_message(app_name: &str, message_name: &str, is_common: bool) -> Result<String> {
+    let base_path: PathBuf = if is_common {
+        Path::new("common_res/messages").join(app_name)
+    } else {
+        Path::new("app").join(app_name).join("messages")
+    };
+
+    let path = base_path.join(format!("{}.txt", message_name));
 
     if !path.exists() {
         error!("Message file not found: {}", path.display());
-        return Err(anyhow::anyhow!(
+        return Err(anyhow!(
             "Message file '{}' for app '{}' does not exist at path: {}",
             message_name,
             app_name,
@@ -188,7 +192,7 @@ pub async fn get_message(app_name: &str, message_name: &str) -> Result<String> {
 
     read_to_string(&path).map_err(|e| {
         error!("Failed to read message file {}: {}", path.display(), e);
-        anyhow::anyhow!(
+        anyhow!(
             "Failed to read message '{}' for app '{}': {}",
             message_name,
             app_name,
