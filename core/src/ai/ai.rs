@@ -346,12 +346,11 @@ pub async fn speech_to_text(file_path: &str) -> Result<String> {
         return Err(anyhow::anyhow!("Voice message file not found: {}", file_path));
     }
     
-    let output = Command::new("whisper")
+    let output = Command::new("/root/projects/whisper.cpp/build/bin/whisper-cli")
+        .arg("-m")
+        .arg("/root/projects/whisper.cpp/models/ggml-base.bin")
+        .arg("-f")
         .arg(file_path)
-        .arg("--model")
-        .arg("base")
-        .arg("--output_format")
-        .arg("plain_text")
         .output()?;
 
     if !output.status.success() {
@@ -360,7 +359,12 @@ pub async fn speech_to_text(file_path: &str) -> Result<String> {
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-    
+
     let result = String::from_utf8(output.stdout)?;
-    Ok(result)
+
+    if result.trim().is_empty() {
+        Ok("Empty text".to_string())
+    } else {
+        Ok(result)
+    }
 }

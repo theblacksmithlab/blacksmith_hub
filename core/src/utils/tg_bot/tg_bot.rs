@@ -1,4 +1,5 @@
 use std::env;
+use std::process::Command;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::state::tg_bot::app_state::BotAppState;
 use std::sync::Arc;
@@ -86,4 +87,16 @@ pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> Result
     destination.flush().await?;
 
     Ok(base_path.to_str().unwrap().to_string())
+}
+
+pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
+    let output = Command::new("whisper")
+        .arg("--help")
+        .output();
+
+    if let Err(_) = output {
+        return Err(anyhow::anyhow!("Whisper CLI not found. Please install whisper.cpp and add it to your PATH."));
+    }
+
+    Ok(())
 }

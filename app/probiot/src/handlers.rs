@@ -7,10 +7,11 @@ use teloxide::Bot;
 use anyhow::Result;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::types::ReplyParameters;
-use tracing::info;
+use tracing::{error, info};
 use crate::user_message_processing::process_user_message;
 use core::utils::tg_bot::tg_bot::download_voice;
 use core::ai::ai::speech_to_text;
+use core::utils::tg_bot::tg_bot::check_whisper_installed;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -27,8 +28,22 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
         if let Some(voice) = msg.voice() {
             let file_path = download_voice(&bot, &voice.file.id, &format!("tmp/{}.ogg", voice.file.id)).await?;
             info!("Passing file path to speech_to_text: {}", file_path);
-            let user_voice_transcribed = speech_to_text(&file_path).await?;
-            process_user_message(bot.clone(), chat_id, user_voice_transcribed, msg, app_state).await?;
+            
+            if let Err(err) = check_whisper_installed() {
+                error!("Whisper CLI not installed: {}", err);
+                bot.send_message(chat_id, "Извини, я не могу обработать голосовое сообщение в данный момент.").await?;
+                return Ok(());
+            }
+
+            match speech_to_text(&file_path).await {
+                Ok(user_voice_transcribed) => {
+                    process_user_message(bot.clone(), chat_id, user_voice_transcribed, msg, app_state).await?;
+                }
+                Err(err) => {
+                    error!("Error during speech-to-text conversion: {}", err);
+                    bot.send_message(chat_id, "Извини, я тебя не понял.").await?;
+                }
+            }
         } else if let Some(text) = msg.text() {
             process_user_message(bot.clone(), chat_id, text.to_string(), msg, app_state).await?;
         } else {
