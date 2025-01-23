@@ -341,6 +341,7 @@ pub async fn vectorize(data: String, app_state: Arc<RequestAppState>) -> Result<
 }
 
 pub async fn speech_to_text(file_path: &str) -> Result<String> {
+    info!("TEMP log: we're in speech_to_text fn");
     if !std::path::Path::new(file_path).exists() {
         return Err(anyhow::anyhow!("Voice message file not found: {}", file_path));
     }
