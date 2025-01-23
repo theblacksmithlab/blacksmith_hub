@@ -90,13 +90,19 @@ pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> Result
 }
 
 pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
-    let output = Command::new("whisper")
+    let output = Command::new("whisper-cli")
         .arg("--help")
         .output();
 
-    if let Err(_) = output {
-        return Err(anyhow::anyhow!("Whisper CLI not found. Please install whisper.cpp and add it to your PATH."));
+    match output {
+        Ok(output) if output.status.success() => Ok(()),
+        Ok(output) => Err(anyhow::anyhow!(
+            "Whisper CLI failed to respond correctly: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )),
+        Err(err) => Err(anyhow::anyhow!(
+            "Whisper CLI not found: {}",
+            err
+        )),
     }
-
-    Ok(())
 }

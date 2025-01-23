@@ -345,26 +345,30 @@ pub async fn speech_to_text(file_path: &str) -> Result<String> {
     if !std::path::Path::new(file_path).exists() {
         return Err(anyhow::anyhow!("Voice message file not found: {}", file_path));
     }
-    
-    let output = Command::new("/root/projects/whisper.cpp/build/bin/whisper-cli")
+
+    let output = Command::new("whisper-cli")
         .arg("-m")
         .arg("/root/projects/whisper.cpp/models/ggml-base.bin")
         .arg("-f")
         .arg(file_path)
-        .output()?;
+        .output();
 
-    if !output.status.success() {
-        return Err(anyhow::anyhow!(
-            "Whisper failed: {}",
+    match output {
+        Ok(output) if output.status.success() => {
+            let result = String::from_utf8(output.stdout)?;
+            if result.trim().is_empty() {
+                Ok("Empty text".to_string())
+            } else {
+                Ok(result)
+            }
+        }
+        Ok(output) => Err(anyhow::anyhow!(
+            "Whisper CLI failed: {}",
             String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-
-    let result = String::from_utf8(output.stdout)?;
-
-    if result.trim().is_empty() {
-        Ok("Empty text".to_string())
-    } else {
-        Ok(result)
+        )),
+        Err(err) => Err(anyhow::anyhow!(
+            "Failed to execute Whisper CLI: {}",
+            err
+        )),
     }
 }
