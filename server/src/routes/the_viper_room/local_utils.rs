@@ -12,7 +12,7 @@ pub async fn generate_user_system_nickname(
     last_name: String,
 ) -> Result<String, String> {
     let system_role = get_system_role_or_fallback(
-        "request_app",
+        "the_viper_room",
         TheViperRoomRoleType::SystemNicknameGeneration,
         None,
     );
