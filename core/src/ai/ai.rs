@@ -24,16 +24,17 @@ use teloxide::prelude::ChatId;
 use tracing::{error, info, warn};
 use crate::models::request_app::request_app::RequestAppSystemRoleType;
 
-pub async fn raw_llm_processing_json(
+pub async fn raw_llm_processing_json<T: LlmProcessing + Send + Sync>(
     system_role: String,
     request: String,
-    app_state: Arc<RequestAppState>,
+    app_state: Arc<T>,
+    model: LlmModel,
 ) -> Result<String> {
-    let llm_client = app_state.llm_client.clone();
+    let llm_client = app_state.get_llm_client().clone();
 
     let llm_request = CreateChatCompletionRequestArgs::default()
         .max_tokens(4095u32)
-        .model("gpt-4o")
+        .model(model.as_str())
         .temperature(0.2)
         .messages([
             ChatCompletionRequestSystemMessageArgs::default()
@@ -269,6 +270,7 @@ pub async fn process_users_self_description(
         system_role,
         user_story_for_profile_creation,
         app_state.clone(),
+        LlmModel::Complex,
     )
     .await?;
     info!(
@@ -358,7 +360,6 @@ pub async fn speech_to_text(file_path: &str) -> Result<String> {
     match output {
         Ok(output) if output.status.success() => {
             let stdout = String::from_utf8(output.stdout)?;
-            info!("TEMP: stdout: {}", stdout);
             
             if stdout.trim().is_empty() {
                 Ok("Empty text".to_string())

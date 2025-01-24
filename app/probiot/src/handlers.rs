@@ -8,11 +8,10 @@ use anyhow::Result;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::types::ReplyParameters;
 use tracing::error;
-use crate::user_message_processing::process_user_message;
+use crate::user_message_processing::process_user_raw_request;
 use core::utils::tg_bot::tg_bot::download_voice;
-use core::ai::ai::speech_to_text;
-use core::utils::common::check_whisper_installed;
-use core::utils::common::convert_to_wav;
+use core::utils::common::handle_voice_message;
+use core::utils::tg_bot::tg_bot::add_llm_response_to_cache;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -24,7 +23,9 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
     let chat_id = msg.chat.id;
     let bot_data = bot.get_me().await?;
     let user_raw_request = msg.text().unwrap_or("Empty request").to_string();
+    let initiator_app_name = "probiot".to_string();
 
+    // TODO: Удалить прямые отправки сообщений ботом, использовать get_message;
     if msg.chat.is_private() {
         if let Some(voice) = msg.voice() {
             let file_path = match download_voice(&bot, &voice.file.id, &format!("tmp/{}.ogg", voice.file.id)).await {
@@ -36,39 +37,40 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
                 }
             };
 
-            if let Err(err) = check_whisper_installed() {
-                error!("Whisper CLI not installed: {}", err);
-                bot.send_message(chat_id, "Извините, я временно не могу обработать голосовые сообщения.").await?;
-                return Ok(());
-            }
-
-            let wav_path = match convert_to_wav(&file_path) {
-                Ok(wav) => wav,
-                Err(err) => {
-                    error!("Failed to convert to WAV: {}", err);
-                    bot.send_message(chat_id, "Не удалось обработать голосовое сообщение. Попробуйте позже.").await?;
-                    return Ok(());
+            match handle_voice_message(&file_path).await {
+                Ok(Some(user_voice_transcribed)) => {
+                    match process_user_raw_request(chat_id, user_voice_transcribed, app_state.clone(), initiator_app_name.clone()).await {
+                        Ok(llm_response) => {
+                            add_llm_response_to_cache(app_state.clone(), chat_id, llm_response.clone()).await;
+                            
+                            bot.send_message(chat_id, llm_response).await?;
+                        }
+                        Err(err) => {
+                            error!("Error in process_user_raw_request: {}", err);
+                            bot.send_message(chat_id, "Произошла ошибка при обработке вашего запроса. Попробуйте ещё раз.").await?;
+                        }
+                    }
                 }
-            };
-
-            match speech_to_text(&wav_path).await {
-                Ok(user_voice_transcribed) => {
-                    if let Err(err) = std::fs::remove_file(&file_path) {
-                        error!("Failed to delete original file: {}", err);
-                    }
-                    if let Err(err) = std::fs::remove_file(&wav_path) {
-                        error!("Failed to delete WAV file: {}", err);
-                    }
-
-                    process_user_message(bot.clone(), chat_id, user_voice_transcribed, msg, app_state).await?;
+                Ok(None) => {
+                    bot.send_message(chat_id, "Не удалось обработать голосовое сообщение. Попробуйте ещё раз.").await?;
                 }
                 Err(err) => {
-                    error!("Error during speech-to-text conversion: {}", err);
-                    bot.send_message(chat_id, "Извините, я не смог распознать ваше сообщение. Попробуйте ещё раз.").await?;
+                    error!("Error in handle_voice_message: {}", err);
+                    bot.send_message(chat_id, "Произошла ошибка при обработке голосового сообщения. Попробуйте ещё раз.").await?;
                 }
             }
         } else if let Some(text) = msg.text() {
-            process_user_message(bot.clone(), chat_id, text.to_string(), msg, app_state).await?;
+            match process_user_raw_request(chat_id, text.to_string(), app_state.clone(), initiator_app_name.clone()).await {
+                Ok(llm_response) => {
+                    add_llm_response_to_cache(app_state.clone(), chat_id, llm_response.clone()).await;
+                    
+                    bot.send_message(chat_id, llm_response).await?;
+                }
+                Err(err) => {
+                    error!("Error in process_user_raw_request: {}", err);
+                    bot.send_message(chat_id, "Произошла ошибка при обработке вашего запроса. Попробуйте ещё раз.").await?;
+                }
+            }
         } else {
             bot.send_message(chat_id, "Извините, я могу работать только с текстом или голосовыми сообщениями.")
                 .await?;
@@ -82,11 +84,13 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
             .map(|user| user.id == bot_data.id)
             .unwrap_or(false))
         {
-            bot.send_message(chat_id, "Пожалуйста, напишите мне в приватный чат.")
+            bot.send_message(chat_id, "Пожалуйста, напишите мне в приватный чат, так наше общение не помешает другим участникам чата, а я смогу ответить на интересующие вас вопросы.")
                 .reply_parameters(ReplyParameters::new(msg.id))
                 .await?;
         }
     }
+    
+    // TODO: Send TTS button;
 
     Ok(())
 }

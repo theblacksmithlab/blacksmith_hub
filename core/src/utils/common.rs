@@ -13,7 +13,7 @@ use std::process::Command;
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tracing::error;
-
+use crate::ai::ai::speech_to_text;
 
 pub fn get_system_role_path<T>(app_name: &str, role_type: T) -> String
 where
@@ -333,5 +333,22 @@ pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
             "Whisper CLI not found: {}",
             err
         )),
+    }
+}
+
+pub async fn handle_voice_message(file_path: &str) -> Result<Option<String>> {
+    check_whisper_installed()?;
+    
+    let wav_path = convert_to_wav(file_path)?;
+    
+    let transcription = speech_to_text(&wav_path).await?;
+    
+    std::fs::remove_file(file_path).ok();
+    std::fs::remove_file(&wav_path).ok();
+
+    if transcription.trim().is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(transcription))
     }
 }

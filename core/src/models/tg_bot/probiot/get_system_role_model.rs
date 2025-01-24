@@ -1,11 +1,13 @@
 pub enum ProbiotRoleType {
-    TestRole,
+    CrapDetection,
+    ClarifyRequest,
 }
 
 impl Into<&'static str> for ProbiotRoleType {
     fn into(self) -> &'static str {
         match self {
-            ProbiotRoleType::TestRole => "test_role",
+            ProbiotRoleType::CrapDetection => "crap_detection",
+            ProbiotRoleType::ClarifyRequest => "clarify_request",
         }
     }
 }

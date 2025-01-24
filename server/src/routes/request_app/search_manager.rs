@@ -10,6 +10,7 @@ use core::vector_db::vector_db::{
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tracing::info;
+use core::utils::common::LlmModel;
 
 pub(crate) async fn activate_search_manager(
     user_request: String,
@@ -59,7 +60,7 @@ pub(crate) async fn activate_search_manager(
     );
 
     let llm_order_processing =
-        raw_llm_processing_json(system_role, message_for_llm, app_state.clone()).await;
+        raw_llm_processing_json(system_role, message_for_llm, app_state.clone(), LlmModel::Complex).await;
 
     info!(
         "Fn: activate_search_manager | Llm texts ordering process result: {:?}",
