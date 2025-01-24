@@ -10,10 +10,6 @@ use teloxide::net::Download;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use anyhow::Result;
-use teloxide::types::Voice;
-use tracing::error;
-use crate::ai::ai::speech_to_text;
-use crate::utils::common::{check_whisper_installed, convert_to_wav};
 
 pub async fn check_username(bot: Bot, msg: Message) -> bool {
     if let Some(_username) = msg.chat.username() {

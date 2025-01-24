@@ -2,16 +2,18 @@ use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use std::sync::Arc;
 use teloxide::macros::BotCommands;
-use teloxide::prelude::{Message, Requester};
+use teloxide::prelude::{CallbackQuery, Message, Requester};
 use teloxide::Bot;
 use anyhow::Result;
 use teloxide::payloads::SendMessageSetters;
-use teloxide::types::ReplyParameters;
+use teloxide::types::{InputFile, ReplyParameters};
 use tracing::error;
 use crate::user_message_processing::process_user_raw_request;
 use core::utils::tg_bot::tg_bot::download_voice;
 use core::utils::common::handle_voice_message;
 use core::utils::tg_bot::tg_bot::add_llm_response_to_cache;
+use crate::probiot_utils::create_tts_button;
+use core::ai::ai::simple_tts;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -42,8 +44,10 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
                     match process_user_raw_request(chat_id, user_voice_transcribed, app_state.clone(), initiator_app_name.clone()).await {
                         Ok(llm_response) => {
                             add_llm_response_to_cache(app_state.clone(), chat_id, llm_response.clone()).await;
-                            
-                            bot.send_message(chat_id, llm_response).await?;
+
+                            bot.send_message(chat_id, llm_response)
+                                .reply_markup(create_tts_button())
+                                .await?;
                         }
                         Err(err) => {
                             error!("Error in process_user_raw_request: {}", err);
@@ -63,8 +67,10 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
             match process_user_raw_request(chat_id, text.to_string(), app_state.clone(), initiator_app_name.clone()).await {
                 Ok(llm_response) => {
                     add_llm_response_to_cache(app_state.clone(), chat_id, llm_response.clone()).await;
-                    
-                    bot.send_message(chat_id, llm_response).await?;
+
+                    bot.send_message(chat_id, llm_response)
+                        .reply_markup(create_tts_button())
+                        .await?;
                 }
                 Err(err) => {
                     error!("Error in process_user_raw_request: {}", err);
@@ -107,6 +113,32 @@ pub(crate) async fn command_handler(
         ProbiotBotCommands::Start => {
             let bot_msg = get_message(Some("probiot"), "start_message", false).await?;
             bot.send_message(user_id, bot_msg).await?;
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) async fn callback_query_handler(bot: Bot, query: CallbackQuery, app_state: Arc<BotAppState>) -> Result<()> {
+    if let Some(data) = query.data {
+        if data == "tts" {
+            if let Some(message) = query.message {
+                if let Some(text) = message.regular_message().and_then(|m| m.text()) {
+                    let message_id = message.id().to_string();
+                    match simple_tts(text.to_string(), app_state).await {
+                        Ok(audio_response) => {
+                            let audio_file_path = format!("tmp/{}.mp3", message_id);
+                            audio_response.save(&audio_file_path).await?;
+                            
+                            bot.send_voice(message.chat().id, InputFile::file(audio_file_path)).await?;
+                        }
+                        Err(err) => {
+                            error!("TTS generation failed: {}", err);
+                            bot.send_message(message.chat().id, "Не удалось озвучить сообщение. Попробуйте позже.").await?;
+                        }
+                    }
+                }
+            }
         }
     }
 

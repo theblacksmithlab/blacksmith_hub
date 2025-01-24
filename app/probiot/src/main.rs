@@ -1,5 +1,6 @@
 mod handlers;
 mod user_message_processing;
+mod probiot_utils;
 
 use crate::handlers::{command_handler, message_handler, ProbiotBotCommands};
 use async_openai::Client as LLM_Client;

@@ -4,11 +4,7 @@ use crate::state::request_app::app_state::UserProfile;
 use crate::vector_db::vector_db::qdrant_upsert;
 use anyhow::{Context, Result};
 use async_openai::types::ResponseFormat::JsonObject;
-use async_openai::types::{
-    ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
-    CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs, CreateEmbeddingResponse,
-    CreateSpeechRequestArgs, SpeechModel, Voice,
-};
+use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs, CreateEmbeddingResponse, CreateSpeechRequestArgs, CreateSpeechResponse, SpeechModel, Voice};
 // use std::env;
 use chrono::{Duration, Utc};
 use std::fs;
@@ -251,6 +247,25 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
 //
 //     Ok(PathBuf::from(audio_file_path))
 // }
+
+pub async fn simple_tts<T: LlmProcessing + Send + Sync>(
+    text: String,
+    app_state: Arc<T>,
+) -> Result<CreateSpeechResponse> {
+    let llm_client = app_state.get_llm_client().clone();
+
+    let request = CreateSpeechRequestArgs::default()
+        .input(&text)
+        .voice(Voice::Onyx)
+        .model(SpeechModel::Tts1Hd)
+        .speed(1.3)
+        .build()?;
+
+    let response = llm_client.audio().speech(request).await?;
+
+    Ok(response)
+}
+
 
 pub async fn process_users_self_description(
     user_id: ChatId,
