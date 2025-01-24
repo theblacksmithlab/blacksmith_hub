@@ -1,8 +1,9 @@
-use core::models::request_app::request_app::RequestAppSystemRoleType;
 use anyhow::Result;
 use core::ai::ai::{raw_llm_processing_json, vectorize};
+use core::models::request_app::request_app::RequestAppSystemRoleType;
 use core::state::request_app::app_state::RequestAppState;
 use core::utils::common::get_system_role_or_fallback;
+use core::utils::common::LlmModel;
 use core::vector_db::vector_db::{
     get_llm_order_from_response, prepare_search_results_for_llm, qdrant_search,
     store_search_results, update_search_results_order, ExecutionMode, QdrantSearchResult,
@@ -10,7 +11,6 @@ use core::vector_db::vector_db::{
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tracing::info;
-use core::utils::common::LlmModel;
 
 pub(crate) async fn activate_search_manager(
     user_request: String,
@@ -56,11 +56,16 @@ pub(crate) async fn activate_search_manager(
     let system_role = get_system_role_or_fallback(
         "request_app",
         RequestAppSystemRoleType::ReorderingResults,
-        None
+        None,
     );
 
-    let llm_order_processing =
-        raw_llm_processing_json(system_role, message_for_llm, app_state.clone(), LlmModel::Complex).await;
+    let llm_order_processing = raw_llm_processing_json(
+        system_role,
+        message_for_llm,
+        app_state.clone(),
+        LlmModel::Complex,
+    )
+    .await;
 
     info!(
         "Fn: activate_search_manager | Llm texts ordering process result: {:?}",

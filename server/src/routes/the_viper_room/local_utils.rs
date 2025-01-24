@@ -1,9 +1,9 @@
 use core::ai::ai::raw_llm_processing;
+use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
+use core::utils::common::get_system_role_or_fallback;
 use core::utils::common::LlmModel;
 use std::sync::Arc;
-use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
-use core::utils::common::get_system_role_or_fallback;
 
 pub async fn generate_user_system_nickname(
     the_viper_room_app_state: Arc<TheViperRoomAppState>,

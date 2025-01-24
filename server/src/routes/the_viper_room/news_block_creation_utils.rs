@@ -1,7 +1,9 @@
 use chrono::Duration as ChronoDuration;
 use chrono::Utc;
 use core::ai::ai::raw_llm_processing;
+use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
 use core::state::llm_client_init_trait::LlmProcessing;
+use core::utils::common::get_system_role_or_fallback;
 use core::utils::common::LlmModel;
 use grammers_client::types::Chat::{Channel, Group, User};
 use grammers_client::{types, Client as g_Client};
@@ -14,8 +16,6 @@ use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::sleep;
 use tracing::info;
-use core::utils::common::get_system_role_or_fallback;
-use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
 
 pub(crate) async fn get_dialogs(client: &g_Client) -> Result<Vec<types::Dialog>, anyhow::Error> {
     info!("Getting list of updates sources...");
@@ -109,7 +109,6 @@ pub(crate) async fn processing_dialogs<T: LlmProcessing + Send + Sync>(
 pub(crate) async fn updates_file_creation<T: LlmProcessing + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
-    ai_utils_dir: &Path,
 ) -> Result<(), anyhow::Error> {
     info!("Writing results from information sources in updates.txt...");
 
@@ -137,11 +136,9 @@ pub(crate) async fn updates_file_creation<T: LlmProcessing + Send + Sync>(
         "\nДата и время формирования обновлений: {}\n",
         utc_plus_3
     )?;
-    
-    let system_role = get_system_role_or_fallback(
-        "the_viper_room",
-        TheViperRoomRoleType::ExtractingNews,
-        None);
+
+    let system_role =
+        get_system_role_or_fallback("the_viper_room", TheViperRoomRoleType::ExtractingNews, None);
 
     for file_path in txt_files.clone() {
         let content = read_file_safe(&file_path)?;
@@ -172,12 +169,12 @@ pub(crate) async fn summarize_updates<T: LlmProcessing + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
     nickname: String,
-    ai_utils_dir: &Path,
 ) -> Result<String, anyhow::Error> {
     let system_role = get_system_role_or_fallback(
         "the_viper_room",
         TheViperRoomRoleType::CreatingPodcast,
-        None);
+        None,
+    );
 
     let updates = read_file_safe(format!("{}/updates.txt", user_tmp_dir))
         .map_err(|e| format!("Failed to read 'updates': {}", e))
@@ -230,11 +227,12 @@ pub(crate) async fn get_latest_messages<T: LlmProcessing + Send + Sync>(
         .create(true)
         .write(true)
         .open(user_tmp_file)?;
-    
+
     let system_role = get_system_role_or_fallback(
         "the_viper_room",
         TheViperRoomRoleType::CheckUsefulness,
-        None);
+        None,
+    );
 
     while let Some(message) = messages.next().await? {
         if message.date() < period {

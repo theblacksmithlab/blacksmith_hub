@@ -1,3 +1,4 @@
+use crate::ai::ai::speech_to_text;
 use crate::models::request_app::request_app::{AvatarRequest, AvatarResponse};
 use crate::state::request_app::app_state::{RequestAppState, UserProfile, UserStates};
 use crate::state::the_viper_room::app_state::{AuthStages, TheViperRoomAppState, UserData};
@@ -7,19 +8,22 @@ use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
 use std::env;
-use std::fs::read_to_string;
+use std::fs::{read_to_string, remove_file};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tracing::error;
-use crate::ai::ai::speech_to_text;
 
 pub fn get_system_role_path<T>(app_name: &str, role_type: T) -> String
 where
     T: Into<&'static str>,
 {
-    format!("common_res/{}/system_roles/{}.txt", app_name, role_type.into())
+    format!(
+        "common_res/{}/system_roles/{}.txt",
+        app_name,
+        role_type.into()
+    )
 }
 
 pub fn get_system_role_or_fallback<T>(
@@ -38,7 +42,9 @@ where
                 "Failed to load system role '{}': {}. Using fallback.",
                 file_path, err
             );
-            fallback.unwrap_or("You are a helpful assistant").to_string()
+            fallback
+                .unwrap_or("You are a helpful assistant")
+                .to_string()
         }
     }
 }
@@ -181,7 +187,11 @@ pub async fn update_the_viper_room_user_data<F>(
     update_fn(data);
 }
 
-pub async fn get_message(app_name: Option<&str>, message_name: &str, is_common: bool) -> Result<String> {
+pub async fn get_message(
+    app_name: Option<&str>,
+    message_name: &str,
+    is_common: bool,
+) -> Result<String> {
     let base_path: PathBuf = if is_common {
         Path::new("common_res/messages/common").to_path_buf()
     } else {
@@ -201,7 +211,11 @@ pub async fn get_message(app_name: Option<&str>, message_name: &str, is_common: 
         return Err(anyhow!(
             "Message file '{}' {} does not exist at path: {}",
             message_name,
-            if is_common { "(common message)" } else { "for app" },
+            if is_common {
+                "(common message)"
+            } else {
+                "for app"
+            },
             path.display()
         ));
     }
@@ -211,7 +225,11 @@ pub async fn get_message(app_name: Option<&str>, message_name: &str, is_common: 
         anyhow!(
             "Failed to read message '{}' {}: {}",
             message_name,
-            if is_common { "(common message)" } else { "for app" },
+            if is_common {
+                "(common message)"
+            } else {
+                "for app"
+            },
             e
         )
     })
@@ -311,17 +329,12 @@ pub fn convert_to_wav(file_path: &str) -> Result<String, anyhow::Error> {
             "FFmpeg conversion failed: {}",
             String::from_utf8_lossy(&output.stderr)
         )),
-        Err(err) => Err(anyhow::anyhow!(
-            "Failed to execute FFmpeg: {}",
-            err
-        )),
+        Err(err) => Err(anyhow::anyhow!("Failed to execute FFmpeg: {}", err)),
     }
 }
 
 pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
-    let output = Command::new("whisper-cli")
-        .arg("--help")
-        .output();
+    let output = Command::new("whisper-cli").arg("--help").output();
 
     match output {
         Ok(output) if output.status.success() => Ok(()),
@@ -329,22 +342,19 @@ pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
             "Whisper CLI failed to respond correctly: {}",
             String::from_utf8_lossy(&output.stderr)
         )),
-        Err(err) => Err(anyhow::anyhow!(
-            "Whisper CLI not found: {}",
-            err
-        )),
+        Err(err) => Err(anyhow::anyhow!("Whisper CLI not found: {}", err)),
     }
 }
 
-pub async fn handle_voice_message(file_path: &str) -> Result<Option<String>> {
+pub async fn transcribe_voice_message(file_path: &str) -> Result<Option<String>> {
     check_whisper_installed()?;
-    
+
     let wav_path = convert_to_wav(file_path)?;
-    
+
     let transcription = speech_to_text(&wav_path).await?;
-    
-    std::fs::remove_file(file_path).ok();
-    std::fs::remove_file(&wav_path).ok();
+
+    remove_file(file_path).ok();
+    remove_file(&wav_path).ok();
 
     if transcription.trim().is_empty() {
         Ok(None)

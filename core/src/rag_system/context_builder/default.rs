@@ -26,14 +26,7 @@ impl ContextBuilder for DefaultContextBuilder {
             return Ok(String::new());
         }
 
-        let mut sorted_docs = documents;
-        sorted_docs.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        let context = sorted_docs
+        let context = documents
             .iter()
             .map(|doc| doc.content.clone())
             .collect::<Vec<String>>()

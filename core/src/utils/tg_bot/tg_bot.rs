@@ -1,15 +1,15 @@
-use std::env;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::state::tg_bot::app_state::BotAppState;
+use anyhow::Result;
+use std::env;
 use std::sync::Arc;
 use teloxide::dispatching::{Dispatcher, UpdateHandler};
 use teloxide::error_handlers::LoggingErrorHandler;
+use teloxide::net::Download;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::{dptree, Bot};
-use teloxide::net::Download;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use anyhow::Result;
 
 pub async fn check_username(bot: Bot, msg: Message) -> bool {
     if let Some(_username) = msg.chat.username() {
@@ -32,7 +32,7 @@ pub async fn run_bot_dispatcher(
     if let Some(callback_handler) = callback_query_handler {
         handler_tree = handler_tree.branch(callback_handler);
     }
-    
+
     Dispatcher::builder(bot.clone(), handler_tree)
         .dependencies(dptree::deps![app_state])
         .enable_ctrlc_handler()

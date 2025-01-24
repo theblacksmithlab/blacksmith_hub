@@ -3,6 +3,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 pub mod context_builder;
+pub mod get_results_via_rag_system;
 pub mod retriever;
 pub mod types;
 pub mod vectorizer;

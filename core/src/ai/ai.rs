@@ -4,7 +4,11 @@ use crate::state::request_app::app_state::UserProfile;
 use crate::vector_db::vector_db::qdrant_upsert;
 use anyhow::{Context, Result};
 use async_openai::types::ResponseFormat::JsonObject;
-use async_openai::types::{ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs, CreateEmbeddingResponse, CreateSpeechRequestArgs, CreateSpeechResponse, SpeechModel, Voice};
+use async_openai::types::{
+    ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
+    CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs, CreateEmbeddingResponse,
+    CreateSpeechRequestArgs, CreateSpeechResponse, SpeechModel, Voice,
+};
 // use std::env;
 use chrono::{Duration, Utc};
 use std::fs;
@@ -14,11 +18,12 @@ use std::sync::Arc;
 // use reqwest::Client as ReqwestClient;
 // use serde_json::json;
 use crate::local_db::local_db::save_user_profile;
-use crate::utils::common::{get_system_role_or_fallback, split_text_into_chunks};
-use crate::utils::common::LlmModel;
-use teloxide::prelude::ChatId;
-use tracing::{error, info, warn};
 use crate::models::request_app::request_app::RequestAppSystemRoleType;
+use crate::utils::common::LlmModel;
+use crate::utils::common::{get_system_role_or_fallback, split_text_into_chunks};
+use teloxide::prelude::ChatId;
+use tiktoken_rs::cl100k_base;
+use tracing::{error, info, warn};
 
 pub async fn raw_llm_processing_json<T: LlmProcessing + Send + Sync>(
     system_role: String,
@@ -266,19 +271,19 @@ pub async fn simple_tts<T: LlmProcessing + Send + Sync>(
     Ok(response)
 }
 
-
 pub async fn process_users_self_description(
     user_id: ChatId,
     user_story_for_profile_creation: String,
     app_state: Arc<RequestAppState>,
 ) -> Result<()> {
     let pool = &app_state.local_db_pool;
-    
-    let fallback_system_role = "Return the text provided to you without additional remarks or design.".to_string();
+
+    let fallback_system_role =
+        "Return the text provided to you without additional remarks or design.".to_string();
     let system_role = get_system_role_or_fallback(
         "request_app",
         RequestAppSystemRoleType::ProcessingUsersBioText,
-        Some(&fallback_system_role)
+        Some(&fallback_system_role),
     );
 
     let users_about_text_str = raw_llm_processing_json(
@@ -359,7 +364,10 @@ pub async fn vectorize(data: String, app_state: Arc<RequestAppState>) -> Result<
 
 pub async fn speech_to_text(file_path: &str) -> Result<String> {
     if !std::path::Path::new(file_path).exists() {
-        return Err(anyhow::anyhow!("Voice message file not found: {}", file_path));
+        return Err(anyhow::anyhow!(
+            "Voice message file not found: {}",
+            file_path
+        ));
     }
 
     let output = Command::new("whisper-cli")
@@ -375,7 +383,7 @@ pub async fn speech_to_text(file_path: &str) -> Result<String> {
     match output {
         Ok(output) if output.status.success() => {
             let stdout = String::from_utf8(output.stdout)?;
-            
+
             if stdout.trim().is_empty() {
                 Ok("Empty text".to_string())
             } else {
@@ -389,10 +397,31 @@ pub async fn speech_to_text(file_path: &str) -> Result<String> {
         }
         Err(err) => {
             error!("Failed to execute Whisper CLI: {}", err);
-            Err(anyhow::anyhow!(
-                "Failed to execute Whisper CLI: {}",
-                err
-            ))
+            Err(anyhow::anyhow!("Failed to execute Whisper CLI: {}", err))
         }
+    }
+}
+
+pub async fn tokenize_and_truncate(data: String) -> Result<String> {
+    let bpe = cl100k_base()?;
+
+    let tokens = bpe.encode_ordinary(&*data);
+    info!(
+        "Tokenize_and_truncate fn | Input tokens: {:?}",
+        tokens.len()
+    );
+
+    if tokens.len() > 10000 {
+        let truncated_tokens = tokens[..10000].to_vec();
+
+        let truncated_data = bpe.decode(truncated_tokens)?;
+
+        let truncated_text_tokens = bpe.encode_ordinary(&*truncated_data);
+        info!("Truncated input tokens: {:?}", truncated_text_tokens.len());
+
+        Ok(truncated_data)
+    } else {
+        info!("Input tokens < 10000, no need to truncate");
+        Ok(data.to_string())
     }
 }

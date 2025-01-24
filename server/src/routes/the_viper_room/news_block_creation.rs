@@ -3,16 +3,16 @@ use crate::routes::the_viper_room::news_block_creation_utils::{
     updates_file_creation,
 };
 use core::ai::ai::{raw_llm_processing, text_to_speech};
+use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
 use core::state::llm_client_init_trait::LlmProcessing;
+use core::utils::common::get_system_role_or_fallback;
 use core::utils::common::{get_message, LlmModel};
 use grammers_client::Client as g_Client;
 use std::fs;
 use std::fs::{create_dir_all, read_dir, remove_file, rename};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, info};
-use core::utils::common::get_system_role_or_fallback;
-use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
 
 pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
     client: &g_Client,
@@ -23,27 +23,14 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
 ) -> anyhow::Result<PathBuf> {
     let user_tmp_dir = format!("common_res/the_viper_room/tmp/{}", user_id);
     create_dir_all(&user_tmp_dir)?;
-    let ai_utils_dir = Path::new("common_res/the_viper_room/ai_utils/");
 
     let channels = get_dialogs(&client).await?;
 
-    processing_dialogs(
-        &client,
-        channels,
-        app_state.clone(),
-        user_tmp_dir.clone(),
-    )
-    .await?;
+    processing_dialogs(&client, channels, app_state.clone(), user_tmp_dir.clone()).await?;
 
-    updates_file_creation(user_tmp_dir.clone(), app_state.clone(), ai_utils_dir).await?;
+    updates_file_creation(user_tmp_dir.clone(), app_state.clone()).await?;
 
-    let podcast_text = summarize_updates(
-        user_tmp_dir.clone(),
-        app_state.clone(),
-        nickname,
-        ai_utils_dir,
-    )
-    .await?;
+    let podcast_text = summarize_updates(user_tmp_dir.clone(), app_state.clone(), nickname).await?;
 
     let audio_path = text_to_speech(
         podcast_text.clone(),
@@ -101,7 +88,8 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
         let system_role = get_system_role_or_fallback(
             "the_viper_room",
             TheViperRoomRoleType::CaptionGeneration,
-            None);
+            None,
+        );
 
         let mut caption = raw_llm_processing(
             system_role,

@@ -1,6 +1,7 @@
 pub enum ProbiotRoleType {
     CrapDetection,
     ClarifyRequest,
+    MainProcessing,
 }
 
 impl Into<&'static str> for ProbiotRoleType {
@@ -8,6 +9,7 @@ impl Into<&'static str> for ProbiotRoleType {
         match self {
             ProbiotRoleType::CrapDetection => "crap_detection",
             ProbiotRoleType::ClarifyRequest => "clarify_request",
+            ProbiotRoleType::MainProcessing => "main_processing",
         }
     }
 }

@@ -40,7 +40,10 @@ async fn main() -> Result<()> {
     let llm_client = LLM_Client::new();
 
     let server_app_state = Arc::new(ServerAppState::new(config.clone()));
-    let request_app_state = Arc::new(RequestAppState::new(qdrant_client.clone(), llm_client.clone()));
+    let request_app_state = Arc::new(RequestAppState::new(
+        qdrant_client.clone(),
+        llm_client.clone(),
+    ));
     let the_viper_room_app_state = Arc::new(TheViperRoomAppState::new(llm_client.clone()));
     let bot_app_state = Arc::new(BotAppState::new(llm_client, qdrant_client));
 

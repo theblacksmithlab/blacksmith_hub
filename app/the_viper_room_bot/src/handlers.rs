@@ -129,8 +129,12 @@ pub(crate) async fn command_handler(
         }
 
         _ => {
-            let bot_msg =
-                get_message(Some("the_viper_room"), "wrong_cmd_or_no_rights_message", false).await?;
+            let bot_msg = get_message(
+                Some("the_viper_room"),
+                "wrong_cmd_or_no_rights_message",
+                false,
+            )
+            .await?;
             bot.send_message(user_id, bot_msg).await?;
         }
     }
