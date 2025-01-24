@@ -23,10 +23,17 @@ pub async fn check_username(bot: Bot, msg: Message) -> bool {
 
 pub async fn run_bot_dispatcher(
     bot: Bot,
-    handler: UpdateHandler<anyhow::Error>,
+    main_handler: UpdateHandler<anyhow::Error>,
     app_state: Arc<BotAppState>,
+    callback_query_handler: Option<UpdateHandler<anyhow::Error>>,
 ) -> Result<()> {
-    Dispatcher::builder(bot.clone(), handler)
+    let mut handler_tree = dptree::entry().branch(main_handler);
+
+    if let Some(callback_handler) = callback_query_handler {
+        handler_tree = handler_tree.branch(callback_handler);
+    }
+    
+    Dispatcher::builder(bot.clone(), handler_tree)
         .dependencies(dptree::deps![app_state])
         .enable_ctrlc_handler()
         .build()

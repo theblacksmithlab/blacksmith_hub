@@ -2,7 +2,7 @@ mod handlers;
 mod user_message_processing;
 mod probiot_utils;
 
-use crate::handlers::{command_handler, message_handler, ProbiotBotCommands};
+use crate::handlers::{callback_query_handler, command_handler, message_handler, ProbiotBotCommands};
 use async_openai::Client as LLM_Client;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
     let llm_client = LLM_Client::new();
 
     let bot_app_state = Arc::new(BotAppState::new(llm_client));
-
+    
     start_probiot(bot_app_state).await?;
 
     Ok(())
@@ -45,10 +45,16 @@ pub async fn start_probiot(app_state: Arc<BotAppState>) -> anyhow::Result<()> {
     let cmd_handler = Update::filter_message()
         .filter_command::<ProbiotBotCommands>()
         .endpoint(command_handler);
+    
     let chat_handler = Update::filter_message().endpoint(message_handler);
-    let handler = dptree::entry().branch(cmd_handler).branch(chat_handler);
+    
+    let callback_handler = Update::filter_callback_query().endpoint(callback_query_handler);
 
-    run_bot_dispatcher(bot, handler, app_state).await?;
+    let main_handler = dptree::entry()
+        .branch(cmd_handler)
+        .branch(chat_handler);
+
+    run_bot_dispatcher(bot, main_handler, app_state, Some(callback_handler)).await?;
 
     Ok(())
 }
