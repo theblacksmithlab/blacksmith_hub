@@ -32,7 +32,6 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
         channels,
         app_state.clone(),
         user_tmp_dir.clone(),
-        ai_utils_dir,
     )
     .await?;
 

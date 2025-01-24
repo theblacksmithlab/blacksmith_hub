@@ -6,21 +6,24 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tokio::sync::Mutex;
+use qdrant_client::Qdrant;
 
 pub struct BotAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,
     pub podcast_manager: Arc<PodcastManager>,
     pub temp_cache: Mutex<HashMap<ChatId, DialogueCache>>,
+    pub qdrant_client: Arc<Qdrant>,
 }
 
 impl BotAppState {
-    pub fn new(llm_client: LLM_Client<OpenAIConfig>) -> Self {
+    pub fn new(llm_client: LLM_Client<OpenAIConfig>, qdrant_client: Arc<Qdrant>) -> Self {
         let podcast_manager = Arc::new(PodcastManager::new());
         let temp_cache = Mutex::new(HashMap::new());
         Self {
             llm_client,
             podcast_manager,
             temp_cache,
+            qdrant_client,
         }
     }
 }

@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use crate::rag_system::types::{Document, DocumentMetadata};
 use crate::rag_system::Retriever;
 use anyhow::Result;
@@ -7,12 +8,12 @@ use qdrant_client::Qdrant;
 use tracing::error;
 
 pub struct QdrantRetriever {
-    client: Qdrant,
+    client: Arc<Qdrant>,
     collection_name: String,
 }
 
 impl QdrantRetriever {
-    pub fn new(client: Qdrant, collection_name: String) -> Self {
+    pub fn new(client: Arc<Qdrant>, collection_name: String) -> Self {
         Self {
             client,
             collection_name,

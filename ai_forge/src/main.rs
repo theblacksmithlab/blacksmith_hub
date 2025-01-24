@@ -31,16 +31,18 @@ async fn main() -> Result<()> {
     let config: AppConfig = config_builder.build()?.try_deserialize()?;
     let config = Arc::new(config);
 
-    let qdrant_client = Qdrant::from_url(&env::var("QDRANT_URL")?)
-        .api_key(env::var("QDRANT_API_KEY")?)
-        .build()?;
+    let qdrant_client = Arc::new(
+        Qdrant::from_url(&env::var("QDRANT_URL")?)
+            .api_key(env::var("QDRANT_API_KEY")?)
+            .build()?,
+    );
 
     let llm_client = LLM_Client::new();
 
     let server_app_state = Arc::new(ServerAppState::new(config.clone()));
-    let request_app_state = Arc::new(RequestAppState::new(qdrant_client, llm_client.clone()));
+    let request_app_state = Arc::new(RequestAppState::new(qdrant_client.clone(), llm_client.clone()));
     let the_viper_room_app_state = Arc::new(TheViperRoomAppState::new(llm_client.clone()));
-    let bot_app_state = Arc::new(BotAppState::new(llm_client));
+    let bot_app_state = Arc::new(BotAppState::new(llm_client, qdrant_client));
 
     info!("Initializing local_db pool...");
     let local_db_pool = create_db_pool().await?;

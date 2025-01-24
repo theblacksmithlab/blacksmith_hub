@@ -1,3 +1,4 @@
+use std::fs::remove_file;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use std::sync::Arc;
@@ -8,10 +9,11 @@ use anyhow::Result;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::types::{InputFile, ReplyParameters};
 use tracing::error;
+use tracing::log::info;
 use crate::user_message_processing::process_user_raw_request;
 use core::utils::tg_bot::tg_bot::download_voice;
 use core::utils::common::handle_voice_message;
-use core::utils::tg_bot::tg_bot::add_llm_response_to_cache;
+use core::utils::tg_bot::tg_bot::{add_llm_response_to_cache, get_cache_as_string};
 use crate::probiot_utils::create_tts_button;
 use core::ai::ai::simple_tts;
 
@@ -48,6 +50,9 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
                             bot.send_message(chat_id, llm_response)
                                 .reply_markup(create_tts_button())
                                 .await?;
+                            
+                            let current_cache = get_cache_as_string(app_state.clone(), chat_id).await;
+                            bot.send_message(chat_id, current_cache).await?;
                         }
                         Err(err) => {
                             error!("Error in process_user_raw_request: {}", err);
@@ -95,8 +100,6 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message, app_state: Arc<BotAp
                 .await?;
         }
     }
-    
-    // TODO: Send TTS button;
 
     Ok(())
 }
@@ -119,7 +122,11 @@ pub(crate) async fn command_handler(
     Ok(())
 }
 
-pub(crate) async fn callback_query_handler(bot: Bot, query: CallbackQuery, app_state: Arc<BotAppState>) -> Result<()> {
+pub(crate) async fn callback_query_handler(
+    bot: Bot,
+    query: CallbackQuery,
+    app_state: Arc<BotAppState>
+) -> Result<()> {
     if let Some(data) = query.data {
         if data == "tts" {
             if let Some(message) = query.message {
@@ -130,7 +137,12 @@ pub(crate) async fn callback_query_handler(bot: Bot, query: CallbackQuery, app_s
                             let audio_file_path = format!("tmp/{}.mp3", message_id);
                             audio_response.save(&audio_file_path).await?;
                             
-                            bot.send_voice(message.chat().id, InputFile::file(audio_file_path)).await?;
+                            bot.send_voice(message.chat().id, InputFile::file(audio_file_path.clone())).await?;
+
+                            match remove_file(audio_file_path.clone()) {
+                                Ok(_) => info!("Tmp tts fn file {} deleted", audio_file_path),
+                                Err(e) => info!("Could not delete tmp tts file {}: {}", audio_file_path, e),
+                            }
                         }
                         Err(err) => {
                             error!("TTS generation failed: {}", err);

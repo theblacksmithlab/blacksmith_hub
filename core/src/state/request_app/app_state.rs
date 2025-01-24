@@ -10,7 +10,7 @@ use teloxide::prelude::ChatId;
 use tokio::sync::Mutex;
 
 pub struct RequestAppState {
-    pub qdrant_client: Qdrant,
+    pub qdrant_client: Arc<Qdrant>,
     pub llm_client: LLM_Client<OpenAIConfig>,
     pub user_states: Mutex<HashMap<ChatId, UserStates>>,
     pub user_profile: Mutex<HashMap<ChatId, UserProfile>>,
@@ -21,7 +21,7 @@ pub struct RequestAppState {
 }
 
 impl RequestAppState {
-    pub fn new(qdrant_client: Qdrant, llm_client: LLM_Client<OpenAIConfig>) -> Self {
+    pub fn new(qdrant_client: Arc<Qdrant>, llm_client: LLM_Client<OpenAIConfig>) -> Self {
         Self {
             qdrant_client,
             llm_client,

@@ -63,7 +63,6 @@ pub(crate) async fn processing_dialogs<T: LlmProcessing + Send + Sync>(
     channels: Vec<types::Dialog>,
     app_state: Arc<T>,
     user_tmp_dir: String,
-    ai_utils_dir: &Path,
 ) -> Result<(), anyhow::Error> {
     // info!("\nReceiving updates from each group...\n");
     // for dialog in groups {
@@ -98,7 +97,6 @@ pub(crate) async fn processing_dialogs<T: LlmProcessing + Send + Sync>(
                 &channel_name,
                 app_state.clone(),
                 user_tmp_dir.clone(),
-                ai_utils_dir,
             )
             .await?;
             sleep(Duration::from_secs(1)).await;
@@ -217,7 +215,6 @@ pub(crate) async fn get_latest_messages<T: LlmProcessing + Send + Sync>(
     chat_name: &str,
     app_state: Arc<T>,
     user_tmp_dir: String,
-    ai_utils_dir: &Path,
 ) -> anyhow::Result<()> {
     let mut messages = client.iter_messages(dialog.chat());
     let now = Utc::now();
