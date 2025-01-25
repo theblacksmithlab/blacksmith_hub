@@ -20,7 +20,7 @@ where
     T: Into<&'static str>,
 {
     format!(
-        "common_res/{}/system_roles/{}.txt",
+        "common_res/system_roles/{}/{}.txt",
         app_name,
         role_type.into()
     )
