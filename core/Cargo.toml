@@ -22,3 +22,4 @@ axum.workspace = true
 reqwest.workspace = true
 async-trait.workspace = true
 tiktoken-rs.workspace = true
+pulldown-cmark.workspace = true

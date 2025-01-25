@@ -94,3 +94,11 @@ pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> Result
 
     Ok(base_path.to_str().unwrap().to_string())
 }
+
+pub async fn get_user_message_count(app_state: &Arc<BotAppState>, user_id: ChatId) -> usize {
+    let cache = app_state.temp_cache.lock().await;
+    cache
+        .get(&user_id)
+        .map(|chat_cache| chat_cache.count_user_messages())
+        .unwrap_or(0)
+}

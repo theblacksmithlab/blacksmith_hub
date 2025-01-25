@@ -3,7 +3,7 @@ mod probiot_utils;
 mod user_message_processing;
 
 use crate::handlers::{
-    callback_query_handler, command_handler, message_handler, ProbiotBotCommands,
+    callback_query_handler, command_handler, message_handler,
 };
 use async_openai::Client as LLM_Client;
 use core::state::tg_bot::app_state::BotAppState;
@@ -17,6 +17,7 @@ use teloxide::prelude::Update;
 use teloxide::{dptree, Bot};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
+use core::models::tg_bot::probiot::probiot_bot_commands::ProbiotBotCommands;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -26,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::new("info"))
         .init();
 
-    info!("Starting Probiot...");
+    info!("Starting bot...");
 
     let qdrant_client = Arc::new(
         Qdrant::from_url(&env::var("QDRANT_URL")?)
@@ -44,6 +45,8 @@ async fn main() -> anyhow::Result<()> {
 }
 
 pub async fn start_probiot(app_state: Arc<BotAppState>) -> anyhow::Result<()> {
+    info!("Probiot summoned up!!");
+    
     let bot = Bot::new(env::var("TELOXIDE_TOKEN_PROBIOT")?);
 
     let cmd_handler = Update::filter_message()

@@ -6,7 +6,6 @@ use core::models::common::qdrant_collection_manager::ApplicationManager;
 use core::models::tg_bot::probiot::get_system_role_model::ProbiotRoleType;
 use core::rag_system::get_results_via_rag_system::get_results_via_rag_system::get_results_via_rag_system;
 use core::state::tg_bot::app_state::BotAppState;
-use core::utils::common::get_message;
 use core::utils::common::get_system_role_or_fallback;
 use core::utils::common::LlmModel;
 use core::utils::tg_bot::tg_bot::{add_user_message_to_cache, get_cache_as_string};
@@ -18,7 +17,6 @@ pub async fn process_user_raw_request(
     chat_id: ChatId,
     user_raw_request: String,
     app_state: Arc<BotAppState>,
-    initiator_app_name: String,
 ) -> Result<String> {
     add_user_message_to_cache(app_state.clone(), chat_id, user_raw_request.clone()).await;
 
@@ -35,14 +33,16 @@ pub async fn process_user_raw_request(
     .await?;
 
     if is_crap {
-        let response_for_crap_request = get_message(
-            Some(&initiator_app_name),
-            "response_for_crap_request",
-            false,
+        info!("Crap request detected, sending message to handle_crap_request fn");
+        let response_for_crap_request = handle_crap_request(
+            user_raw_request,
+            app_state.clone(),
+            clarified_request.clone(),
         )
         .await?;
         Ok(response_for_crap_request)
     } else {
+        info!("Valid request detected, sending message to handle_valid_request fn");
         let response_for_valid_request = handle_valid_request(
             user_raw_request,
             clarified_request,
@@ -95,5 +95,23 @@ pub async fn handle_valid_request(
     let llm_response =
         raw_llm_processing(system_role, llm_message, app_state, LlmModel::Complex).await?;
 
+    Ok(llm_response)
+}
+
+pub async fn handle_crap_request(
+    user_raw_request: String,
+    app_state: Arc<BotAppState>,
+    current_cache: String,
+) -> Result<String> {
+    let llm_message = format!(
+        "User's current query: {}\nChat history: {}",
+        user_raw_request, current_cache
+    );
+
+    let system_role = get_system_role_or_fallback("probiot", ProbiotRoleType::CrapRequestProcessing, None);
+
+    let llm_response =
+        raw_llm_processing(system_role, llm_message, app_state, LlmModel::Light).await?;
+    
     Ok(llm_response)
 }

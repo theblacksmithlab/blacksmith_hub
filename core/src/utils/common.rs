@@ -14,6 +14,7 @@ use std::process::Command;
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tracing::error;
+use pulldown_cmark::{html, Parser};
 
 pub fn get_system_role_path<T>(app_name: &str, role_type: T) -> String
 where
@@ -192,6 +193,8 @@ pub async fn get_message(
     message_name: &str,
     is_common: bool,
 ) -> Result<String> {
+    const DEFAULT_FALLBACK_MESSAGE: &str = "Извините, произошла техническая ошибка. Пожалуйста, попробуйте позже.";
+    
     let base_path: PathBuf = if is_common {
         Path::new("common_res/messages/common").to_path_buf()
     } else {
@@ -199,7 +202,7 @@ pub async fn get_message(
             Some(name) => Path::new("common_res/messages").join(name),
             None => {
                 error!("App name is required when is_common = false");
-                return Err(anyhow!("App name is required when is_common = false"));
+                return Ok(DEFAULT_FALLBACK_MESSAGE.to_string());
             }
         }
     };
@@ -208,31 +211,20 @@ pub async fn get_message(
 
     if !path.exists() {
         error!("Message file not found: {}", path.display());
-        return Err(anyhow!(
-            "Message file '{}' {} does not exist at path: {}",
-            message_name,
-            if is_common {
-                "(common message)"
-            } else {
-                "for app"
-            },
-            path.display()
-        ));
+        return Ok(DEFAULT_FALLBACK_MESSAGE.to_string());
     }
 
-    read_to_string(&path).map_err(|e| {
-        error!("Failed to read message file {}: {}", path.display(), e);
-        anyhow!(
-            "Failed to read message '{}' {}: {}",
-            message_name,
-            if is_common {
-                "(common message)"
-            } else {
-                "for app"
-            },
-            e
-        )
-    })
+    read_to_string(&path)
+        .map_err(|e| {
+            error!("Failed to read message file {}: {}", path.display(), e);
+            anyhow!(
+                "Failed to read message '{}' {}: {}",
+                message_name,
+                if is_common { "(common message)" } else { "for app" },
+                e
+            )
+        })
+        .or_else(|_| Ok(DEFAULT_FALLBACK_MESSAGE.to_string()))
 }
 
 pub async fn get_user_avatar(
@@ -361,4 +353,11 @@ pub async fn transcribe_voice_message(file_path: &str) -> Result<Option<String>>
     } else {
         Ok(Some(transcription))
     }
+}
+
+pub fn markdown_to_html(markdown: &str) -> String {
+    let parser = Parser::new(markdown);
+    let mut html_output = String::new();
+    html::push_html(&mut html_output, parser);
+    html_output
 }

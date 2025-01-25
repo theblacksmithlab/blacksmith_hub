@@ -10,6 +10,8 @@ use teloxide::macros::BotCommands;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::Bot;
 use tracing::info;
+use core::models::common::system_messages::{CommonMessages, TheViperRoomBotMessages};
+use core::models::common::app_name::AppName;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -23,7 +25,12 @@ pub enum TheViperRoomBotCommands {
 
 pub(crate) async fn message_handler(bot: Bot, msg: Message) -> Result<()> {
     let user_id = msg.chat.id;
-    let bot_msg = get_message(None, "auto_reply", true).await?;
+    let bot_msg = get_message(
+        None,
+        CommonMessages::AutoReply.as_str(),
+        true
+    )
+        .await?;
     bot.send_message(user_id, bot_msg).await?;
 
     Ok(())
@@ -36,6 +43,7 @@ pub(crate) async fn command_handler(
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let user_id = msg.chat.id;
+    let initiator_app_name = AppName::TheViperRoomBot.as_str().to_string();
 
     let lord_admin_id: i64 = env::var("LORD_ADMIN_ID")
         .expect("LORD_ADMIN_ID environment variable must be set")
@@ -71,7 +79,12 @@ pub(crate) async fn command_handler(
     match cmd {
         TheViperRoomBotCommands::Start => {
             info!("Healthy user starts the App... Ok");
-            let bot_msg = get_message(None, "start_message", true).await?;
+            let bot_msg = get_message(
+                None,
+                CommonMessages::StartMessage.as_str(),
+                true
+            )
+                .await?;
             bot.send_message(user_id, bot_msg).await?;
         }
 
@@ -130,8 +143,8 @@ pub(crate) async fn command_handler(
 
         _ => {
             let bot_msg = get_message(
-                Some("the_viper_room"),
-                "wrong_cmd_or_no_rights_message",
+                Some(&initiator_app_name),
+                TheViperRoomBotMessages::WrongCmdOrNoRightsMessage.as_str(),
                 false,
             )
             .await?;
