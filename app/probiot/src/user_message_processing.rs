@@ -84,7 +84,7 @@ pub async fn handle_valid_request(
         .unwrap_or_else(|_| search_results_text_payload);
 
     let llm_message = format!(
-        "User's current query: {}\nUser's refined query: {}\nChat history: {}\nUseful information from the database: {}",
+        "User's current query: {}\nUser's refined query: {}\nChat history: {}\nUseful information from the database:\n{}",
         user_raw_request, clarified_request, current_cache, processed_data
     );
 

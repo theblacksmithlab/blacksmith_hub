@@ -23,8 +23,6 @@ use tracing::log::info;
 use core::models::common::app_name::AppName;
 use uuid::Uuid;
 use core::models::common::system_messages::{CommonMessages, ProbiotMessages};
-use core::utils::common::markdown_to_html;
-
 
 pub(crate) async fn message_handler(
     bot: Bot,
