@@ -7,7 +7,7 @@ use async_openai::types::ResponseFormat::JsonObject;
 use async_openai::types::{
     ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
     CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs, CreateEmbeddingResponse,
-    CreateSpeechRequestArgs, SpeechModel, Voice,
+    CreateSpeechRequestArgs, CreateSpeechResponse, SpeechModel, Voice,
 };
 // use std::env;
 use chrono::{Duration, Utc};
@@ -18,21 +18,24 @@ use std::sync::Arc;
 // use reqwest::Client as ReqwestClient;
 // use serde_json::json;
 use crate::local_db::local_db::save_user_profile;
-use crate::utils::common::split_text_into_chunks;
-use crate::utils::common::{get_system_role_file_path, read_system_role, LlmModel, SystemRoleType};
+use crate::models::request_app::request_app::RequestAppSystemRoleType;
+use crate::utils::common::LlmModel;
+use crate::utils::common::{get_system_role_or_fallback, split_text_into_chunks};
 use teloxide::prelude::ChatId;
-use tracing::{info, warn};
+use tiktoken_rs::cl100k_base;
+use tracing::{error, info, warn};
 
-pub async fn raw_llm_processing_json(
+pub async fn raw_llm_processing_json<T: LlmProcessing + Send + Sync>(
     system_role: String,
     request: String,
-    app_state: Arc<RequestAppState>,
+    app_state: Arc<T>,
+    model: LlmModel,
 ) -> Result<String> {
-    let llm_client = app_state.llm_client.clone();
+    let llm_client = app_state.get_llm_client().clone();
 
     let llm_request = CreateChatCompletionRequestArgs::default()
         .max_tokens(4095u32)
-        .model("gpt-4o")
+        .model(model.as_str())
         .temperature(0.2)
         .messages([
             ChatCompletionRequestSystemMessageArgs::default()
@@ -250,6 +253,24 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
 //     Ok(PathBuf::from(audio_file_path))
 // }
 
+pub async fn simple_tts<T: LlmProcessing + Send + Sync>(
+    text: String,
+    app_state: Arc<T>,
+) -> Result<CreateSpeechResponse> {
+    let llm_client = app_state.get_llm_client().clone();
+
+    let request = CreateSpeechRequestArgs::default()
+        .input(&text)
+        .voice(Voice::Onyx)
+        .model(SpeechModel::Tts1Hd)
+        .speed(1.3)
+        .build()?;
+
+    let response = llm_client.audio().speech(request).await?;
+
+    Ok(response)
+}
+
 pub async fn process_users_self_description(
     user_id: ChatId,
     user_story_for_profile_creation: String,
@@ -257,18 +278,19 @@ pub async fn process_users_self_description(
 ) -> Result<()> {
     let pool = &app_state.local_db_pool;
 
-    let role_type = SystemRoleType::ProcessingUserStoryForProfile;
-    let file_path = get_system_role_file_path(role_type);
-
-    let system_role = read_system_role(file_path).unwrap_or_else(|err| {
-        eprintln!("Failed to load system role: {}", err);
-        "Return the text provided to you without additional remarks or design.".to_string()
-    });
+    let fallback_system_role =
+        "Return the text provided to you without additional remarks or design.".to_string();
+    let system_role = get_system_role_or_fallback(
+        "request_app",
+        RequestAppSystemRoleType::ProcessingUsersBioText,
+        Some(&fallback_system_role),
+    );
 
     let users_about_text_str = raw_llm_processing_json(
         system_role,
         user_story_for_profile_creation,
         app_state.clone(),
+        LlmModel::Complex,
     )
     .await?;
     info!(
@@ -338,4 +360,68 @@ pub async fn vectorize(data: String, app_state: Arc<RequestAppState>) -> Result<
     let embedding = response.data.into_iter().next().unwrap().embedding;
 
     Ok(embedding)
+}
+
+pub async fn speech_to_text(file_path: &str) -> Result<String> {
+    if !std::path::Path::new(file_path).exists() {
+        return Err(anyhow::anyhow!(
+            "Voice message file not found: {}",
+            file_path
+        ));
+    }
+
+    let output = Command::new("whisper-cli")
+        .arg("-m")
+        .arg("/root/projects/whisper.cpp/models/ggml-base.bin")
+        .arg("-f")
+        .arg(file_path)
+        .arg("-l")
+        .arg("ru")
+        .arg("--no-timestamps")
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => {
+            let stdout = String::from_utf8(output.stdout)?;
+
+            if stdout.trim().is_empty() {
+                Ok("Empty text".to_string())
+            } else {
+                Ok(stdout)
+            }
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            error!("Whisper CLI failed: {}", stderr);
+            Err(anyhow::anyhow!("Whisper CLI failed: {}", stderr))
+        }
+        Err(err) => {
+            error!("Failed to execute Whisper CLI: {}", err);
+            Err(anyhow::anyhow!("Failed to execute Whisper CLI: {}", err))
+        }
+    }
+}
+
+pub async fn tokenize_and_truncate(data: String) -> Result<String> {
+    let bpe = cl100k_base()?;
+
+    let tokens = bpe.encode_ordinary(&*data);
+    info!(
+        "Tokenize_and_truncate fn | Input tokens: {:?}",
+        tokens.len()
+    );
+
+    if tokens.len() > 10000 {
+        let truncated_tokens = tokens[..10000].to_vec();
+
+        let truncated_data = bpe.decode(truncated_tokens)?;
+
+        let truncated_text_tokens = bpe.encode_ordinary(&*truncated_data);
+        info!("Truncated input tokens: {:?}", truncated_text_tokens.len());
+
+        Ok(truncated_data)
+    } else {
+        info!("Input tokens < 10000, no need to truncate");
+        Ok(data.to_string())
+    }
 }

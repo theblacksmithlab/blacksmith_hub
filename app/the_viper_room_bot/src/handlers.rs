@@ -23,7 +23,7 @@ pub enum TheViperRoomBotCommands {
 
 pub(crate) async fn message_handler(bot: Bot, msg: Message) -> Result<()> {
     let user_id = msg.chat.id;
-    let bot_msg = get_message("the_viper_room", "auto_reply", true).await?;
+    let bot_msg = get_message(None, "auto_reply", true).await?;
     bot.send_message(user_id, bot_msg).await?;
 
     Ok(())
@@ -71,7 +71,7 @@ pub(crate) async fn command_handler(
     match cmd {
         TheViperRoomBotCommands::Start => {
             info!("Healthy user starts the App... Ok");
-            let bot_msg = get_message("the_viper_room", "start_message", true).await?;
+            let bot_msg = get_message(None, "start_message", true).await?;
             bot.send_message(user_id, bot_msg).await?;
         }
 
@@ -129,8 +129,12 @@ pub(crate) async fn command_handler(
         }
 
         _ => {
-            let bot_msg =
-                get_message("the_viper_room", "wrong_cmd_or_no_rights_message", true).await?;
+            let bot_msg = get_message(
+                Some("the_viper_room"),
+                "wrong_cmd_or_no_rights_message",
+                false,
+            )
+            .await?;
             bot.send_message(user_id, bot_msg).await?;
         }
     }

@@ -1,12 +1,14 @@
 use chrono::Duration as ChronoDuration;
 use chrono::Utc;
 use core::ai::ai::raw_llm_processing;
+use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
 use core::state::llm_client_init_trait::LlmProcessing;
+use core::utils::common::get_system_role_or_fallback;
 use core::utils::common::LlmModel;
 use grammers_client::types::Chat::{Channel, Group, User};
 use grammers_client::{types, Client as g_Client};
 use std::fs;
-use std::fs::{read_dir, read_to_string, remove_file, OpenOptions};
+use std::fs::{read_dir, remove_file, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
@@ -61,7 +63,6 @@ pub(crate) async fn processing_dialogs<T: LlmProcessing + Send + Sync>(
     channels: Vec<types::Dialog>,
     app_state: Arc<T>,
     user_tmp_dir: String,
-    ai_utils_dir: &Path,
 ) -> Result<(), anyhow::Error> {
     // info!("\nReceiving updates from each group...\n");
     // for dialog in groups {
@@ -96,7 +97,6 @@ pub(crate) async fn processing_dialogs<T: LlmProcessing + Send + Sync>(
                 &channel_name,
                 app_state.clone(),
                 user_tmp_dir.clone(),
-                ai_utils_dir,
             )
             .await?;
             sleep(Duration::from_secs(1)).await;
@@ -109,7 +109,6 @@ pub(crate) async fn processing_dialogs<T: LlmProcessing + Send + Sync>(
 pub(crate) async fn updates_file_creation<T: LlmProcessing + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
-    ai_utils_dir: &Path,
 ) -> Result<(), anyhow::Error> {
     info!("Writing results from information sources in updates.txt...");
 
@@ -138,9 +137,8 @@ pub(crate) async fn updates_file_creation<T: LlmProcessing + Send + Sync>(
         utc_plus_3
     )?;
 
-    let system_role_path = ai_utils_dir.join("system_role_extracting_news.txt");
-    let system_role = read_to_string(&system_role_path)
-        .map_err(|e| anyhow::anyhow!("Failed to read 'system role': {}", e))?;
+    let system_role =
+        get_system_role_or_fallback("the_viper_room", TheViperRoomRoleType::ExtractingNews, None);
 
     for file_path in txt_files.clone() {
         let content = read_file_safe(&file_path)?;
@@ -171,11 +169,12 @@ pub(crate) async fn summarize_updates<T: LlmProcessing + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
     nickname: String,
-    ai_utils_dir: &Path,
 ) -> Result<String, anyhow::Error> {
-    let system_role_path = ai_utils_dir.join("system_role_creating_podcast.txt");
-    let system_role = read_to_string(&system_role_path)
-        .map_err(|e| anyhow::anyhow!("Failed to read 'system role': {}", e))?;
+    let system_role = get_system_role_or_fallback(
+        "the_viper_room",
+        TheViperRoomRoleType::CreatingPodcast,
+        None,
+    );
 
     let updates = read_file_safe(format!("{}/updates.txt", user_tmp_dir))
         .map_err(|e| format!("Failed to read 'updates': {}", e))
@@ -213,7 +212,6 @@ pub(crate) async fn get_latest_messages<T: LlmProcessing + Send + Sync>(
     chat_name: &str,
     app_state: Arc<T>,
     user_tmp_dir: String,
-    ai_utils_dir: &Path,
 ) -> anyhow::Result<()> {
     let mut messages = client.iter_messages(dialog.chat());
     let now = Utc::now();
@@ -230,11 +228,11 @@ pub(crate) async fn get_latest_messages<T: LlmProcessing + Send + Sync>(
         .write(true)
         .open(user_tmp_file)?;
 
-    let system_role_path = ai_utils_dir.join("system_role_usefulness.txt");
-    let system_role = read_to_string(&system_role_path).map_err(|e| {
-        eprintln!("Failed to read 'system role': {}", e);
-        e
-    })?;
+    let system_role = get_system_role_or_fallback(
+        "the_viper_room",
+        TheViperRoomRoleType::CheckUsefulness,
+        None,
+    );
 
     while let Some(message) = messages.next().await? {
         if message.date() < period {

@@ -22,7 +22,7 @@ pub(crate) async fn command_handler(
 ) -> anyhow::Result<()> {
     let RequestAppBotCommands::Start = cmd;
 
-    let bot_msg = get_message("request_app", "start_message", true).await?;
+    let bot_msg = get_message(None, "start_message", true).await?;
     bot.send_message(msg.chat.id, bot_msg).await?;
 
     Ok(())

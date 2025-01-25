@@ -1,3 +1,4 @@
+use crate::ai::ai::speech_to_text;
 use crate::models::request_app::request_app::{AvatarRequest, AvatarResponse};
 use crate::state::request_app::app_state::{RequestAppState, UserProfile, UserStates};
 use crate::state::the_viper_room::app_state::{AuthStages, TheViperRoomAppState, UserData};
@@ -7,30 +8,45 @@ use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
 use std::env;
-use std::fs::read_to_string;
+use std::fs::{read_to_string, remove_file};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tracing::error;
 
-pub enum SystemRoleType {
-    ProcessingUserStoryForProfile,
-    // ProcessingUserStoryForRequest,
-    ReorderingResults,
+pub fn get_system_role_path<T>(app_name: &str, role_type: T) -> String
+where
+    T: Into<&'static str>,
+{
+    format!(
+        "common_res/{}/system_roles/{}.txt",
+        app_name,
+        role_type.into()
+    )
 }
 
-pub fn get_system_role_file_path(role_type: SystemRoleType) -> &'static str {
-    match role_type {
-        SystemRoleType::ProcessingUserStoryForProfile => {
-            "common_res/system_role_for_processing_users_about_text.txt"
+pub fn get_system_role_or_fallback<T>(
+    app_name: &str,
+    role_type: T,
+    fallback: Option<&str>,
+) -> String
+where
+    T: Into<&'static str>,
+{
+    let file_path = get_system_role_path(app_name, role_type);
+    match read_to_string(&file_path) {
+        Ok(content) => content,
+        Err(err) => {
+            eprintln!(
+                "Failed to load system role '{}': {}. Using fallback.",
+                file_path, err
+            );
+            fallback
+                .unwrap_or("You are a helpful assistant")
+                .to_string()
         }
-        // SystemRoleType::ProcessingUserStoryForRequest => "common_res/system_role_for_processing_users_request_text.txt",
-        SystemRoleType::ReorderingResults => "common_res/system_role_for_reordering_via_llm.txt",
     }
-}
-
-pub fn read_system_role(file_path: &str) -> Result<String, String> {
-    read_to_string(file_path).map_err(|e| format!("Failed to read '{}': {}", file_path, e))
 }
 
 pub enum LlmModel {
@@ -171,11 +187,21 @@ pub async fn update_the_viper_room_user_data<F>(
     update_fn(data);
 }
 
-pub async fn get_message(app_name: &str, message_name: &str, is_common: bool) -> Result<String> {
+pub async fn get_message(
+    app_name: Option<&str>,
+    message_name: &str,
+    is_common: bool,
+) -> Result<String> {
     let base_path: PathBuf = if is_common {
-        Path::new("common_res/messages").join(app_name)
+        Path::new("common_res/messages/common").to_path_buf()
     } else {
-        Path::new("app").join(app_name).join("messages")
+        match app_name {
+            Some(name) => Path::new("common_res/messages").join(name),
+            None => {
+                error!("App name is required when is_common = false");
+                return Err(anyhow!("App name is required when is_common = false"));
+            }
+        }
     };
 
     let path = base_path.join(format!("{}.txt", message_name));
@@ -183,9 +209,13 @@ pub async fn get_message(app_name: &str, message_name: &str, is_common: bool) ->
     if !path.exists() {
         error!("Message file not found: {}", path.display());
         return Err(anyhow!(
-            "Message file '{}' for app '{}' does not exist at path: {}",
+            "Message file '{}' {} does not exist at path: {}",
             message_name,
-            app_name,
+            if is_common {
+                "(common message)"
+            } else {
+                "for app"
+            },
             path.display()
         ));
     }
@@ -193,9 +223,13 @@ pub async fn get_message(app_name: &str, message_name: &str, is_common: bool) ->
     read_to_string(&path).map_err(|e| {
         error!("Failed to read message file {}: {}", path.display(), e);
         anyhow!(
-            "Failed to read message '{}' for app '{}': {}",
+            "Failed to read message '{}' {}: {}",
             message_name,
-            app_name,
+            if is_common {
+                "(common message)"
+            } else {
+                "for app"
+            },
             e
         )
     })
@@ -273,4 +307,58 @@ pub fn split_text_into_chunks(text: &str, max_chars: usize) -> Vec<String> {
     }
 
     chunks
+}
+
+pub fn convert_to_wav(file_path: &str) -> Result<String, anyhow::Error> {
+    let mut path = std::path::PathBuf::from(file_path);
+    path.set_extension("wav");
+
+    let wav_path = path.to_str().unwrap();
+
+    let output = Command::new("ffmpeg")
+        .arg("-i")
+        .arg(file_path)
+        .arg("-ar")
+        .arg("16000")
+        .arg(&wav_path)
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => Ok(wav_path.to_string()),
+        Ok(output) => Err(anyhow::anyhow!(
+            "FFmpeg conversion failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )),
+        Err(err) => Err(anyhow::anyhow!("Failed to execute FFmpeg: {}", err)),
+    }
+}
+
+pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
+    let output = Command::new("whisper-cli").arg("--help").output();
+
+    match output {
+        Ok(output) if output.status.success() => Ok(()),
+        Ok(output) => Err(anyhow::anyhow!(
+            "Whisper CLI failed to respond correctly: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )),
+        Err(err) => Err(anyhow::anyhow!("Whisper CLI not found: {}", err)),
+    }
+}
+
+pub async fn transcribe_voice_message(file_path: &str) -> Result<Option<String>> {
+    check_whisper_installed()?;
+
+    let wav_path = convert_to_wav(file_path)?;
+
+    let transcription = speech_to_text(&wav_path).await?;
+
+    remove_file(file_path).ok();
+    remove_file(&wav_path).ok();
+
+    if transcription.trim().is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(transcription))
+    }
 }

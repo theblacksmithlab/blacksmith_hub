@@ -1,7 +1,8 @@
 use core::ai::ai::raw_llm_processing;
+use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
+use core::utils::common::get_system_role_or_fallback;
 use core::utils::common::LlmModel;
-use std::fs::read_to_string;
 use std::sync::Arc;
 
 pub async fn generate_user_system_nickname(
@@ -10,8 +11,11 @@ pub async fn generate_user_system_nickname(
     first_name: String,
     last_name: String,
 ) -> Result<String, String> {
-    let system_role = read_to_string("common_res/the_viper_room/ai_utils/system_role_nickname.txt")
-        .map_err(|e| format!("Failed to read system role: {}", e))?;
+    let system_role = get_system_role_or_fallback(
+        "the_viper_room",
+        TheViperRoomRoleType::SystemNicknameGeneration,
+        None,
+    );
 
     let user_data = format!(
         "Username: {}, user's firstname: {}, user's lastname: {}",

@@ -33,6 +33,7 @@ qdrant-client = "1.13.0"
 
 # AI Services
 async-openai = "0.26.0"
+tiktoken-rs = "0.6.0"
 
 # Serialization & Data Handling
 serde = { version = "1.0.203", features = ["derive"] }

@@ -1,10 +1,15 @@
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::state::tg_bot::app_state::BotAppState;
+use anyhow::Result;
+use std::env;
 use std::sync::Arc;
 use teloxide::dispatching::{Dispatcher, UpdateHandler};
 use teloxide::error_handlers::LoggingErrorHandler;
+use teloxide::net::Download;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::{dptree, Bot};
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 pub async fn check_username(bot: Bot, msg: Message) -> bool {
     if let Some(_username) = msg.chat.username() {
@@ -18,10 +23,17 @@ pub async fn check_username(bot: Bot, msg: Message) -> bool {
 
 pub async fn run_bot_dispatcher(
     bot: Bot,
-    handler: UpdateHandler<anyhow::Error>,
+    main_handler: UpdateHandler<anyhow::Error>,
     app_state: Arc<BotAppState>,
-) -> anyhow::Result<()> {
-    Dispatcher::builder(bot.clone(), handler)
+    callback_query_handler: Option<UpdateHandler<anyhow::Error>>,
+) -> Result<()> {
+    let mut handler_tree = dptree::entry().branch(main_handler);
+
+    if let Some(callback_handler) = callback_query_handler {
+        handler_tree = handler_tree.branch(callback_handler);
+    }
+
+    Dispatcher::builder(bot.clone(), handler_tree)
         .dependencies(dptree::deps![app_state])
         .enable_ctrlc_handler()
         .build()
@@ -64,4 +76,21 @@ pub async fn get_cache_as_string(app_state: Arc<BotAppState>, user_id: ChatId) -
         .get(&user_id)
         .map(|chat_cache| chat_cache.get_cache_as_string())
         .unwrap_or_else(|| "[]".to_string())
+}
+
+pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> Result<String> {
+    let base_path = env::current_dir()?.join(save_path);
+
+    if let Some(parent_dir) = base_path.parent() {
+        tokio::fs::create_dir_all(parent_dir).await?;
+    }
+
+    let mut destination = File::create(&base_path).await?;
+
+    let file = bot.get_file(file_id).await?;
+    bot.download_file(&file.path, &mut destination).await?;
+
+    destination.flush().await?;
+
+    Ok(base_path.to_str().unwrap().to_string())
 }
