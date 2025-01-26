@@ -79,11 +79,10 @@ impl DialogueCache {
     pub fn add_tts_payload(&mut self, message_id: String, tts_payload: String) {
         self.tts_data.insert(message_id, tts_payload);
     }
-    
+
     pub fn get_and_remove_tts_payload(&mut self, message_id: String) -> Option<String> {
         self.tts_data.remove(&message_id)
     }
-    
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -2,7 +2,8 @@ use crate::probiot_utils::{check_request_for_crap_content, clarify_request};
 use anyhow::Result;
 use core::ai::ai::raw_llm_processing;
 use core::ai::ai::tokenize_and_truncate;
-use core::models::common::qdrant_collection_manager::ApplicationManager;
+use core::models::common::app_name::AppName;
+use core::models::common::qdrant_collection_manager::AppsCollections;
 use core::models::tg_bot::probiot::get_system_role_model::ProbiotRoleType;
 use core::rag_system::get_results_via_rag_system::get_results_via_rag_system::get_results_via_rag_system;
 use core::state::tg_bot::app_state::BotAppState;
@@ -18,11 +19,17 @@ pub async fn process_user_raw_request(
     user_raw_request: String,
     app_state: Arc<BotAppState>,
 ) -> Result<String> {
+    info!("Start processing user raw request...");
     add_user_message_to_cache(app_state.clone(), chat_id, user_raw_request.clone()).await;
 
-    let clarified_request = clarify_request(user_raw_request.clone(), app_state.clone()).await?;
-
     let current_cache = get_cache_as_string(app_state.clone(), chat_id).await;
+
+    let clarified_request = clarify_request(
+        user_raw_request.clone(),
+        current_cache.clone(),
+        app_state.clone(),
+    )
+    .await?;
 
     let is_crap = check_request_for_crap_content(
         user_raw_request.clone(),
@@ -60,10 +67,7 @@ pub async fn handle_valid_request(
     app_state: Arc<BotAppState>,
     current_cache: String,
 ) -> Result<String> {
-    let qdrant_collection_manager = ApplicationManager::new();
-
-    let collection_names: Vec<String> = qdrant_collection_manager
-        .get_probiot_collections()
+    let collection_names: Vec<String> = AppsCollections::all_collections_for_app(AppName::Probiot)
         .iter()
         .map(|collection| collection.as_str().to_string())
         .collect();
@@ -72,7 +76,7 @@ pub async fn handle_valid_request(
         clarified_request.clone(), // Check results providing user_raw_request/clarified_request
         collection_names,
         10,
-        0.3,
+        0.4,
         app_state.clone(),
     )
     .await?;
@@ -108,10 +112,11 @@ pub async fn handle_crap_request(
         user_raw_request, current_cache
     );
 
-    let system_role = get_system_role_or_fallback("probiot", ProbiotRoleType::CrapRequestProcessing, None);
+    let system_role =
+        get_system_role_or_fallback("probiot", ProbiotRoleType::CrapRequestProcessing, None);
 
     let llm_response =
         raw_llm_processing(system_role, llm_message, app_state, LlmModel::Light).await?;
-    
+
     Ok(llm_response)
 }

@@ -26,10 +26,14 @@ impl CommonMessages {
             CommonMessages::StartMessage => "start_message",
             CommonMessages::AutoReply => "auto_reply",
             CommonMessages::DefaultSystemErrorMessage => "default_system_error_message",
-            CommonMessages::ErrorDownloadingVoiceMessageFile => "error_downloading_voice_message_file",
+            CommonMessages::ErrorDownloadingVoiceMessageFile => {
+                "error_downloading_voice_message_file"
+            }
             CommonMessages::ErrorProcessingRequest => "error_processing_request",
             CommonMessages::ErrorProcessingVoiceMessage => "error_processing_voice_message",
-            CommonMessages::GlobalErrorProcessingVoiceMessage => "global_error_processing_voice_message",
+            CommonMessages::GlobalErrorProcessingVoiceMessage => {
+                "global_error_processing_voice_message"
+            }
             CommonMessages::InvalidRequestContent => "invalid_request_content",
         }
     }
@@ -56,8 +60,15 @@ impl ProbiotMessages {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TheViperRoomMessages {
-    WelcomeMessage,
-    ErrorMessage,
+    DonationFooter,
+}
+
+impl TheViperRoomMessages {
+    pub fn as_str(&self) -> &str {
+        match self {
+            TheViperRoomMessages::DonationFooter => "donation_footer",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

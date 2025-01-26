@@ -1,6 +1,8 @@
 use crate::local_utils::{generate_podcast, schedule_podcast, stop_daily_podcasts};
 use anyhow::Result;
 use core::grammers::grammers_functionality::initialize_grammers_client;
+use core::models::common::app_name::AppName;
+use core::models::common::system_messages::{CommonMessages, TheViperRoomBotMessages};
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use std::path::Path;
@@ -10,8 +12,6 @@ use teloxide::macros::BotCommands;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::Bot;
 use tracing::info;
-use core::models::common::system_messages::{CommonMessages, TheViperRoomBotMessages};
-use core::models::common::app_name::AppName;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -25,12 +25,7 @@ pub enum TheViperRoomBotCommands {
 
 pub(crate) async fn message_handler(bot: Bot, msg: Message) -> Result<()> {
     let user_id = msg.chat.id;
-    let bot_msg = get_message(
-        None,
-        CommonMessages::AutoReply.as_str(),
-        true
-    )
-        .await?;
+    let bot_msg = get_message(None, CommonMessages::AutoReply.as_str(), true).await?;
     bot.send_message(user_id, bot_msg).await?;
 
     Ok(())
@@ -79,12 +74,7 @@ pub(crate) async fn command_handler(
     match cmd {
         TheViperRoomBotCommands::Start => {
             info!("Healthy user starts the App... Ok");
-            let bot_msg = get_message(
-                None,
-                CommonMessages::StartMessage.as_str(),
-                true
-            )
-                .await?;
+            let bot_msg = get_message(None, CommonMessages::StartMessage.as_str(), true).await?;
             bot.send_message(user_id, bot_msg).await?;
         }
 

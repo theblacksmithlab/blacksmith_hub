@@ -11,7 +11,7 @@ impl Into<&'static str> for ProbiotRoleType {
             ProbiotRoleType::CrapDetection => "crap_detection",
             ProbiotRoleType::ClarifyRequest => "clarify_request",
             ProbiotRoleType::MainProcessing => "main_processing",
-            ProbiotRoleType::CrapRequestProcessing => "crap_request_processing"
+            ProbiotRoleType::CrapRequestProcessing => "crap_request_processing",
         }
     }
 }

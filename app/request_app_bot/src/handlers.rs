@@ -1,3 +1,5 @@
+use core::models::common::app_name::AppName;
+use core::models::common::system_messages::CommonMessages;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::tg_bot::{
@@ -8,9 +10,6 @@ use teloxide::macros::BotCommands;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Requester};
 use teloxide::Bot;
-use core::models::common::system_messages::CommonMessages;
-use core::models::common::app_name::AppName;
-
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -25,12 +24,7 @@ pub(crate) async fn command_handler(
 ) -> anyhow::Result<()> {
     let RequestAppBotCommands::Start = cmd;
 
-    let bot_msg = get_message(
-        None,
-        CommonMessages::StartMessage.as_str(),
-        true
-    )
-        .await?;
+    let bot_msg = get_message(None, CommonMessages::StartMessage.as_str(), true).await?;
     bot.send_message(msg.chat.id, bot_msg).await?;
 
     Ok(())
@@ -68,12 +62,7 @@ pub(crate) async fn message_handler(
         .parse_mode(teloxide::types::ParseMode::Html)
         .await?;
 
-    let bot_msg = get_message(
-        None,
-        CommonMessages::AutoReply.as_str(),
-        true
-    )
-        .await?;
+    let bot_msg = get_message(None, CommonMessages::AutoReply.as_str(), true).await?;
     bot.send_message(user_id, bot_msg).await?;
 
     Ok(())

@@ -7,14 +7,14 @@ use anyhow::{anyhow, Result};
 use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
+use pulldown_cmark::{html, Parser};
 use std::env;
 use std::fs::{read_to_string, remove_file};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
-use tracing::error;
-use pulldown_cmark::{html, Parser};
+use tracing::{error, info};
 
 pub fn get_system_role_path<T>(app_name: &str, role_type: T) -> String
 where
@@ -193,8 +193,9 @@ pub async fn get_message(
     message_name: &str,
     is_common: bool,
 ) -> Result<String> {
-    const DEFAULT_FALLBACK_MESSAGE: &str = "Извините, произошла техническая ошибка. Пожалуйста, попробуйте позже.";
-    
+    const DEFAULT_FALLBACK_MESSAGE: &str =
+        "Извините, произошла техническая ошибка. Пожалуйста, попробуйте позже.";
+
     let base_path: PathBuf = if is_common {
         Path::new("common_res/messages/common").to_path_buf()
     } else {
@@ -220,7 +221,11 @@ pub async fn get_message(
             anyhow!(
                 "Failed to read message '{}' {}: {}",
                 message_name,
-                if is_common { "(common message)" } else { "for app" },
+                if is_common {
+                    "(common message)"
+                } else {
+                    "for app"
+                },
                 e
             )
         })
@@ -349,6 +354,7 @@ pub async fn transcribe_voice_message(file_path: &str) -> Result<Option<String>>
     remove_file(&wav_path).ok();
 
     if transcription.trim().is_empty() {
+        info!("Voice message transcription is empty, looks like user sent message by mistake");
         Ok(None)
     } else {
         Ok(Some(transcription))
