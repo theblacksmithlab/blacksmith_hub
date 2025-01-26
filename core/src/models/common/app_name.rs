@@ -5,6 +5,7 @@ pub enum AppName {
     TheViperRoomBot,
     RequestApp,
     RequestAppBot,
+    TesterBot,
 }
 
 impl AppName {
@@ -15,6 +16,7 @@ impl AppName {
             AppName::TheViperRoomBot => "the_viper_room_bot",
             AppName::RequestApp => "request_app",
             AppName::RequestAppBot => "request_app_bot",
+            AppName::TesterBot => "tester_bot",
         }
     }
 }

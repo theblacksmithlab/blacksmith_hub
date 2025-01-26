@@ -352,7 +352,7 @@ pub async fn vectorize(data: String, app_state: Arc<RequestAppState>) -> Result<
     let llm_client = app_state.llm_client.clone();
 
     let request = CreateEmbeddingRequestArgs::default()
-        .model("text-embedding-3-large")
+        .model(LlmModel::TextEmbedding3Large.as_str())
         .input(data)
         .build()?;
 

@@ -1,4 +1,6 @@
-use crate::local_utils::{generate_podcast, schedule_podcast, stop_daily_podcasts};
+use crate::the_viper_room_bot::the_viper_room_bot_local_utils::{
+    generate_podcast, schedule_podcast, stop_daily_podcasts,
+};
 use anyhow::Result;
 use core::grammers::grammers_functionality::initialize_grammers_client;
 use core::models::common::app_name::AppName;
@@ -23,7 +25,7 @@ pub enum TheViperRoomBotCommands {
     Stop,
 }
 
-pub(crate) async fn message_handler(bot: Bot, msg: Message) -> Result<()> {
+pub(crate) async fn the_viper_room_message_handler(bot: Bot, msg: Message) -> Result<()> {
     let user_id = msg.chat.id;
     let bot_msg = get_message(None, CommonMessages::AutoReply.as_str(), true).await?;
     bot.send_message(user_id, bot_msg).await?;
@@ -31,7 +33,7 @@ pub(crate) async fn message_handler(bot: Bot, msg: Message) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn command_handler(
+pub(crate) async fn the_viper_room_command_handler(
     bot: Bot,
     msg: Message,
     cmd: TheViperRoomBotCommands,

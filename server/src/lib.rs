@@ -1,5 +1,7 @@
 pub mod routes;
 
+use crate::routes::request_app::handlers::handle_user_action;
+use crate::routes::the_viper_room::handlers::handle_the_viper_room_user_action;
 use axum::http::Method;
 use axum::response::IntoResponse;
 use axum::routing::{get, options, post};
@@ -13,9 +15,6 @@ use http::{HeaderValue, StatusCode};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{AllowHeaders, CorsLayer};
-use crate::routes::the_viper_room::handlers::handle_the_viper_room_user_action;
-use crate::routes::request_app::handlers::handle_user_action;
-
 
 pub async fn start_server(
     server_app_state: Arc<ServerAppState>,
