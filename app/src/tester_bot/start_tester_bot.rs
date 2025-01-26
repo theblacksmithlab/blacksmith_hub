@@ -1,4 +1,8 @@
-use crate::tester::tester_bot_handlers::{tester_bot_command_handler, tester_bot_message_handler, TesterBotCommands};
+use crate::tester_bot::tester_bot_handlers::{
+    tester_bot_command_handler,
+    tester_bot_message_handler,
+    TesterBotCommands
+};
 use crate::start_bot;
 use core::models::common::app_name::AppName;
 use core::state::tg_bot::app_state::BotAppState;

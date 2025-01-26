@@ -1,7 +1,7 @@
 use crate::probiot::start_probiot::start_probiot;
 use crate::request_app_bot::start_request_app_bot::start_request_app_bot;
 use crate::the_viper_room_bot::start_the_viper_room_bot::start_the_viper_room_bot;
-use crate::tester::start_tester_bot::start_tester_bot;
+use crate::tester_bot::start_tester_bot::start_tester_bot;
 use async_openai::Client as LLM_Client;
 use core::models::common::app_name::AppName;
 use core::state::tg_bot::app_state::BotAppState;
@@ -18,7 +18,7 @@ use tracing_subscriber::EnvFilter;
 mod probiot;
 mod request_app_bot;
 mod the_viper_room_bot;
-mod tester;
+mod tester_bot;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
