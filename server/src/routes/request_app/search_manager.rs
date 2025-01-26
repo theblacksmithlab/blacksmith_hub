@@ -1,5 +1,5 @@
 use anyhow::Result;
-use core::ai::ai::{raw_llm_processing_json, vectorize};
+use core::ai::common::common::{raw_llm_processing_json, vectorize};
 use core::models::request_app::request_app::RequestAppSystemRoleType;
 use core::state::request_app::app_state::RequestAppState;
 use core::utils::common::get_system_role_or_fallback;

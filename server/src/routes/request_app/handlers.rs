@@ -2,7 +2,7 @@ use crate::routes::request_app::local_utils::{
     display_user_request_server, search_by_users_request_server, send_user_profile_server,
     show_result_by_direction, MAIN_MENU_BUTTONS, PROFILE_MENU_BUTTONS, REQUEST_MENU_BUTTONS,
 };
-use core::ai::ai::{process_users_request, process_users_self_description};
+use core::ai::request_app::request_app::{process_users_request, process_users_self_description};
 use core::grammers::grammers_functionality::create_chat;
 use core::state::request_app::app_state::RequestAppState;
 use core::utils::common::{determine_user_request, update_request_app_user_state};
