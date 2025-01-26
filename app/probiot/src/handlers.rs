@@ -1,27 +1,26 @@
-use crate::probiot_utils::create_tts_button;
+use crate::probiot_utils::{
+    append_footer_if_needed, create_tts_button, get_and_remove_tts_payload, save_tts_payload,
+};
 use crate::user_message_processing::process_user_raw_request;
 use anyhow::Result;
 use core::ai::ai::simple_tts;
+use core::models::common::app_name::AppName;
+use core::models::common::system_messages::{CommonMessages, ProbiotMessages};
+use core::models::tg_bot::probiot::probiot_bot_commands::ProbiotBotCommands;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::common::transcribe_voice_message;
+use core::utils::tg_bot::tg_bot::add_llm_response_to_cache;
 use core::utils::tg_bot::tg_bot::download_voice;
-use core::utils::tg_bot::tg_bot::{add_llm_response_to_cache, get_cache_as_string};
 use std::fs::remove_file;
 use std::sync::Arc;
-use teloxide::macros::BotCommands;
 use teloxide::payloads::SendMessageSetters;
-use teloxide::prelude::{CallbackQuery, Message, Requester};
-use teloxide::types::{InputFile, ReplyParameters};
+use teloxide::prelude::{CallbackQuery, ChatId, Message, Requester};
+use teloxide::types::{InputFile, ParseMode, ReplyParameters};
 use teloxide::Bot;
 use tracing::error;
 use tracing::log::info;
-
-#[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase")]
-pub enum ProbiotBotCommands {
-    Start,
-}
+use uuid::Uuid;
 
 pub(crate) async fn message_handler(
     bot: Bot,
@@ -31,11 +30,19 @@ pub(crate) async fn message_handler(
     let chat_id = msg.chat.id;
     let bot_data = bot.get_me().await?;
     let user_raw_request = msg.text().unwrap_or("Empty request").to_string();
-    let initiator_app_name = "probiot".to_string();
+    let initiator_app_name = AppName::Probiot.as_str().to_string();
+    info!(
+        "Got message: {} from: @{}",
+        user_raw_request,
+        msg.chat.username().unwrap_or("Anonymous User")
+    );
 
-    // TODO: Удалить прямые отправки сообщений ботом, использовать get_message;
     if msg.chat.is_private() {
         if let Some(voice) = msg.voice() {
+            info!(
+                "Message received from @{} is voice message. Let's process it...",
+                msg.chat.username().unwrap_or("Anonymous User")
+            );
             let file_path =
                 match download_voice(&bot, &voice.file.id, &format!("tmp/{}.ogg", voice.file.id))
                     .await
@@ -43,97 +50,158 @@ pub(crate) async fn message_handler(
                     Ok(path) => path,
                     Err(err) => {
                         error!("Failed to download voice message: {}", err);
-                        bot.send_message(
-                            chat_id,
-                            "Не удалось скачать голосовое сообщение. Попробуйте позже.",
+                        let bot_msg = get_message(
+                            None,
+                            CommonMessages::ErrorDownloadingVoiceMessageFile.as_str(),
+                            true,
                         )
                         .await?;
+                        bot.send_message(chat_id, bot_msg).await?;
                         return Ok(());
                     }
                 };
 
             match transcribe_voice_message(&file_path).await {
                 Ok(Some(user_voice_transcribed)) => {
+                    info!("Voice message transcribed successfully...");
                     match process_user_raw_request(
                         chat_id,
                         user_voice_transcribed,
                         app_state.clone(),
-                        initiator_app_name.clone(),
                     )
                     .await
                     {
                         Ok(llm_response) => {
-                            add_llm_response_to_cache(
+                            let full_response = append_footer_if_needed(
+                                initiator_app_name.as_str(),
+                                llm_response.clone(),
                                 app_state.clone(),
                                 chat_id,
+                            )
+                            .await
+                            .unwrap_or_else(|_| llm_response.clone());
+
+                            let message_id = Uuid::new_v4().to_string();
+
+                            save_tts_payload(
+                                app_state.clone(),
+                                chat_id,
+                                message_id.clone(),
                                 llm_response.clone(),
                             )
                             .await;
 
-                            bot.send_message(chat_id, llm_response)
-                                .reply_markup(create_tts_button())
+                            bot.send_message(chat_id, full_response.clone())
+                                .reply_markup(create_tts_button(chat_id, message_id))
                                 .await?;
 
-                            let current_cache =
-                                get_cache_as_string(app_state.clone(), chat_id).await;
-                            bot.send_message(chat_id, current_cache).await?;
+                            info!(
+                                "Successfully processed voice message from @{}",
+                                msg.chat.username().unwrap_or("Anonymous User")
+                            );
+
+                            add_llm_response_to_cache(
+                                app_state.clone(),
+                                chat_id,
+                                full_response.clone(),
+                            )
+                            .await;
                         }
                         Err(err) => {
                             error!("Error in process_user_raw_request: {}", err);
-                            bot.send_message(chat_id, "Произошла ошибка при обработке вашего запроса. Попробуйте ещё раз.").await?;
+                            let bot_msg = get_message(
+                                None,
+                                CommonMessages::ErrorProcessingRequest.as_str(),
+                                true,
+                            )
+                            .await?;
+                            bot.send_message(chat_id, bot_msg).await?;
                         }
                     }
                 }
                 Ok(None) => {
-                    bot.send_message(
-                        chat_id,
-                        "Не удалось обработать голосовое сообщение. Попробуйте ещё раз.",
+                    let bot_msg = get_message(
+                        None,
+                        CommonMessages::ErrorProcessingVoiceMessage.as_str(),
+                        true,
                     )
                     .await?;
+                    bot.send_message(chat_id, bot_msg).await?;
                 }
                 Err(err) => {
                     error!("Error in handle_voice_message: {}", err);
-                    bot.send_message(
-                        chat_id,
-                        "Произошла ошибка при обработке голосового сообщения. Попробуйте ещё раз.",
+                    let bot_msg = get_message(
+                        None,
+                        CommonMessages::GlobalErrorProcessingVoiceMessage.as_str(),
+                        true,
                     )
                     .await?;
+                    bot.send_message(chat_id, bot_msg).await?;
                 }
             }
         } else if let Some(text) = msg.text() {
-            match process_user_raw_request(
-                chat_id,
-                text.to_string(),
-                app_state.clone(),
-                initiator_app_name.clone(),
-            )
-            .await
-            {
+            info!(
+                "Message received from @{} is text message. Let's process it...",
+                msg.chat.username().unwrap_or("Anonymous User")
+            );
+            match process_user_raw_request(chat_id, text.to_string(), app_state.clone()).await {
                 Ok(llm_response) => {
-                    add_llm_response_to_cache(app_state.clone(), chat_id, llm_response.clone())
-                        .await;
+                    let full_response = append_footer_if_needed(
+                        initiator_app_name.as_str(),
+                        llm_response.clone(),
+                        app_state.clone(),
+                        chat_id,
+                    )
+                    .await
+                    .unwrap_or_else(|_| llm_response.clone());
 
-                    bot.send_message(chat_id, llm_response)
-                        .reply_markup(create_tts_button())
+                    // let htmled_full_response = markdown_to_html(&full_response);
+
+                    let message_id = Uuid::new_v4().to_string();
+
+                    save_tts_payload(
+                        app_state.clone(),
+                        chat_id,
+                        message_id.clone(),
+                        llm_response.clone(),
+                    )
+                    .await;
+
+                    bot.send_message(chat_id, full_response.clone())
+                        .reply_markup(create_tts_button(chat_id, message_id))
+                        .parse_mode(ParseMode::Html)
                         .await?;
+
+                    info!(
+                        "Successfully processed text message from @{}",
+                        msg.chat.username().unwrap_or("Anonymous User")
+                    );
+
+                    add_llm_response_to_cache(app_state.clone(), chat_id, full_response.clone())
+                        .await;
                 }
                 Err(err) => {
                     error!("Error in process_user_raw_request: {}", err);
-                    bot.send_message(
-                        chat_id,
-                        "Произошла ошибка при обработке вашего запроса. Попробуйте ещё раз.",
-                    )
-                    .await?;
+                    let bot_msg =
+                        get_message(None, CommonMessages::ErrorProcessingRequest.as_str(), true)
+                            .await?;
+                    bot.send_message(chat_id, bot_msg).await?;
                 }
             }
         } else {
-            bot.send_message(
-                chat_id,
-                "Извините, я могу работать только с текстом или голосовыми сообщениями.",
-            )
-            .await?;
+            info!(
+                "Message received from @{} is neither voice nor text. No need to process it...",
+                msg.chat.username().unwrap_or("Anonymous User")
+            );
+            let bot_msg =
+                get_message(None, CommonMessages::InvalidRequestContent.as_str(), true).await?;
+            bot.send_message(chat_id, bot_msg).await?;
         }
     } else {
+        info!(
+            "Got message from @{} in public chat. User invited for private messaging",
+            msg.chat.username().unwrap_or("Anonymous User")
+        );
         if user_raw_request.contains(&format!(
             "@{}",
             bot_data.user.clone().username.unwrap_or_default()
@@ -144,7 +212,13 @@ pub(crate) async fn message_handler(
                 .map(|user| user.id == bot_data.id)
                 .unwrap_or(false))
         {
-            bot.send_message(chat_id, "Пожалуйста, напишите мне в приватный чат, так наше общение не помешает другим участникам чата, а я смогу ответить на интересующие вас вопросы.")
+            let bot_msg = get_message(
+                Some(&initiator_app_name),
+                ProbiotMessages::PrivateChatInvitation.as_str(),
+                false,
+            )
+            .await?;
+            bot.send_message(chat_id, bot_msg)
                 .reply_parameters(ReplyParameters::new(msg.id))
                 .await?;
         }
@@ -160,10 +234,16 @@ pub(crate) async fn command_handler(
     _app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let user_id = msg.chat.id;
+    let initiator_app_name = AppName::Probiot.as_str().to_string();
 
     match cmd {
         ProbiotBotCommands::Start => {
-            let bot_msg = get_message(Some("probiot"), "start_message", false).await?;
+            let bot_msg = get_message(
+                Some(&initiator_app_name),
+                ProbiotMessages::StartMessage.as_str(),
+                false,
+            )
+            .await?;
             bot.send_message(user_id, bot_msg).await?;
         }
     }
@@ -177,37 +257,51 @@ pub(crate) async fn callback_query_handler(
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
     if let Some(data) = query.data {
-        if data == "tts" {
-            if let Some(message) = query.message {
-                if let Some(text) = message.regular_message().and_then(|m| m.text()) {
-                    let message_id = message.id().to_string();
-                    match simple_tts(text.to_string(), app_state).await {
-                        Ok(audio_response) => {
-                            let audio_file_path = format!("tmp/{}.mp3", message_id);
-                            audio_response.save(&audio_file_path).await?;
+        if let Some(data) = data.strip_prefix("tts:") {
+            let parts: Vec<&str> = data.split(':').collect();
+            if parts.len() == 2 {
+                if let Ok(chat_id_i64) = parts[0].parse::<i64>() {
+                    let chat_id = ChatId(chat_id_i64);
+                    let message_id = parts[1].to_string();
 
-                            bot.send_voice(
-                                message.chat().id,
-                                InputFile::file(audio_file_path.clone()),
-                            )
-                            .await?;
+                    let tts_payload =
+                        get_and_remove_tts_payload(app_state.clone(), chat_id, message_id.clone())
+                            .await;
 
-                            match remove_file(audio_file_path.clone()) {
-                                Ok(_) => info!("Tmp tts fn file {} deleted", audio_file_path),
-                                Err(e) => info!(
-                                    "Could not delete tmp tts file {}: {}",
-                                    audio_file_path, e
-                                ),
+                    if let Some(tts_payload) = tts_payload {
+                        match simple_tts(tts_payload, app_state.clone()).await {
+                            Ok(audio_response) => {
+                                let audio_file_path = format!("tmp/{}.mp3", message_id);
+                                audio_response.save(&audio_file_path).await?;
+
+                                bot.send_voice(
+                                    query.message.unwrap().chat().id,
+                                    InputFile::file(audio_file_path.clone()),
+                                )
+                                .await?;
+
+                                if let Err(e) = remove_file(audio_file_path.clone()) {
+                                    info!(
+                                        "Could not delete tmp tts file {}: {}",
+                                        audio_file_path, e
+                                    );
+                                }
+                            }
+                            Err(err) => {
+                                error!("TTS generation failed: {}", err);
+                                bot.send_message(
+                                    query.message.unwrap().chat().id,
+                                    "Не удалось озвучить сообщение. Попробуйте позже.",
+                                )
+                                .await?;
                             }
                         }
-                        Err(err) => {
-                            error!("TTS generation failed: {}", err);
-                            bot.send_message(
-                                message.chat().id,
-                                "Не удалось озвучить сообщение. Попробуйте позже.",
-                            )
-                            .await?;
-                        }
+                    } else {
+                        bot.send_message(
+                            query.message.unwrap().chat().id,
+                            "Не удалось найти текст для озвучивания. Попробуйте позже.",
+                        )
+                        .await?;
                     }
                 }
             }

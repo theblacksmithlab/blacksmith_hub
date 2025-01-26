@@ -1,19 +1,21 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 #[derive(Default)]
 pub struct DialogueCache {
     messages: VecDeque<UserInteraction>,
     max_size: usize,
+    tts_data: HashMap<String, String>,
 }
 
 impl DialogueCache {
-    pub(crate) fn new(max_size: usize) -> Self {
+    pub fn new(max_size: usize) -> Self {
         DialogueCache {
             messages: VecDeque::new(),
             max_size,
+            tts_data: HashMap::new(),
         }
     }
 
@@ -31,6 +33,13 @@ impl DialogueCache {
         if self.messages.len() > self.max_size {
             self.messages.pop_front();
         }
+    }
+
+    pub(crate) fn count_user_messages(&self) -> usize {
+        self.messages
+            .iter()
+            .filter(|interaction| interaction.role == "user")
+            .count()
     }
 
     pub(crate) fn add_llm_response_to_cache(&mut self, llm_response: String) {
@@ -65,6 +74,14 @@ impl DialogueCache {
             eprintln!("Error serializing temp cache: {}", e);
             "[]".to_string()
         })
+    }
+
+    pub fn add_tts_payload(&mut self, message_id: String, tts_payload: String) {
+        self.tts_data.insert(message_id, tts_payload);
+    }
+
+    pub fn get_and_remove_tts_payload(&mut self, message_id: String) -> Option<String> {
+        self.tts_data.remove(&message_id)
     }
 }
 

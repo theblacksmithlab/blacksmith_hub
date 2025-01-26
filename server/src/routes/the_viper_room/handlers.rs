@@ -1,5 +1,4 @@
 use crate::routes::the_viper_room::news_block_creation::news_block_creation;
-use crate::routes::the_viper_room::{generate_user_system_nickname, get_user_system_nickname};
 use axum::extract::State;
 use axum::Json;
 use core::grammers::grammers_functionality::{initialize_grammers_client, session_file_creation};
@@ -16,6 +15,7 @@ use std::env;
 use std::fs::{read, remove_file};
 use std::sync::Arc;
 use tracing::info;
+use crate::routes::the_viper_room::local_utils::{generate_user_system_nickname, get_user_system_nickname};
 
 pub(crate) async fn handle_the_viper_room_user_action(
     State(the_viper_room_app_state): State<Arc<TheViperRoomAppState>>,

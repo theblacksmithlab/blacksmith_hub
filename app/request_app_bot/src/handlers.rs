@@ -1,3 +1,5 @@
+use core::models::common::app_name::AppName;
+use core::models::common::system_messages::CommonMessages;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::tg_bot::{
@@ -22,7 +24,7 @@ pub(crate) async fn command_handler(
 ) -> anyhow::Result<()> {
     let RequestAppBotCommands::Start = cmd;
 
-    let bot_msg = get_message(None, "start_message", true).await?;
+    let bot_msg = get_message(None, CommonMessages::StartMessage.as_str(), true).await?;
     bot.send_message(msg.chat.id, bot_msg).await?;
 
     Ok(())
@@ -34,6 +36,7 @@ pub(crate) async fn message_handler(
     app_state: Arc<BotAppState>,
 ) -> anyhow::Result<()> {
     let user_id = msg.chat.id;
+    let _initiator_app_name = AppName::RequestAppBot.as_str().to_string();
 
     let user_message = msg.text().unwrap_or_default();
 
@@ -59,8 +62,8 @@ pub(crate) async fn message_handler(
         .parse_mode(teloxide::types::ParseMode::Html)
         .await?;
 
-    // let bot_msg = get_message("request_app", "auto_reply").await?;
-    // bot.send_message(user_id, bot_msg).await?;
+    let bot_msg = get_message(None, CommonMessages::AutoReply.as_str(), true).await?;
+    bot.send_message(user_id, bot_msg).await?;
 
     Ok(())
 }
