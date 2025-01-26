@@ -3,13 +3,17 @@ use crate::state::tg_bot::app_state::BotAppState;
 use anyhow::Result;
 use std::env;
 use std::sync::Arc;
+use std::time::Duration;
 use teloxide::dispatching::{Dispatcher, UpdateHandler};
 use teloxide::error_handlers::LoggingErrorHandler;
 use teloxide::net::Download;
 use teloxide::prelude::{ChatId, Message, Requester};
+use teloxide::types::ChatAction;
 use teloxide::{dptree, Bot};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::Mutex;
+use tokio::time::sleep;
 
 pub async fn check_username(bot: Bot, msg: Message) -> bool {
     if let Some(_username) = msg.chat.username() {
@@ -101,4 +105,22 @@ pub async fn get_user_message_count(app_state: &Arc<BotAppState>, user_id: ChatI
         .get(&user_id)
         .map(|chat_cache| chat_cache.count_user_messages())
         .unwrap_or(0)
+}
+
+pub async fn start_bots_chat_action(
+    bot: Bot,
+    chat_id: ChatId,
+    action: ChatAction,
+    typing_flag: Arc<Mutex<bool>>,
+) {
+    tokio::spawn(async move {
+        while *typing_flag.lock().await {
+            bot.send_chat_action(chat_id, action.clone()).await.ok();
+            sleep(Duration::from_secs(4)).await;
+        }
+    });
+}
+
+pub async fn stop_bots_chat_action(typing_flag: Arc<Mutex<bool>>) {
+    *typing_flag.lock().await = false;
 }
