@@ -15,6 +15,3 @@ tokio.workspace = true
 
 core = { path = "../core" }
 server = { path = "../server" }
-
-request_app_bot = { path = "../app/request_app_bot" }
-the_viper_room_bot = { path = "../app/the_viper_room_bot" }

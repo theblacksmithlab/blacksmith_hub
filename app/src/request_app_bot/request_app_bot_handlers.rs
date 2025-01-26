@@ -17,7 +17,7 @@ pub enum RequestAppBotCommands {
     Start,
 }
 
-pub(crate) async fn command_handler(
+pub(crate) async fn request_app_command_handler(
     bot: Bot,
     msg: Message,
     cmd: RequestAppBotCommands,
@@ -30,7 +30,7 @@ pub(crate) async fn command_handler(
     Ok(())
 }
 
-pub(crate) async fn message_handler(
+pub(crate) async fn request_app_message_handler(
     bot: Bot,
     msg: Message,
     app_state: Arc<BotAppState>,

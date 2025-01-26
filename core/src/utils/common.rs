@@ -51,8 +51,9 @@ where
 }
 
 pub enum LlmModel {
-    Light,   // gpt-4o-mini
-    Complex, // gpt-4o
+    Light,               // OpenAI gpt-4o-mini
+    Complex,             // OpenAI gpt-4o
+    TextEmbedding3Large, // OpenAI embedding generative model
 }
 
 impl LlmModel {
@@ -60,6 +61,7 @@ impl LlmModel {
         match self {
             LlmModel::Light => "gpt-4o-mini",
             LlmModel::Complex => "gpt-4o",
+            LlmModel::TextEmbedding3Large => "text-embedding-3-large",
         }
     }
 }

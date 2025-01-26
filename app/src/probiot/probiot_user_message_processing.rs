@@ -1,4 +1,4 @@
-use crate::probiot_utils::{check_request_for_crap_content, clarify_request};
+use crate::probiot::probiot_utils::{check_request_for_crap_content, clarify_request};
 use anyhow::Result;
 use core::ai::ai::raw_llm_processing;
 use core::ai::ai::tokenize_and_truncate;

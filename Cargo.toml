@@ -3,9 +3,7 @@ members = [
     "core",
     "server",
     "ai_forge",
-    "app/request_app_bot",
-    "app/the_viper_room_bot",
-    "app/probiot"
+    "app",
 ]
 default-members = ["ai_forge"]
 

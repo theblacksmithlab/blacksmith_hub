@@ -1,7 +1,7 @@
-use crate::probiot_utils::{
+use crate::probiot::probiot_user_message_processing::process_user_raw_request;
+use crate::probiot::probiot_utils::{
     append_footer_if_needed, create_tts_button, get_and_remove_tts_payload, save_tts_payload,
 };
-use crate::user_message_processing::process_user_raw_request;
 use anyhow::Result;
 use core::ai::ai::simple_tts;
 use core::models::common::app_name::AppName;
@@ -22,7 +22,7 @@ use tracing::error;
 use tracing::log::info;
 use uuid::Uuid;
 
-pub(crate) async fn message_handler(
+pub(crate) async fn probiot_message_handler(
     bot: Bot,
     msg: Message,
     app_state: Arc<BotAppState>,
@@ -227,7 +227,7 @@ pub(crate) async fn message_handler(
     Ok(())
 }
 
-pub(crate) async fn command_handler(
+pub(crate) async fn probiot_command_handler(
     bot: Bot,
     msg: Message,
     cmd: ProbiotBotCommands,
@@ -251,7 +251,7 @@ pub(crate) async fn command_handler(
     Ok(())
 }
 
-pub(crate) async fn callback_query_handler(
+pub(crate) async fn probiot_callback_query_handler(
     bot: Bot,
     query: CallbackQuery,
     app_state: Arc<BotAppState>,

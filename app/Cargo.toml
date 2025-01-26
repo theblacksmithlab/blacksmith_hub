@@ -1,5 +1,5 @@
 [package]
-name = "probiot"
+name = "app"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,5 +14,8 @@ tracing.workspace = true
 qdrant-client.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
+chrono.workspace = true
+grammers-client.workspace = true
 
-core = { path = "../../core" }
+core = { path = "../core" }
+server = { path = "../server" }
