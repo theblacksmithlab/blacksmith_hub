@@ -1,15 +1,15 @@
-use std::fs;
-use std::sync::Arc;
-use anyhow::Context;
-use async_openai::types::{CreateEmbeddingRequestArgs, CreateEmbeddingResponse};
-use teloxide::prelude::ChatId;
-use tracing::info;
 use crate::ai::common::common::raw_llm_processing_json;
 use crate::local_db::local_db::save_user_profile;
 use crate::models::request_app::request_app::RequestAppSystemRoleType;
 use crate::state::request_app::app_state::{RequestAppState, UserProfile};
 use crate::utils::common::{get_system_role_or_fallback, LlmModel};
 use crate::vector_db::vector_db::qdrant_upsert;
+use anyhow::Context;
+use async_openai::types::{CreateEmbeddingRequestArgs, CreateEmbeddingResponse};
+use std::fs;
+use std::sync::Arc;
+use teloxide::prelude::ChatId;
+use tracing::info;
 
 pub async fn process_users_self_description(
     user_id: ChatId,
@@ -32,7 +32,7 @@ pub async fn process_users_self_description(
         app_state.clone(),
         LlmModel::Complex,
     )
-        .await?;
+    .await?;
     info!(
         "TEMP log: LLM processed users self description {}",
         users_about_text_str
@@ -82,8 +82,8 @@ pub async fn process_users_request(
         user_id,
         username,
     )
-        .await
-        .context("Failed to upsert data in Qdrant")?;
+    .await
+    .context("Failed to upsert data in Qdrant")?;
 
     Ok(())
 }

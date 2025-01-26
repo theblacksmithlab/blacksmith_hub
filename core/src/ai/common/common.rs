@@ -6,15 +6,15 @@ use anyhow::{Context, Result};
 use async_openai::types::ResponseFormat::JsonObject;
 use async_openai::types::{
     ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
-    CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs, CreateEmbeddingResponse
+    CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs, CreateEmbeddingResponse,
 };
 use std::fs;
 
-use std::sync::Arc;
 use crate::local_db::local_db::save_user_profile;
 use crate::models::request_app::request_app::RequestAppSystemRoleType;
+use crate::utils::common::get_system_role_or_fallback;
 use crate::utils::common::LlmModel;
-use crate::utils::common::{get_system_role_or_fallback};
+use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tiktoken_rs::cl100k_base;
 use tracing::info;

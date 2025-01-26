@@ -8,8 +8,8 @@ use teloxide::dispatching::{Dispatcher, UpdateHandler};
 use teloxide::error_handlers::LoggingErrorHandler;
 use teloxide::net::Download;
 use teloxide::prelude::{ChatId, Message, Requester};
-use teloxide::{dptree, Bot};
 use teloxide::types::ChatAction;
+use teloxide::{dptree, Bot};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
@@ -115,9 +115,7 @@ pub async fn start_bots_chat_action(
 ) {
     tokio::spawn(async move {
         while *typing_flag.lock().await {
-            bot.send_chat_action(chat_id, action.clone())
-                .await
-                .ok();
+            bot.send_chat_action(chat_id, action.clone()).await.ok();
             sleep(Duration::from_secs(4)).await;
         }
     });

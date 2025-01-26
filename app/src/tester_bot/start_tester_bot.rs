@@ -1,9 +1,7 @@
-use crate::tester_bot::tester_bot_handlers::{
-    tester_bot_command_handler,
-    tester_bot_message_handler,
-    TesterBotCommands
-};
 use crate::start_bot;
+use crate::tester_bot::tester_bot_handlers::{
+    tester_bot_command_handler, tester_bot_message_handler, TesterBotCommands,
+};
 use core::models::common::app_name::AppName;
 use core::state::tg_bot::app_state::BotAppState;
 use std::sync::Arc;
@@ -26,5 +24,5 @@ pub async fn start_tester_bot(app_state: Arc<BotAppState>) -> anyhow::Result<()>
         message_handler,
         callback_query_handler,
     )
-        .await
+    .await
 }

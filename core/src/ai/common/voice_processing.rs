@@ -1,12 +1,12 @@
+use crate::state::llm_client_init_trait::LlmProcessing;
+use crate::utils::common::split_text_into_chunks;
+use async_openai::types::{CreateSpeechRequestArgs, CreateSpeechResponse, SpeechModel, Voice};
+use chrono::{Duration, Utc};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
-use async_openai::types::{CreateSpeechRequestArgs, CreateSpeechResponse, SpeechModel, Voice};
-use chrono::{Duration, Utc};
 use tracing::{error, info, warn};
-use crate::state::llm_client_init_trait::LlmProcessing;
-use crate::utils::common::split_text_into_chunks;
 
 pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
     text: String,

@@ -1,13 +1,15 @@
+use core::models::common::app_name::AppName;
+use core::models::common::system_messages::CommonMessages;
+use core::state::tg_bot::app_state::BotAppState;
+use core::utils::common::get_message;
+use core::utils::tg_bot::tg_bot::{
+    add_llm_response_to_cache, add_user_message_to_cache, get_cache_as_string,
+};
 use std::sync::Arc;
-use teloxide::Bot;
 use teloxide::macros::BotCommands;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Requester};
-use core::utils::common::get_message;
-use core::models::common::system_messages::CommonMessages;
-use core::state::tg_bot::app_state::BotAppState;
-use core::models::common::app_name::AppName;
-use core::utils::tg_bot::tg_bot::{add_user_message_to_cache, add_llm_response_to_cache, get_cache_as_string};
+use teloxide::Bot;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
