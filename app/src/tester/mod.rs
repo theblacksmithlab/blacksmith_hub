@@ -1,2 +1,2 @@
-mod start_tester_bot;
-mod tester_bot_handlers;
+pub mod start_tester_bot;
+pub mod tester_bot_handlers;
