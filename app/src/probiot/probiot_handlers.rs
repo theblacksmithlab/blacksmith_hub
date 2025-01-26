@@ -14,13 +14,17 @@ use core::utils::tg_bot::tg_bot::add_llm_response_to_cache;
 use core::utils::tg_bot::tg_bot::download_voice;
 use std::fs::remove_file;
 use std::sync::Arc;
+use std::time::Duration;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{CallbackQuery, ChatId, Message, Requester};
-use teloxide::types::{InputFile, ParseMode, ReplyParameters};
+use teloxide::types::{ChatAction, InputFile, ParseMode, ReplyParameters};
 use teloxide::Bot;
+use tokio::sync::Mutex;
+use tokio::time::sleep;
 use tracing::error;
 use tracing::log::info;
 use uuid::Uuid;
+use core::utils::tg_bot::tg_bot::{start_bots_chat_action, stop_bots_chat_action};
 
 pub(crate) async fn probiot_message_handler(
     bot: Bot,
@@ -43,6 +47,9 @@ pub(crate) async fn probiot_message_handler(
                 "Message received from @{} is voice message. Let's process it...",
                 msg.chat.username().unwrap_or("Anonymous User")
             );
+
+            let typing_flag = Arc::new(Mutex::new(true));
+            start_bots_chat_action(bot.clone(), chat_id, ChatAction::Typing, Arc::clone(&typing_flag)).await;
             
             let file_path =
                 match download_voice(&bot, &voice.file.id, &format!("tmp/{}.ogg", voice.file.id))
@@ -57,6 +64,7 @@ pub(crate) async fn probiot_message_handler(
                             true,
                         )
                         .await?;
+                        stop_bots_chat_action(typing_flag).await;
                         bot.send_message(chat_id, bot_msg).await?;
                         return Ok(());
                     }
@@ -92,6 +100,8 @@ pub(crate) async fn probiot_message_handler(
                             )
                             .await;
                             
+                            stop_bots_chat_action(typing_flag).await;
+                            
                             bot.send_message(chat_id, full_response.clone())
                                 .reply_markup(create_tts_button(chat_id, message_id))
                                 .await?;
@@ -116,6 +126,7 @@ pub(crate) async fn probiot_message_handler(
                                 true,
                             )
                             .await?;
+                            stop_bots_chat_action(typing_flag).await;
                             bot.send_message(chat_id, bot_msg).await?;
                         }
                     }
@@ -127,6 +138,7 @@ pub(crate) async fn probiot_message_handler(
                         true,
                     )
                     .await?;
+                    stop_bots_chat_action(typing_flag).await;
                     bot.send_message(chat_id, bot_msg).await?;
                 }
                 Err(err) => {
@@ -137,6 +149,7 @@ pub(crate) async fn probiot_message_handler(
                         true,
                     )
                     .await?;
+                    stop_bots_chat_action(typing_flag).await;
                     bot.send_message(chat_id, bot_msg).await?;
                 }
             }
@@ -145,6 +158,10 @@ pub(crate) async fn probiot_message_handler(
                 "Message received from @{} is text message. Let's process it...",
                 msg.chat.username().unwrap_or("Anonymous User")
             );
+
+            let typing_flag = Arc::new(Mutex::new(true));
+            start_bots_chat_action(bot.clone(), chat_id, ChatAction::Typing, Arc::clone(&typing_flag)).await;
+            
             match process_user_raw_request(chat_id, text.to_string(), app_state.clone()).await {
                 Ok(llm_response) => {
                     let full_response = append_footer_if_needed(
@@ -168,6 +185,8 @@ pub(crate) async fn probiot_message_handler(
                     )
                     .await;
 
+                    stop_bots_chat_action(typing_flag).await;
+                    
                     bot.send_message(chat_id, full_response.clone())
                         .reply_markup(create_tts_button(chat_id, message_id))
                         .parse_mode(ParseMode::Html)
@@ -186,6 +205,7 @@ pub(crate) async fn probiot_message_handler(
                     let bot_msg =
                         get_message(None, CommonMessages::ErrorProcessingRequest.as_str(), true)
                             .await?;
+                    stop_bots_chat_action(typing_flag).await;
                     bot.send_message(chat_id, bot_msg).await?;
                 }
             }
@@ -265,6 +285,9 @@ pub(crate) async fn probiot_callback_query_handler(
                     let chat_id = ChatId(chat_id_i64);
                     let message_id = parts[1].to_string();
 
+                    let action_flag = Arc::new(Mutex::new(true));
+                    start_bots_chat_action(bot.clone(), chat_id, ChatAction::RecordVoice, Arc::clone(&action_flag)).await;
+                    
                     let tts_payload =
                         get_and_remove_tts_payload(app_state.clone(), chat_id, message_id.clone())
                             .await;
@@ -275,6 +298,8 @@ pub(crate) async fn probiot_callback_query_handler(
                                 let audio_file_path = format!("tmp/{}.mp3", message_id);
                                 audio_response.save(&audio_file_path).await?;
 
+                                stop_bots_chat_action(action_flag).await;
+                                
                                 bot.send_voice(
                                     query.message.unwrap().chat().id,
                                     InputFile::file(audio_file_path.clone()),
@@ -290,6 +315,9 @@ pub(crate) async fn probiot_callback_query_handler(
                             }
                             Err(err) => {
                                 error!("TTS generation failed: {}", err);
+
+                                stop_bots_chat_action(action_flag).await;
+                                
                                 bot.send_message(
                                     query.message.unwrap().chat().id,
                                     "Не удалось озвучить сообщение. Попробуйте позже.",
@@ -298,6 +326,7 @@ pub(crate) async fn probiot_callback_query_handler(
                             }
                         }
                     } else {
+                        stop_bots_chat_action(action_flag).await;
                         bot.send_message(
                             query.message.unwrap().chat().id,
                             "Не удалось найти текст для озвучивания. Попробуйте позже.",
