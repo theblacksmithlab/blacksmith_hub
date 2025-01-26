@@ -1,4 +1,4 @@
-use core::ai::ai::raw_llm_processing;
+use core::ai::common::common::raw_llm_processing;
 use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
 use core::utils::common::get_system_role_or_fallback;

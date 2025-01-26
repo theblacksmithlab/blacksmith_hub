@@ -1,4 +1,4 @@
-use crate::ai::ai::speech_to_text;
+use crate::ai::common::voice_processing::speech_to_text;
 use crate::models::request_app::request_app::{AvatarRequest, AvatarResponse};
 use crate::state::request_app::app_state::{RequestAppState, UserProfile, UserStates};
 use crate::state::the_viper_room::app_state::{AuthStages, TheViperRoomAppState, UserData};

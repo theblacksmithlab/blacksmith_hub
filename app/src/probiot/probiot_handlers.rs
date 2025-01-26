@@ -3,7 +3,7 @@ use crate::probiot::probiot_utils::{
     append_footer_if_needed, create_tts_button, get_and_remove_tts_payload, save_tts_payload,
 };
 use anyhow::Result;
-use core::ai::ai::simple_tts;
+use core::ai::common::voice_processing::simple_tts;
 use core::models::common::app_name::AppName;
 use core::models::common::system_messages::{CommonMessages, ProbiotMessages};
 use core::models::tg_bot::probiot::probiot_bot_commands::ProbiotBotCommands;
@@ -43,6 +43,7 @@ pub(crate) async fn probiot_message_handler(
                 "Message received from @{} is voice message. Let's process it...",
                 msg.chat.username().unwrap_or("Anonymous User")
             );
+            
             let file_path =
                 match download_voice(&bot, &voice.file.id, &format!("tmp/{}.ogg", voice.file.id))
                     .await
@@ -90,7 +91,7 @@ pub(crate) async fn probiot_message_handler(
                                 llm_response.clone(),
                             )
                             .await;
-
+                            
                             bot.send_message(chat_id, full_response.clone())
                                 .reply_markup(create_tts_button(chat_id, message_id))
                                 .await?;

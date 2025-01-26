@@ -2,7 +2,8 @@ use crate::routes::the_viper_room::news_block_creation_utils::{
     get_dialogs, mix_podcast_with_music, processing_dialogs, summarize_updates,
     updates_file_creation,
 };
-use core::ai::ai::{raw_llm_processing, text_to_speech};
+use core::ai::common::common::raw_llm_processing;
+use core::ai::common::voice_processing::text_to_speech;
 use core::models::common::app_name::AppName;
 use core::models::common::system_messages::TheViperRoomMessages;
 use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;

@@ -1,7 +1,7 @@
 use crate::probiot::probiot_utils::{check_request_for_crap_content, clarify_request};
 use anyhow::Result;
-use core::ai::ai::raw_llm_processing;
-use core::ai::ai::tokenize_and_truncate;
+use core::ai::common::common::raw_llm_processing;
+use core::ai::common::common::tokenize_and_truncate;
 use core::models::common::app_name::AppName;
 use core::models::common::qdrant_collection_manager::AppsCollections;
 use core::models::tg_bot::probiot::get_system_role_model::ProbiotRoleType;

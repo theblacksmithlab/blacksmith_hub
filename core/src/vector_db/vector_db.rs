@@ -1,4 +1,4 @@
-use crate::ai::ai::vectorize;
+use crate::ai::common::common::vectorize;
 use crate::state::request_app::app_state::{RequestAppState, UserSearchResults};
 use anyhow::Result;
 use qdrant_client::qdrant::condition::ConditionOneOf;

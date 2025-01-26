@@ -1,5 +1,5 @@
 use anyhow::Result;
-use core::ai::ai::{raw_llm_processing, raw_llm_processing_json};
+use core::ai::common::common::{raw_llm_processing, raw_llm_processing_json};
 use core::models::common::dialogue_cache::DialogueCache;
 use core::models::common::system_messages::ProbiotMessages;
 use core::models::tg_bot::probiot::get_system_role_model::ProbiotRoleType;

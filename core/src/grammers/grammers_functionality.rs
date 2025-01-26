@@ -19,7 +19,7 @@ use std::{env, fs};
 use tracing::info;
 
 pub async fn create_chat(requester_username: &str, recipient_user: &str) -> Result<()> {
-    let session_file = "common_res/grammers_sessions/7543812650.session";
+    let session_file = "common_res/request_app/grammers_system_session/7543812650.session";
     let session_path = Path::new(&session_file);
 
     let api_id: i32 = env::var("TELEGRAM_API_ID")

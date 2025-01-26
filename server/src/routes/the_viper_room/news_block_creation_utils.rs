@@ -1,6 +1,6 @@
 use chrono::Duration as ChronoDuration;
 use chrono::Utc;
-use core::ai::ai::raw_llm_processing;
+use core::ai::common::common::raw_llm_processing;
 use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
 use core::state::llm_client_init_trait::LlmProcessing;
 use core::utils::common::get_system_role_or_fallback;

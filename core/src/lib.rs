@@ -6,5 +6,4 @@ pub mod models;
 pub mod state;
 pub mod utils;
 pub mod vector_db;
-
 pub mod rag_system;
