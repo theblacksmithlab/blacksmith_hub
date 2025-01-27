@@ -42,7 +42,6 @@ async fn main() -> Result<()> {
         llm_client.clone(),
     ));
     let the_viper_room_app_state = Arc::new(TheViperRoomAppState::new(llm_client.clone()));
-    // let bot_app_state = Arc::new(BotAppState::new(llm_client, qdrant_client));
 
     info!("Initializing local_db pool...");
     let local_db_pool = create_db_pool().await?;
@@ -70,25 +69,6 @@ async fn main() -> Result<()> {
         }
     });
     info!("Server started successfully");
-
-    // let request_app_bot_state = bot_app_state.clone();
-    // let viper_room_bot_state = bot_app_state.clone();
-
-    // info!("Starting Request App bot...");
-    // tokio::spawn(async move {
-    //     if let Err(e) = start_request_app_bot(request_app_bot_state).await {
-    //         tracing::error!("Request App Bot error: {:?}", e);
-    //     }
-    //     info!("Request App bot started successfully");
-    // });
-    //
-    // info!("Starting The Viper Room bot...");
-    // tokio::spawn(async move {
-    //     if let Err(e) = start_the_viper_room_bot(viper_room_bot_state).await {
-    //         tracing::error!("Bot error: {:?}", e);
-    //     }
-    //     info!("The Viper Room bot started successfully");
-    // });
 
     info!("All system components initialized successfully");
 
