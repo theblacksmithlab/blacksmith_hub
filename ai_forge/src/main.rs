@@ -5,15 +5,12 @@ use core::config::server_config::AppConfig;
 use core::local_db::local_db::{create_db_pool, create_table};
 use core::state::request_app::app_state::RequestAppState;
 use core::state::server::app_state::ServerAppState;
-// use core::state::tg_bot::app_state::BotAppState;
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;
-// use request_app_bot::start_request_app_bot;
 use server::start_server;
 use std::env;
 use std::sync::Arc;
-// use the_viper_room_bot::start_the_viper_room_bot;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 

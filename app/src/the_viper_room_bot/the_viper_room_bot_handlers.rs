@@ -1,6 +1,7 @@
 use crate::the_viper_room_bot::the_viper_room_bot_local_utils::{
     generate_podcast, schedule_podcast, stop_daily_podcasts,
 };
+use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
 use anyhow::Result;
 use core::grammers::grammers_functionality::initialize_grammers_client;
 use core::models::common::app_name::AppName;
@@ -14,16 +15,6 @@ use teloxide::macros::BotCommands;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::Bot;
 use tracing::info;
-
-#[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase")]
-pub enum TheViperRoomBotCommands {
-    Start,
-    Podcast,
-    Test,
-    Schedule,
-    Stop,
-}
 
 pub(crate) async fn the_viper_room_message_handler(bot: Bot, msg: Message) -> Result<()> {
     let user_id = msg.chat.id;
