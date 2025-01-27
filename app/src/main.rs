@@ -14,11 +14,13 @@ use teloxide::dispatching::UpdateHandler;
 use teloxide::{dptree, Bot};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
+use crate::w3a_bot::start_w3a_bot::start_w3a_bot;
 
 mod probiot;
 mod request_app_bot;
 mod tester_bot;
 mod the_viper_room_bot;
+mod w3a_bot;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -38,6 +40,7 @@ async fn main() -> anyhow::Result<()> {
         "request_app" => AppName::RequestApp,
         "request_app_bot" => AppName::RequestAppBot,
         "tester_bot" => AppName::TesterBot,
+        "w3a_bot" => AppName::W3ABot,
         _ => return Err(anyhow::anyhow!("Unknown app name: {}", app_name_str)),
     };
 
@@ -60,6 +63,7 @@ async fn main() -> anyhow::Result<()> {
         AppName::TheViperRoomBot => start_the_viper_room_bot(app_state).await?,
         AppName::RequestAppBot => start_request_app_bot(app_state).await?,
         AppName::TesterBot => start_tester_bot(app_state).await?,
+        AppName::W3ABot => {start_w3a_bot(app_state).await?},
         _ => {
             return Err(anyhow::anyhow!(
                 "Bot not implemented for app: {}",
@@ -83,6 +87,7 @@ pub async fn start_bot(
         AppName::TheViperRoomBot => Bot::new(env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM")?),
         AppName::RequestAppBot => Bot::new(env::var("TELOXIDE_TOKEN_REQUEST_APP")?),
         AppName::TesterBot => Bot::new(env::var("TELOXIDE_TOKEN_TESTER")?),
+        AppName::W3ABot => Bot::new(env::var("TELOXIDE_TOKEN_W3A_BOT")?),
         _ => return Err(anyhow::anyhow!("Unsupported app name")),
     };
 
