@@ -6,16 +6,10 @@ use core::utils::tg_bot::tg_bot::{
     add_llm_response_to_cache, add_user_message_to_cache, get_cache_as_string,
 };
 use std::sync::Arc;
-use teloxide::macros::BotCommands;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Requester};
 use teloxide::Bot;
-
-#[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase")]
-pub enum RequestAppBotCommands {
-    Start,
-}
+use core::models::tg_bot::request_app_bot::request_app_bot_commands::RequestAppBotCommands;
 
 pub(crate) async fn request_app_command_handler(
     bot: Bot,
