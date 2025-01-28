@@ -17,7 +17,7 @@ pub async fn get_results_via_rag_system(
 
     let retriever = QdrantRetriever::new(app_state.qdrant_client.clone(), collection_names);
 
-    let context_builder = DefaultContextBuilder::new().with_separator("\n\n".to_string());
+    let context_builder = DefaultContextBuilder::new().with_separator("\n-\n".to_string());
 
     let rag_system = RAGSystem::new(vectorizer, retriever, context_builder, config);
 

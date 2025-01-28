@@ -10,6 +10,7 @@ pub struct Document {
     pub content: String,
     pub score: Option<f32>,
     pub metadata: Option<DocumentMetadata>,
+    pub vector: Option<Vec<f32>>,
 }
 
 #[derive(Clone, Debug)]

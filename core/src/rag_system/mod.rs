@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use crate::rag_system::types::{Document, RAGConfig, RetrievedContext};
 use anyhow::Result;
 use async_trait::async_trait;
+use tracing::info;
 
 pub mod context_builder;
 pub mod get_results_via_rag_system;
@@ -76,18 +77,26 @@ where
                 related_max_documents,
                 related_similarity_threshold,
             } => {
+                info!("TEMP LOG: Advanced RAG system started");
                 let vector = self.vectorizer.vectorize(query).await?;
                 let base_results = self
                     .retriever
                     .search(vector.clone(), *base_max_documents, *base_similarity_threshold)
                     .await?;
+                info!("TEMP LOG: Documents quantity in base results: {}", base_results.len());
 
                 let mut all_results = base_results.clone();
                 let mut seen_ids = base_results.iter().map(|doc| doc.point_id.clone()).collect::<HashSet<_>>();
 
                 for base_result in &base_results {
-                    // TODO: Consider using vector from qdrant result point
-                    let base_vector = self.vectorizer.vectorize(&base_result.content).await?;
+                    let base_vector = match &base_result.vector {
+                        Some(vector) => {
+                            info!("TEMP LOG: Vector used from Document");
+                            vector.clone()
+                        },
+                        None => self.vectorizer.vectorize(&base_result.content).await?,
+                    };
+
                     let related_results = self
                         .retriever
                         .search(
@@ -97,8 +106,11 @@ where
                         )
                         .await?;
 
+                    info!("TEMP LOG: Documents quantity in related in ITERATION: {}", related_results.len());
+
                     for related_result in related_results {
                         if seen_ids.insert(related_result.point_id.clone()) {
+                            info!("TEMP LOG: Related point is unique. All's good");
                             all_results.push(related_result);
                         }
                     }
@@ -109,6 +121,7 @@ where
                         .partial_cmp(&a.score)
                         .unwrap_or(std::cmp::Ordering::Equal)
                 });
+                info!("TEMP LOG: Documents quantity in the end of the search: {}", all_results.len());
 
                 let context = self.context_builder.build_context(all_results.clone())?;
                 return Ok(RetrievedContext { context, documents: all_results });
