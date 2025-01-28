@@ -1,4 +1,4 @@
-use crate::probiot::probiot_utils::{check_request_for_crap_content, clarify_request};
+use crate::probiot::probiot_utils::{check_request_for_crap_content, clarify_request, get_advanced_rag_config};
 use anyhow::Result;
 use core::ai::common::common::raw_llm_processing;
 use core::ai::common::common::tokenize_and_truncate;
@@ -72,20 +72,22 @@ pub async fn handle_valid_request(
         .map(|collection| collection.as_str().to_string())
         .collect();
 
+    // RAG system mode
+    let rag_config = get_advanced_rag_config();
+
     let search_results = get_results_via_rag_system(
-        clarified_request.clone(), // Check results providing user_raw_request/clarified_request
+        clarified_request.clone(),
         collection_names,
-        10,
-        0.4,
+        rag_config,
         app_state.clone(),
     )
-    .await?;
+        .await?;
 
-    let search_results_text_payload = search_results.context;
+    let rag_system_search_result_payload = search_results.context;
 
-    let processed_data = tokenize_and_truncate(search_results_text_payload.clone())
+    let processed_data = tokenize_and_truncate(rag_system_search_result_payload.clone())
         .await
-        .unwrap_or_else(|_| search_results_text_payload);
+        .unwrap_or_else(|_| rag_system_search_result_payload);
 
     let llm_message = format!(
         "User's current query: {}\nUser's refined query: {}\nChat history: {}\nUseful information from the database:\n{}",

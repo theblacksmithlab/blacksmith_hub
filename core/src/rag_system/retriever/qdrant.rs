@@ -1,8 +1,8 @@
-use crate::rag_system::types::{Document, DocumentMetadata};
+use crate::rag_system::types::{Document, DocumentMetadata, PointId};
 use crate::rag_system::Retriever;
 use anyhow::Result;
 use async_trait::async_trait;
-use qdrant_client::qdrant::{SearchParamsBuilder, SearchPointsBuilder};
+use qdrant_client::qdrant::{point_id, SearchParamsBuilder, SearchPointsBuilder};
 use qdrant_client::Qdrant;
 use std::sync::Arc;
 use tracing::error;
@@ -37,15 +37,24 @@ impl Retriever for QdrantRetriever {
                 query_vector.clone(),
                 limit as u64,
             )
-            .with_payload(true)
-            .with_vectors(true)
-            .score_threshold(similarity_threshold)
-            .params(SearchParamsBuilder::default().exact(true))
-            .build();
+                .with_payload(true)
+                .with_vectors(true)
+                .score_threshold(similarity_threshold)
+                .params(SearchParamsBuilder::default().exact(true))
+                .build();
 
             match self.client.search_points(search_request).await {
                 Ok(response) => {
                     let documents = response.result.into_iter().map(|point| {
+                        let point_id = match point.id {
+                            Some(id) => match id.point_id_options {
+                                Some(point_id::PointIdOptions::Num(num)) => PointId::Num(num),
+                                Some(point_id::PointIdOptions::Uuid(uuid)) => PointId::Uuid(uuid),
+                                None => PointId::Uuid("unknown".to_string()),
+                            },
+                            None => PointId::Uuid("unknown".to_string()),
+                        };
+
                         let content = point
                             .payload
                             .get("text")
@@ -63,9 +72,10 @@ impl Retriever for QdrantRetriever {
                         let timestamp = point.payload.get("timestamp").and_then(|v| v.as_integer());
 
                         Document {
+                            point_id,
                             content,
-                            metadata: Some(DocumentMetadata { source, timestamp }),
                             score: Some(point.score),
+                            metadata: Some(DocumentMetadata { source, timestamp }),
                         }
                     });
 

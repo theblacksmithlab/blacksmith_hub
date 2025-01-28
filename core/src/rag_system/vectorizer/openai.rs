@@ -4,6 +4,7 @@ use anyhow::Result;
 use async_openai::types::{CreateEmbeddingRequestArgs, CreateEmbeddingResponse};
 use async_trait::async_trait;
 use std::sync::Arc;
+use crate::utils::common::LlmModel;
 
 pub struct OpenAIVectorizer<T: LlmProcessing> {
     app_state: Arc<T>,
@@ -19,9 +20,10 @@ impl<T: LlmProcessing> OpenAIVectorizer<T> {
 impl<T: LlmProcessing + Send + Sync> Vectorizer for OpenAIVectorizer<T> {
     async fn vectorize(&self, text: &str) -> Result<Vec<f32>> {
         let llm_client = self.app_state.get_llm_client();
+        let llm_model = LlmModel::TextEmbedding3Large;
 
         let request = CreateEmbeddingRequestArgs::default()
-            .model("text-embedding-3-large")
+            .model(llm_model.as_str())
             .input(text)
             .build()?;
 

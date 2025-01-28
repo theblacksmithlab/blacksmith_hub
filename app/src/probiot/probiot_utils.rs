@@ -11,6 +11,7 @@ use core::utils::tg_bot::tg_bot::get_user_message_count;
 use std::sync::Arc;
 use teloxide::types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup};
 use tracing::{error, info};
+use core::rag_system::types::RAGConfig;
 
 pub fn create_tts_button(chat_id: ChatId, message_id: String) -> InlineKeyboardMarkup {
     let callback_data = format!("tts:{}:{}", chat_id, message_id);
@@ -118,5 +119,21 @@ pub async fn append_footer_if_needed(
         Ok(format!("{}\n{}", llm_response, footer_message))
     } else {
         Ok(llm_response)
+    }
+}
+
+pub fn _get_default_rag_config() -> RAGConfig {
+    RAGConfig::Default {
+        max_documents: 10,
+        similarity_threshold: 0.4,
+    }
+}
+
+pub fn get_advanced_rag_config() -> RAGConfig {
+    RAGConfig::Advanced {
+        base_max_documents: 5,
+        base_similarity_threshold: 0.7,
+        related_max_documents: 2,
+        related_similarity_threshold: 0.6,
     }
 }
