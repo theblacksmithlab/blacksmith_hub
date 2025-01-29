@@ -11,9 +11,9 @@ use teloxide::{dptree, Bot};
 use teloxide::prelude::Update;
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
-use core::models::tg_bot::probiot::probiot_bot_commands::ProbiotBotCommands;
+use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
-use crate::probiot::probiot_handlers::{probiot_callback_query_handler, probiot_command_handler, probiot_message_handler};
+use crate::probiot_bot::probiot_bot_handlers::{probiot_callback_query_handler, probiot_command_handler, probiot_message_handler};
 use crate::the_viper_room_bot::the_viper_room_bot_handlers::{the_viper_room_command_handler, the_viper_room_message_handler};
 use core::models::tg_bot::request_app_bot::request_app_bot_commands::RequestAppBotCommands;
 use crate::request_app_bot::request_app_bot_handlers::{request_app_command_handler, request_app_message_handler};
@@ -23,11 +23,11 @@ use core::models::tg_bot::w3a_bot::w3a_bot_commands::W3ABotCommands;
 use crate::w3a_bot::w3a_bot_handlers::{w3a_bot_command_handler, w3a_bot_message_handler};
 use anyhow::Result;
 
-mod probiot;
 mod request_app_bot;
 mod tester_bot;
 mod the_viper_room_bot;
 mod w3a_bot;
+mod probiot_bot;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
 
     let app_name_str = env::var("APP_NAME").unwrap_or_else(|_| "tester_bot".to_string());
     let app_name = match app_name_str.as_str() {
-        "probiot" => AppName::Probiot,
+        "probiot_bot" => AppName::ProbiotBot,
         "the_viper_room_bot" => AppName::TheViperRoomBot,
         "request_app_bot" => AppName::RequestAppBot,
         "tester_bot" => AppName::TesterBot,
@@ -96,7 +96,7 @@ async fn start_bot_with_handlers(
 ) -> Result<()> {
     let (command_handler, message_handler, callback_query_handler) = handlers;
     let bot = match app_state.app_name {
-        AppName::Probiot => Bot::new(env::var("TELOXIDE_TOKEN_PROBIOT")?),
+        AppName::ProbiotBot => Bot::new(env::var("TELOXIDE_TOKEN_PROBIOT")?),
         AppName::TheViperRoomBot => Bot::new(env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM")?),
         AppName::RequestAppBot => Bot::new(env::var("TELOXIDE_TOKEN_REQUEST_APP")?),
         AppName::TesterBot => Bot::new(env::var("TELOXIDE_TOKEN_TESTER")?),
@@ -125,7 +125,7 @@ fn get_handlers(
     Option<UpdateHandler<anyhow::Error>>,
 )> {
     match app_name {
-        AppName::Probiot => Ok((
+        AppName::ProbiotBot => Ok((
             Update::filter_message()
                 .filter_command::<ProbiotBotCommands>()
                 .endpoint(probiot_command_handler),

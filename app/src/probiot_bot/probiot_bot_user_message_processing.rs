@@ -1,10 +1,10 @@
-use crate::probiot::probiot_utils::{check_request_for_crap_content, clarify_request, get_advanced_rag_config};
+use crate::probiot_bot::probiot_bot_utils::{check_request_for_crap_content, clarify_request, get_advanced_rag_config};
 use anyhow::Result;
 use core::ai::common::common::raw_llm_processing;
 use core::ai::common::common::tokenize_and_truncate;
 use core::models::common::app_name::AppName;
 use core::models::common::qdrant_collection_manager::AppsCollections;
-use core::models::tg_bot::probiot::get_system_role_model::ProbiotRoleType;
+use core::models::tg_bot::probiot_bot::get_system_role_model::ProbiotRoleType;
 use core::rag_system::get_results_via_rag_system::get_results_via_rag_system::get_results_via_rag_system;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_system_role_or_fallback;
@@ -67,7 +67,7 @@ pub async fn handle_valid_request(
     app_state: Arc<BotAppState>,
     current_cache: String,
 ) -> Result<String> {
-    let collection_names: Vec<String> = AppsCollections::all_collections_for_app(AppName::Probiot)
+    let collection_names: Vec<String> = AppsCollections::all_collections_for_app(AppName::ProbiotBot)
         .iter()
         .map(|collection| collection.as_str().to_string())
         .collect();

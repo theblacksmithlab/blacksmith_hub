@@ -1,6 +1,6 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppsSystemMessages {
-    Probiot(ProbiotMessages),
+    Probiot(ProbiotBotMessages),
     TheViperRoom(TheViperRoomMessages),
     TheViperRoomBot(TheViperRoomBotMessages),
     RequestApp(RequestAppMessages),
@@ -40,20 +40,20 @@ impl CommonMessages {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ProbiotMessages {
+pub enum ProbiotBotMessages {
     StartMessage,
     PrivateChatInvitation,
     ResponseFooter,
     CrapRequestResponse,
 }
 
-impl ProbiotMessages {
+impl ProbiotBotMessages {
     pub fn as_str(&self) -> &str {
         match self {
-            ProbiotMessages::StartMessage => "start_message",
-            ProbiotMessages::PrivateChatInvitation => "private_chat_invitation",
-            ProbiotMessages::ResponseFooter => "response_footer_contacts",
-            ProbiotMessages::CrapRequestResponse => "response_for_crap_request",
+            ProbiotBotMessages::StartMessage => "start_message",
+            ProbiotBotMessages::PrivateChatInvitation => "private_chat_invitation",
+            ProbiotBotMessages::ResponseFooter => "response_footer_contacts",
+            ProbiotBotMessages::CrapRequestResponse => "response_for_crap_request",
         }
     }
 }

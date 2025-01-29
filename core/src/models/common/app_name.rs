@@ -1,6 +1,6 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppName {
-    Probiot,
+    ProbiotBot,
     TheViperRoom,
     TheViperRoomBot,
     RequestApp,
@@ -12,7 +12,7 @@ pub enum AppName {
 impl AppName {
     pub fn as_str(&self) -> &str {
         match self {
-            AppName::Probiot => "probiot",
+            AppName::ProbiotBot => "probiot_bot",
             AppName::TheViperRoom => "the_viper_room",
             AppName::TheViperRoomBot => "the_viper_room_bot",
             AppName::RequestApp => "request_app",

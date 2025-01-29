@@ -1,12 +1,12 @@
-use crate::probiot::probiot_user_message_processing::process_user_raw_request;
-use crate::probiot::probiot_utils::{
+use crate::probiot_bot::probiot_bot_user_message_processing::process_user_raw_request;
+use crate::probiot_bot::probiot_bot_utils::{
     append_footer_if_needed, create_tts_button, get_and_remove_tts_payload, save_tts_payload,
 };
 use anyhow::Result;
 use core::ai::common::voice_processing::simple_tts;
 use core::models::common::app_name::AppName;
-use core::models::common::system_messages::{CommonMessages, ProbiotMessages};
-use core::models::tg_bot::probiot::probiot_bot_commands::ProbiotBotCommands;
+use core::models::common::system_messages::{CommonMessages, ProbiotBotMessages};
+use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::common::transcribe_voice_message;
@@ -32,7 +32,7 @@ pub(crate) async fn probiot_message_handler(
     let chat_id = msg.chat.id;
     let bot_data = bot.get_me().await?;
     let user_raw_request = msg.text().unwrap_or("Empty request").to_string();
-    let initiator_app_name = AppName::Probiot.as_str().to_string();
+    let initiator_app_name = AppName::ProbiotBot.as_str().to_string();
     info!(
         "Got message: {} from: @{}",
         user_raw_request,
@@ -245,7 +245,7 @@ pub(crate) async fn probiot_message_handler(
         {
             let bot_msg = get_message(
                 Some(&initiator_app_name),
-                ProbiotMessages::PrivateChatInvitation.as_str(),
+                ProbiotBotMessages::PrivateChatInvitation.as_str(),
                 false,
             )
             .await?;
@@ -265,13 +265,13 @@ pub(crate) async fn probiot_command_handler(
     _app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let user_id = msg.chat.id;
-    let initiator_app_name = AppName::Probiot.as_str().to_string();
+    let initiator_app_name = AppName::ProbiotBot.as_str().to_string();
 
     match cmd {
         ProbiotBotCommands::Start => {
             let bot_msg = get_message(
                 Some(&initiator_app_name),
-                ProbiotMessages::StartMessage.as_str(),
+                ProbiotBotMessages::StartMessage.as_str(),
                 false,
             )
             .await?;

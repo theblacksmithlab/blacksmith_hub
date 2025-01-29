@@ -1,8 +1,8 @@
 use anyhow::Result;
 use core::ai::common::common::{raw_llm_processing, raw_llm_processing_json};
 use core::models::common::dialogue_cache::DialogueCache;
-use core::models::common::system_messages::ProbiotMessages;
-use core::models::tg_bot::probiot::get_system_role_model::ProbiotRoleType;
+use core::models::common::system_messages::ProbiotBotMessages;
+use core::models::tg_bot::probiot_bot::get_system_role_model::ProbiotRoleType;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::common::get_system_role_or_fallback;
@@ -112,7 +112,7 @@ pub async fn append_footer_if_needed(
     if message_count > 0 && message_count % 3 == 0 {
         let footer_message = get_message(
             Some(app_name),
-            ProbiotMessages::ResponseFooter.as_str(),
+            ProbiotBotMessages::ResponseFooter.as_str(),
             false,
         )
         .await?;
