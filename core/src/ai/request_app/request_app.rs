@@ -1,11 +1,11 @@
 use crate::ai::common::common::raw_llm_processing_json;
 use crate::local_db::local_db::save_user_profile;
-use crate::models::request_app::request_app::RequestAppSystemRoleType;
+use crate::models::common::app_name::AppName;
+use crate::models::common::system_roles::RequestAppSystemRoleType;
 use crate::state::request_app::app_state::{RequestAppState, UserProfile};
 use crate::utils::common::{get_system_role_or_fallback, LlmModel};
 use crate::vector_db::vector_db::qdrant_upsert;
 use anyhow::Context;
-use async_openai::types::{CreateEmbeddingRequestArgs, CreateEmbeddingResponse};
 use std::fs;
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
@@ -21,7 +21,7 @@ pub async fn process_users_self_description(
     let fallback_system_role =
         "Return the text provided to you without additional remarks or design.".to_string();
     let system_role = get_system_role_or_fallback(
-        "request_app",
+        &AppName::RequestApp,
         RequestAppSystemRoleType::ProcessingUsersBioText,
         Some(&fallback_system_role),
     );
@@ -86,18 +86,4 @@ pub async fn process_users_request(
     .context("Failed to upsert data in Qdrant")?;
 
     Ok(())
-}
-
-pub async fn vectorize(data: String, app_state: Arc<RequestAppState>) -> anyhow::Result<Vec<f32>> {
-    let llm_client = app_state.llm_client.clone();
-
-    let request = CreateEmbeddingRequestArgs::default()
-        .model(LlmModel::TextEmbedding3Large.as_str())
-        .input(data)
-        .build()?;
-
-    let response: CreateEmbeddingResponse = llm_client.embeddings().create(request).await?;
-    let embedding = response.data.into_iter().next().unwrap().embedding;
-
-    Ok(embedding)
 }

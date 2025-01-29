@@ -1,12 +1,13 @@
 use core::models::common::app_name::AppName;
+use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::CommonMessages;
+use core::models::tg_bot::tester_bot::tester_bot_commands::TesterBotCommands;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::tg_bot::{
     add_llm_response_to_cache, add_user_message_to_cache, get_cache_as_string,
 };
 use std::sync::Arc;
-use core::models::tg_bot::tester_bot::tester_bot_commands::TesterBotCommands;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Requester};
 use teloxide::Bot;
@@ -18,7 +19,7 @@ pub(crate) async fn tester_bot_command_handler(
 ) -> anyhow::Result<()> {
     let TesterBotCommands::Start = cmd;
 
-    let bot_msg = get_message(None, CommonMessages::StartMessage.as_str(), true).await?;
+    let bot_msg = get_message(AppsSystemMessages::Common(CommonMessages::StartMessage)).await?;
     bot.send_message(msg.chat.id, bot_msg).await?;
 
     Ok(())
@@ -56,7 +57,7 @@ pub(crate) async fn tester_bot_message_handler(
         .parse_mode(teloxide::types::ParseMode::Html)
         .await?;
 
-    let bot_msg = get_message(None, CommonMessages::AutoReply.as_str(), true).await?;
+    let bot_msg = get_message(AppsSystemMessages::Common(CommonMessages::AutoReply)).await?;
     bot.send_message(user_id, bot_msg).await?;
 
     Ok(())

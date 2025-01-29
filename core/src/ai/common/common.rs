@@ -11,7 +11,8 @@ use async_openai::types::{
 use std::fs;
 
 use crate::local_db::local_db::save_user_profile;
-use crate::models::request_app::request_app::RequestAppSystemRoleType;
+use crate::models::common::app_name::AppName;
+use crate::models::common::system_roles::RequestAppSystemRoleType;
 use crate::utils::common::get_system_role_or_fallback;
 use crate::utils::common::LlmModel;
 use std::sync::Arc;
@@ -106,7 +107,7 @@ pub async fn process_users_self_description(
     let fallback_system_role =
         "Return the text provided to you without additional remarks or design.".to_string();
     let system_role = get_system_role_or_fallback(
-        "request_app",
+        &AppName::RequestApp,
         RequestAppSystemRoleType::ProcessingUsersBioText,
         Some(&fallback_system_role),
     );

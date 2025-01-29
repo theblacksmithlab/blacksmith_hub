@@ -1,10 +1,12 @@
-use crate::probiot_bot::probiot_bot_utils::{check_request_for_crap_content, clarify_request, get_advanced_rag_config};
+use crate::probiot_bot::probiot_bot_utils::{
+    check_request_for_crap_content, clarify_request, get_advanced_rag_config,
+};
 use anyhow::Result;
 use core::ai::common::common::raw_llm_processing;
 use core::ai::common::common::tokenize_and_truncate;
 use core::models::common::app_name::AppName;
 use core::models::common::qdrant_collection_manager::AppsCollections;
-use core::models::tg_bot::probiot_bot::get_system_role_model::ProbiotRoleType;
+use core::models::common::system_roles::ProbiotRoleType;
 use core::rag_system::get_results_via_rag_system::get_results_via_rag_system::get_results_via_rag_system;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_system_role_or_fallback;
@@ -18,6 +20,7 @@ pub async fn process_user_raw_request(
     chat_id: ChatId,
     user_raw_request: String,
     app_state: Arc<BotAppState>,
+    app_name: AppName,
 ) -> Result<String> {
     info!("Start processing user raw request...");
     add_user_message_to_cache(app_state.clone(), chat_id, user_raw_request.clone()).await;
@@ -28,6 +31,7 @@ pub async fn process_user_raw_request(
         user_raw_request.clone(),
         current_cache.clone(),
         app_state.clone(),
+        app_name.clone(),
     )
     .await?;
 
@@ -67,10 +71,11 @@ pub async fn handle_valid_request(
     app_state: Arc<BotAppState>,
     current_cache: String,
 ) -> Result<String> {
-    let collection_names: Vec<String> = AppsCollections::all_collections_for_app(AppName::ProbiotBot)
-        .iter()
-        .map(|collection| collection.as_str().to_string())
-        .collect();
+    let collection_names: Vec<String> =
+        AppsCollections::all_collections_for_app(AppName::ProbiotBot)
+            .iter()
+            .map(|collection| collection.as_str().to_string())
+            .collect();
 
     // RAG system mode
     let rag_config = get_advanced_rag_config();
@@ -81,7 +86,7 @@ pub async fn handle_valid_request(
         rag_config,
         app_state.clone(),
     )
-        .await?;
+    .await?;
 
     let rag_system_search_result_payload = search_results.context;
 
@@ -96,7 +101,8 @@ pub async fn handle_valid_request(
 
     info!("TEMP log: LLM message: {}", llm_message);
 
-    let system_role = get_system_role_or_fallback("probiot", ProbiotRoleType::MainProcessing, None);
+    let system_role =
+        get_system_role_or_fallback(&AppName::ProbiotBot, ProbiotRoleType::MainProcessing, None);
 
     let llm_response =
         raw_llm_processing(system_role, llm_message, app_state, LlmModel::Complex).await?;
@@ -114,8 +120,11 @@ pub async fn handle_crap_request(
         user_raw_request, current_cache
     );
 
-    let system_role =
-        get_system_role_or_fallback("probiot", ProbiotRoleType::CrapRequestProcessing, None);
+    let system_role = get_system_role_or_fallback(
+        &AppName::ProbiotBot,
+        ProbiotRoleType::CrapRequestProcessing,
+        None,
+    );
 
     let llm_response =
         raw_llm_processing(system_role, llm_message, app_state, LlmModel::Light).await?;

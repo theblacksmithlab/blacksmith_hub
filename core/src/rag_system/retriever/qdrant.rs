@@ -37,11 +37,11 @@ impl Retriever for QdrantRetriever {
                 query_vector.clone(),
                 limit as u64,
             )
-                .with_payload(true)
-                .with_vectors(true)
-                .score_threshold(similarity_threshold)
-                .params(SearchParamsBuilder::default().exact(true))
-                .build();
+            .with_payload(true)
+            .with_vectors(true)
+            .score_threshold(similarity_threshold)
+            .params(SearchParamsBuilder::default().exact(true))
+            .build();
 
             match self.client.search_points(search_request).await {
                 Ok(response) => {
@@ -78,13 +78,17 @@ impl Retriever for QdrantRetriever {
                                 }
                                 Some(vectors_output::VectorsOptions::Vectors(named_vectors)) => {
                                     error!("Named vectors retrieval option is not supported yet!");
-                                    named_vectors.vectors.values().next().map(|v| v.data.clone())
+                                    named_vectors
+                                        .vectors
+                                        .values()
+                                        .next()
+                                        .map(|v| v.data.clone())
                                 }
                                 None => None,
                             },
                             None => None,
                         };
-                        
+
                         Document {
                             point_id,
                             content,

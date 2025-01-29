@@ -53,23 +53,3 @@ pub struct AvatarRequest {
 pub struct AvatarResponse {
     pub avatar_url: Option<String>,
 }
-
-pub enum TheViperRoomRoleType {
-    CaptionGeneration,
-    ExtractingNews,
-    SystemNicknameGeneration,
-    CreatingPodcast,
-    CheckUsefulness,
-}
-
-impl Into<&'static str> for TheViperRoomRoleType {
-    fn into(self) -> &'static str {
-        match self {
-            TheViperRoomRoleType::CaptionGeneration => "caption_generation",
-            TheViperRoomRoleType::ExtractingNews => "extracting_news",
-            TheViperRoomRoleType::SystemNicknameGeneration => "system_nickname_generation",
-            TheViperRoomRoleType::CreatingPodcast => "creating_podcast",
-            TheViperRoomRoleType::CheckUsefulness => "system_role_usefulness",
-        }
-    }
-}

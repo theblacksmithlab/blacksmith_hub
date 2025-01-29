@@ -6,6 +6,7 @@ pub enum AppsSystemMessages {
     RequestApp(RequestAppMessages),
     RequestAppBot(RequestAppBotMessages),
     Common(CommonMessages),
+    W3ABot(W3ABotMessages),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -44,6 +45,7 @@ pub enum ProbiotBotMessages {
     StartMessage,
     PrivateChatInvitation,
     ResponseFooter,
+    // Todo: Get rid of CrapRequestResponse hard-coded message
     CrapRequestResponse,
 }
 
@@ -52,8 +54,25 @@ impl ProbiotBotMessages {
         match self {
             ProbiotBotMessages::StartMessage => "start_message",
             ProbiotBotMessages::PrivateChatInvitation => "private_chat_invitation",
-            ProbiotBotMessages::ResponseFooter => "response_footer_contacts",
+            ProbiotBotMessages::ResponseFooter => "response_footer",
             ProbiotBotMessages::CrapRequestResponse => "response_for_crap_request",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum W3ABotMessages {
+    StartMessage,
+    PrivateChatInvitation,
+    ResponseFooter,
+}
+
+impl W3ABotMessages {
+    pub fn as_str(&self) -> &str {
+        match self {
+            W3ABotMessages::StartMessage => "start_message",
+            W3ABotMessages::PrivateChatInvitation => "private_chat_invitation",
+            W3ABotMessages::ResponseFooter => "response_footer",
         }
     }
 }
@@ -88,12 +107,30 @@ impl TheViperRoomBotMessages {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RequestAppMessages {
-    RequestReceived,
-    ErrorMessage,
+    TestMessage1,
+    TestMessage2,
+}
+
+impl RequestAppMessages {
+    pub fn as_str(&self) -> &str {
+        match self {
+            RequestAppMessages::TestMessage1 => "test_message_1",
+            RequestAppMessages::TestMessage2 => "test_message_2",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RequestAppBotMessages {
-    BotStartMessage,
-    ErrorMessage,
+    TestMessage1,
+    TestMessage2,
+}
+
+impl RequestAppBotMessages {
+    pub fn as_str(&self) -> &str {
+        match self {
+            RequestAppBotMessages::TestMessage1 => "test_message_1",
+            RequestAppBotMessages::TestMessage2 => "test_message_2",
+        }
+    }
 }

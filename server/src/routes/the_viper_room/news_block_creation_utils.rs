@@ -1,7 +1,8 @@
 use chrono::Duration as ChronoDuration;
 use chrono::Utc;
 use core::ai::common::common::raw_llm_processing;
-use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
+use core::models::common::app_name::AppName;
+use core::models::common::system_roles::TheViperRoomRoleType;
 use core::state::llm_client_init_trait::LlmProcessing;
 use core::utils::common::get_system_role_or_fallback;
 use core::utils::common::LlmModel;
@@ -137,8 +138,11 @@ pub(crate) async fn updates_file_creation<T: LlmProcessing + Send + Sync>(
         utc_plus_3
     )?;
 
-    let system_role =
-        get_system_role_or_fallback("the_viper_room", TheViperRoomRoleType::ExtractingNews, None);
+    let system_role = get_system_role_or_fallback(
+        &AppName::TheViperRoom,
+        TheViperRoomRoleType::ExtractingNews,
+        None,
+    );
 
     for file_path in txt_files.clone() {
         let content = read_file_safe(&file_path)?;
@@ -171,7 +175,7 @@ pub(crate) async fn summarize_updates<T: LlmProcessing + Send + Sync>(
     nickname: String,
 ) -> Result<String, anyhow::Error> {
     let system_role = get_system_role_or_fallback(
-        "the_viper_room",
+        &AppName::TheViperRoom,
         TheViperRoomRoleType::CreatingPodcast,
         None,
     );
@@ -229,7 +233,7 @@ pub(crate) async fn get_latest_messages<T: LlmProcessing + Send + Sync>(
         .open(user_tmp_file)?;
 
     let system_role = get_system_role_or_fallback(
-        "the_viper_room",
+        &AppName::TheViperRoom,
         TheViperRoomRoleType::CheckUsefulness,
         None,
     );

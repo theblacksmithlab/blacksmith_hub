@@ -6,7 +6,7 @@ pub enum AppName {
     RequestApp,
     RequestAppBot,
     TesterBot,
-    W3ABot
+    W3ABot,
 }
 
 impl AppName {
@@ -18,7 +18,7 @@ impl AppName {
             AppName::RequestApp => "request_app",
             AppName::RequestAppBot => "request_app_bot",
             AppName::TesterBot => "tester_bot",
-            AppName::W3ABot => "w3a_bot"
+            AppName::W3ABot => "w3a_bot",
         }
     }
 }

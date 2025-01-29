@@ -1,5 +1,6 @@
 use core::ai::common::common::raw_llm_processing;
-use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
+use core::models::common::app_name::AppName;
+use core::models::common::system_roles::TheViperRoomRoleType;
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
 use core::utils::common::get_system_role_or_fallback;
 use core::utils::common::LlmModel;
@@ -12,7 +13,7 @@ pub async fn generate_user_system_nickname(
     last_name: String,
 ) -> Result<String, String> {
     let system_role = get_system_role_or_fallback(
-        "the_viper_room",
+        &AppName::TheViperRoom,
         TheViperRoomRoleType::SystemNicknameGeneration,
         None,
     );

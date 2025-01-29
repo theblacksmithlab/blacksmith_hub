@@ -1,5 +1,25 @@
+use crate::default_message_handler::default_message_handler;
+use crate::probiot_bot::probiot_bot_handlers::{
+    probiot_callback_query_handler, probiot_command_handler,
+};
+use crate::request_app_bot::request_app_bot_handlers::{
+    request_app_command_handler, request_app_message_handler,
+};
+use crate::tester_bot::tester_bot_handlers::{
+    tester_bot_command_handler, tester_bot_message_handler,
+};
+use crate::the_viper_room_bot::the_viper_room_bot_handlers::{
+    the_viper_room_command_handler, the_viper_room_message_handler,
+};
+use crate::w3a_bot::w3a_bot_handlers::w3a_bot_command_handler;
+use anyhow::Result;
 use async_openai::Client as LLM_Client;
 use core::models::common::app_name::AppName;
+use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
+use core::models::tg_bot::request_app_bot::request_app_bot_commands::RequestAppBotCommands;
+use core::models::tg_bot::tester_bot::tester_bot_commands::TesterBotCommands;
+use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
+use core::models::tg_bot::w3a_bot::w3a_bot_commands::W3ABotCommands;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use dotenv::dotenv;
@@ -7,27 +27,17 @@ use qdrant_client::Qdrant;
 use std::env;
 use std::sync::Arc;
 use teloxide::dispatching::{HandlerExt, UpdateFilterExt, UpdateHandler};
-use teloxide::{dptree, Bot};
 use teloxide::prelude::Update;
+use teloxide::{dptree, Bot};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
-use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
-use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
-use crate::probiot_bot::probiot_bot_handlers::{probiot_callback_query_handler, probiot_command_handler, probiot_message_handler};
-use crate::the_viper_room_bot::the_viper_room_bot_handlers::{the_viper_room_command_handler, the_viper_room_message_handler};
-use core::models::tg_bot::request_app_bot::request_app_bot_commands::RequestAppBotCommands;
-use crate::request_app_bot::request_app_bot_handlers::{request_app_command_handler, request_app_message_handler};
-use core::models::tg_bot::tester_bot::tester_bot_commands::TesterBotCommands;
-use crate::tester_bot::tester_bot_handlers::{tester_bot_command_handler, tester_bot_message_handler};
-use core::models::tg_bot::w3a_bot::w3a_bot_commands::W3ABotCommands;
-use crate::w3a_bot::w3a_bot_handlers::{w3a_bot_command_handler, w3a_bot_message_handler};
-use anyhow::Result;
 
+mod default_message_handler;
+mod probiot_bot;
 mod request_app_bot;
 mod tester_bot;
 mod the_viper_room_bot;
 mod w3a_bot;
-mod probiot_bot;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -47,7 +57,10 @@ async fn main() -> Result<()> {
         "tester_bot" => AppName::TesterBot,
         "w3a_bot" => AppName::W3ABot,
         "the_viper_room" | "request_app" => {
-            info!("No Telegram bot system implementation for app: {}", app_name_str);
+            info!(
+                "No Telegram bot system implementation for app: {}",
+                app_name_str
+            );
             return Ok(());
         }
         _ => return Err(anyhow::anyhow!("Unknown APP_NAME: {}", app_name_str)),
@@ -104,7 +117,10 @@ async fn start_bot_with_handlers(
         _ => return Err(anyhow::anyhow!("Unsupported app name")),
     };
 
-    info!("Starting | {} | Telegram bot...", app_state.app_name.as_str());
+    info!(
+        "Starting | {} | Telegram bot...",
+        app_state.app_name.as_str()
+    );
 
     let main_handler = dptree::entry()
         .branch(command_handler)
@@ -112,8 +128,6 @@ async fn start_bot_with_handlers(
 
     run_bot_dispatcher(bot, main_handler, app_state.clone(), callback_query_handler).await?;
 
-    info!("| {} | Telegram bot is ready to serve!", app_state.app_name.as_str());
-    
     Ok(())
 }
 
@@ -129,7 +143,7 @@ fn get_handlers(
             Update::filter_message()
                 .filter_command::<ProbiotBotCommands>()
                 .endpoint(probiot_command_handler),
-            Update::filter_message().endpoint(probiot_message_handler),
+            Update::filter_message().endpoint(default_message_handler),
             Some(Update::filter_callback_query().endpoint(probiot_callback_query_handler)),
         )),
         AppName::TheViperRoomBot => Ok((
@@ -157,7 +171,7 @@ fn get_handlers(
             Update::filter_message()
                 .filter_command::<W3ABotCommands>()
                 .endpoint(w3a_bot_command_handler),
-            Update::filter_message().endpoint(w3a_bot_message_handler),
+            Update::filter_message().endpoint(default_message_handler),
             None,
         )),
         AppName::TheViperRoom | AppName::RequestApp => Err(anyhow::anyhow!(

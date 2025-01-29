@@ -6,7 +6,7 @@ use strum::IntoEnumIterator;
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppsCollections {
     ProbiotBot(ProbiotBotCollections),
-    W3ABot(W3ABotCollections)
+    W3ABot(W3ABotCollections),
 }
 
 impl AppsCollections {

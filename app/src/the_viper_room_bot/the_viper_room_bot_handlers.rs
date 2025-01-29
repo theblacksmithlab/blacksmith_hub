@@ -1,11 +1,11 @@
 use crate::the_viper_room_bot::the_viper_room_bot_local_utils::{
     generate_podcast, schedule_podcast, stop_daily_podcasts,
 };
-use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
 use anyhow::Result;
 use core::grammers::grammers_functionality::initialize_grammers_client;
-use core::models::common::app_name::AppName;
+use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::{CommonMessages, TheViperRoomBotMessages};
+use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use std::path::Path;
@@ -17,7 +17,7 @@ use tracing::info;
 
 pub(crate) async fn the_viper_room_message_handler(bot: Bot, msg: Message) -> Result<()> {
     let user_id = msg.chat.id;
-    let bot_msg = get_message(None, CommonMessages::AutoReply.as_str(), true).await?;
+    let bot_msg = get_message(AppsSystemMessages::Common(CommonMessages::AutoReply)).await?;
     bot.send_message(user_id, bot_msg).await?;
 
     Ok(())
@@ -30,7 +30,6 @@ pub(crate) async fn the_viper_room_command_handler(
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let user_id = msg.chat.id;
-    let initiator_app_name = AppName::TheViperRoomBot.as_str().to_string();
 
     let lord_admin_id: i64 = env::var("LORD_ADMIN_ID")
         .expect("LORD_ADMIN_ID environment variable must be set")
@@ -66,7 +65,8 @@ pub(crate) async fn the_viper_room_command_handler(
     match cmd {
         TheViperRoomBotCommands::Start => {
             info!("Healthy user starts the App... Ok");
-            let bot_msg = get_message(None, CommonMessages::StartMessage.as_str(), true).await?;
+            let bot_msg =
+                get_message(AppsSystemMessages::Common(CommonMessages::StartMessage)).await?;
             bot.send_message(user_id, bot_msg).await?;
         }
 
@@ -124,11 +124,9 @@ pub(crate) async fn the_viper_room_command_handler(
         }
 
         _ => {
-            let bot_msg = get_message(
-                Some(&initiator_app_name),
-                TheViperRoomBotMessages::WrongCmdOrNoRightsMessage.as_str(),
-                false,
-            )
+            let bot_msg = get_message(AppsSystemMessages::TheViperRoomBot(
+                TheViperRoomBotMessages::WrongCmdOrNoRightsMessage,
+            ))
             .await?;
             bot.send_message(user_id, bot_msg).await?;
         }
