@@ -55,10 +55,25 @@ pub async fn check_request_for_crap_content(
     clarified_request: String,
     current_cache: String,
     app_state: Arc<BotAppState>,
+    app_name: AppName,
 ) -> Result<bool> {
-    let system_role =
-        get_system_role_or_fallback(&AppName::ProbiotBot, ProbiotRoleType::CrapDetection, None);
+    let system_role = match app_name {
+        AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::CrapDetection)),
+        AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::CrapDetection)),
+        _ => None,
+    };
 
+    let system_role = match system_role {
+        Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
+        None => {
+            error!(
+                "CrapDetection role is not defined for app '{}'. Using fallback.",
+                app_name.as_str()
+            );
+            "You are a helpful assistant".to_string()
+        }
+    };
+    
     let llm_message = format!(
         "User's current query: {}\nUser's refined query: {}\nChat history: {}",
         user_raw_request, clarified_request, current_cache
@@ -102,7 +117,7 @@ pub async fn clarify_request(
         Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
         None => {
             error!(
-                "🚨 ClarifyRequest role is not defined for app '{}'. Using fallback.",
+                "ClarifyRequest role is not defined for app '{}'. Using fallback.",
                 app_name.as_str()
             );
             "You are a helpful assistant".to_string()
