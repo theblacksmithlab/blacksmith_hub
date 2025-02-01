@@ -6,6 +6,7 @@ use core::local_db::local_db::{create_db_pool, create_table};
 use core::state::request_app::app_state::RequestAppState;
 use core::state::server::app_state::ServerAppState;
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
+use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;
 use server::start_server;
@@ -42,6 +43,7 @@ async fn main() -> Result<()> {
         llm_client.clone(),
     ));
     let the_viper_room_app_state = Arc::new(TheViperRoomAppState::new(llm_client.clone()));
+    let blacksmith_web_app_state = Arc::new(BlacksmithWebAppState::new(llm_client.clone(), qdrant_client.clone()));
 
     info!("Initializing local_db pool...");
     let local_db_pool = create_db_pool().await?;
@@ -62,6 +64,7 @@ async fn main() -> Result<()> {
             server_app_state,
             request_app_state,
             the_viper_room_app_state,
+            blacksmith_web_app_state
         )
         .await
         {
