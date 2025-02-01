@@ -1,26 +1,26 @@
 use crate::models::common::app_name::AppName;
-use crate::models::tg_bot::probiot::qdrant_collections::ProbiotCollections;
+use crate::models::tg_bot::probiot_bot::qdrant_collections::ProbiotBotCollections;
 use crate::models::tg_bot::w3a_bot::qdrant_collections::W3ABotCollections;
 use strum::IntoEnumIterator;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppsCollections {
-    Probiot(ProbiotCollections),
-    W3ABot(W3ABotCollections)
+    ProbiotBot(ProbiotBotCollections),
+    W3ABot(W3ABotCollections),
 }
 
 impl AppsCollections {
     pub fn as_str(&self) -> &str {
         match self {
-            AppsCollections::Probiot(collection) => collection.as_str(),
+            AppsCollections::ProbiotBot(collection) => collection.as_str(),
             AppsCollections::W3ABot(collection) => collection.as_str(),
         }
     }
 
     pub fn all_collections_for_app(app_name: AppName) -> Vec<Self> {
         match app_name {
-            AppName::Probiot => ProbiotCollections::iter()
-                .map(AppsCollections::Probiot)
+            AppName::ProbiotBot => ProbiotBotCollections::iter()
+                .map(AppsCollections::ProbiotBot)
                 .collect(),
             AppName::W3ABot => W3ABotCollections::iter()
                 .map(AppsCollections::W3ABot)

@@ -5,8 +5,9 @@ use crate::routes::the_viper_room::news_block_creation_utils::{
 use core::ai::common::common::raw_llm_processing;
 use core::ai::common::voice_processing::text_to_speech;
 use core::models::common::app_name::AppName;
-use core::models::common::system_messages::TheViperRoomMessages;
-use core::models::the_viper_room::the_viper_room::TheViperRoomRoleType;
+use core::models::common::system_messages::AppsSystemMessages;
+use core::models::common::system_messages::TheViperRoomBotMessages;
+use core::models::common::system_roles::TheViperRoomRoleType;
 use core::state::llm_client_init_trait::LlmProcessing;
 use core::utils::common::get_system_role_or_fallback;
 use core::utils::common::{get_message, LlmModel};
@@ -26,7 +27,6 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
 ) -> anyhow::Result<PathBuf> {
     let user_tmp_dir = format!("common_res/the_viper_room/tmp/{}", user_id);
     create_dir_all(&user_tmp_dir)?;
-    let initiator_app_name = AppName::TheViperRoom.as_str().to_string();
 
     let channels = get_dialogs(&client).await?;
 
@@ -90,7 +90,7 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
 
     if need_caption {
         let system_role = get_system_role_or_fallback(
-            &initiator_app_name,
+            &AppName::TheViperRoom,
             TheViperRoomRoleType::CaptionGeneration,
             None,
         );
@@ -103,11 +103,9 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
         )
         .await?;
         caption.push_str(
-            &get_message(
-                Some(&initiator_app_name),
-                TheViperRoomMessages::DonationFooter.as_str(),
-                false,
-            )
+            &get_message(AppsSystemMessages::TheViperRoomBot(
+                TheViperRoomBotMessages::DonationFooter,
+            ))
             .await?,
         );
 

@@ -1,8 +1,8 @@
-use crate::rag_system::types::{Document, DocumentMetadata};
+use crate::rag_system::types::{Document, DocumentMetadata, PointId};
 use crate::rag_system::Retriever;
 use anyhow::Result;
 use async_trait::async_trait;
-use qdrant_client::qdrant::{SearchParamsBuilder, SearchPointsBuilder};
+use qdrant_client::qdrant::{point_id, vectors_output, SearchParamsBuilder, SearchPointsBuilder};
 use qdrant_client::Qdrant;
 use std::sync::Arc;
 use tracing::error;
@@ -46,6 +46,15 @@ impl Retriever for QdrantRetriever {
             match self.client.search_points(search_request).await {
                 Ok(response) => {
                     let documents = response.result.into_iter().map(|point| {
+                        let point_id = match point.id {
+                            Some(id) => match id.point_id_options {
+                                Some(point_id::PointIdOptions::Num(num)) => PointId::Num(num),
+                                Some(point_id::PointIdOptions::Uuid(uuid)) => PointId::Uuid(uuid),
+                                None => PointId::Uuid("unknown".to_string()),
+                            },
+                            None => PointId::Uuid("unknown".to_string()),
+                        };
+
                         let content = point
                             .payload
                             .get("text")
@@ -62,10 +71,30 @@ impl Retriever for QdrantRetriever {
 
                         let timestamp = point.payload.get("timestamp").and_then(|v| v.as_integer());
 
+                        let vector = match &point.vectors {
+                            Some(vectors_output) => match &vectors_output.vectors_options {
+                                Some(vectors_output::VectorsOptions::Vector(single_vector)) => {
+                                    Some(single_vector.data.clone())
+                                }
+                                Some(vectors_output::VectorsOptions::Vectors(named_vectors)) => {
+                                    error!("Named vectors retrieval option is not supported yet!");
+                                    named_vectors
+                                        .vectors
+                                        .values()
+                                        .next()
+                                        .map(|v| v.data.clone())
+                                }
+                                None => None,
+                            },
+                            None => None,
+                        };
+
                         Document {
+                            point_id,
                             content,
-                            metadata: Some(DocumentMetadata { source, timestamp }),
                             score: Some(point.score),
+                            metadata: Some(DocumentMetadata { source, timestamp }),
+                            vector,
                         }
                     });
 
@@ -82,6 +111,8 @@ impl Retriever for QdrantRetriever {
                 .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
+
+        all_documents.truncate(limit);
 
         Ok(all_documents)
     }

@@ -24,19 +24,3 @@ pub struct AvatarRequest {
 pub struct AvatarResponse {
     pub avatar_url: Option<String>,
 }
-
-pub enum RequestAppSystemRoleType {
-    ProcessingUsersBioText,
-    // ProcessingUsersRequestText,
-    ReorderingResults,
-}
-
-impl Into<&'static str> for RequestAppSystemRoleType {
-    fn into(self) -> &'static str {
-        match self {
-            RequestAppSystemRoleType::ProcessingUsersBioText => "processing_users_bio_text",
-            // RequestAppSystemRoleType::ProcessingUsersRequestText => "processing_users_request_text",
-            RequestAppSystemRoleType::ReorderingResults => "reordering_results",
-        }
-    }
-}

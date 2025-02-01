@@ -1,4 +1,6 @@
 use crate::ai::common::voice_processing::speech_to_text;
+use crate::models::common::app_name::AppName;
+use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::request_app::request_app::{AvatarRequest, AvatarResponse};
 use crate::state::request_app::app_state::{RequestAppState, UserProfile, UserStates};
 use crate::state::the_viper_room::app_state::{AuthStages, TheViperRoomAppState, UserData};
@@ -16,33 +18,50 @@ use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tracing::{error, info};
 
-pub fn get_system_role_path<T>(app_name: &str, role_type: T) -> String
-where
-    T: Into<&'static str>,
-{
+pub fn get_mapped_from_app_name_role_directory(app_name: &AppName) -> &str {
+    match app_name {
+        AppName::ProbiotBot => "probiot",
+        AppName::W3ABot => "w3a",
+        AppName::RequestAppBot => "request_app",
+        AppName::TheViperRoomBot => "the_viper_room",
+        _ => app_name.as_str(),
+    }
+}
+
+pub fn get_system_role_path(app_name: &AppName, role_type: &str) -> String {
     format!(
         "common_res/system_roles/{}/{}.txt",
-        app_name,
-        role_type.into()
+        get_mapped_from_app_name_role_directory(app_name),
+        role_type
     )
 }
 
 pub fn get_system_role_or_fallback<T>(
-    app_name: &str,
+    app_name: &AppName,
     role_type: T,
     fallback: Option<&str>,
 ) -> String
 where
-    T: Into<&'static str>,
+    T: AsRef<str>,
 {
-    let file_path = get_system_role_path(app_name, role_type);
+    let role_str = role_type.as_ref();
+
+    let file_path = get_system_role_path(app_name, role_str);
+
     match read_to_string(&file_path) {
         Ok(content) => content,
         Err(err) => {
-            eprintln!(
+            error!(
                 "Failed to load system role '{}': {}. Using fallback.",
                 file_path, err
             );
+
+            error!(
+                "Invalid role '{}' used for application '{}'. This role does not exist.",
+                role_str,
+                app_name.as_str()
+            );
+
             fallback
                 .unwrap_or("You are a helpful assistant")
                 .to_string()
@@ -190,24 +209,39 @@ pub async fn update_the_viper_room_user_data<F>(
     update_fn(data);
 }
 
-pub async fn get_message(
-    app_name: Option<&str>,
-    message_name: &str,
-    is_common: bool,
-) -> Result<String> {
+pub async fn get_message(message_enum: AppsSystemMessages) -> Result<String> {
     const DEFAULT_FALLBACK_MESSAGE: &str =
         "Извините, произошла техническая ошибка. Пожалуйста, попробуйте позже.";
 
-    let base_path: PathBuf = if is_common {
-        Path::new("common_res/messages/common").to_path_buf()
-    } else {
-        match app_name {
-            Some(name) => Path::new("common_res/messages").join(name),
-            None => {
-                error!("App name is required when is_common = false");
-                return Ok(DEFAULT_FALLBACK_MESSAGE.to_string());
-            }
-        }
+    let (base_path, message_name): (PathBuf, String) = match message_enum {
+        AppsSystemMessages::Common(msg) => (
+            Path::new("common_res/messages/common").to_path_buf(),
+            msg.as_str().to_string(),
+        ),
+        AppsSystemMessages::Probiot(msg) => (
+            Path::new("common_res/messages/probiot_bot").to_path_buf(),
+            msg.as_str().to_string(),
+        ),
+        AppsSystemMessages::TheViperRoom(msg) => (
+            Path::new("common_res/messages/the_viper_room").to_path_buf(),
+            msg.as_str().to_string(),
+        ),
+        AppsSystemMessages::TheViperRoomBot(msg) => (
+            Path::new("common_res/messages/the_viper_room_bot").to_path_buf(),
+            msg.as_str().to_string(),
+        ),
+        AppsSystemMessages::RequestApp(msg) => (
+            Path::new("common_res/messages/request_app").to_path_buf(),
+            msg.as_str().to_string(),
+        ),
+        AppsSystemMessages::RequestAppBot(msg) => (
+            Path::new("common_res/messages/request_app_bot").to_path_buf(),
+            msg.as_str().to_string(),
+        ),
+        AppsSystemMessages::W3ABot(msg) => (
+            Path::new("common_res/messages/w3a_bot").to_path_buf(),
+            msg.as_str().to_string(),
+        ),
     };
 
     let path = base_path.join(format!("{}.txt", message_name));
@@ -223,11 +257,7 @@ pub async fn get_message(
             anyhow!(
                 "Failed to read message '{}' {}: {}",
                 message_name,
-                if is_common {
-                    "(common message)"
-                } else {
-                    "for app"
-                },
+                path.display(),
                 e
             )
         })

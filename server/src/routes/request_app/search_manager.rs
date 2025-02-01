@@ -1,6 +1,7 @@
 use anyhow::Result;
 use core::ai::common::common::{raw_llm_processing_json, vectorize};
-use core::models::request_app::request_app::RequestAppSystemRoleType;
+use core::models::common::app_name::AppName;
+use core::models::common::system_roles::RequestAppSystemRoleType;
 use core::state::request_app::app_state::RequestAppState;
 use core::utils::common::get_system_role_or_fallback;
 use core::utils::common::LlmModel;
@@ -54,7 +55,7 @@ pub(crate) async fn activate_search_manager(
     info!("Fn: activate_search_manager | message: {}", message_for_llm);
 
     let system_role = get_system_role_or_fallback(
-        "request_app",
+        &AppName::RequestApp,
         RequestAppSystemRoleType::ReorderingResults,
         None,
     );

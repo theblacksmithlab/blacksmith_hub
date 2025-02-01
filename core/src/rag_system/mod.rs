@@ -1,6 +1,8 @@
 use crate::rag_system::types::{Document, RAGConfig, RetrievedContext};
 use anyhow::Result;
 use async_trait::async_trait;
+use std::collections::HashSet;
+use tracing::info;
 
 pub mod context_builder;
 pub mod get_results_via_rag_system;
@@ -56,17 +58,96 @@ where
     }
 
     pub async fn process(&self, query: &str) -> Result<RetrievedContext> {
-        let vector = self.vectorizer.vectorize(query).await?;
-        let documents = self
-            .retriever
-            .search(
-                vector,
-                self.config.max_documents,
-                self.config.similarity_threshold,
-            )
-            .await?;
-        let context = self.context_builder.build_context(documents.clone())?;
+        match &self.config {
+            RAGConfig::Default {
+                max_documents,
+                similarity_threshold,
+            } => {
+                let vector = self.vectorizer.vectorize(query).await?;
+                let base_results = self
+                    .retriever
+                    .search(vector.clone(), *max_documents, *similarity_threshold)
+                    .await?;
+                let context = self.context_builder.build_context(base_results.clone())?;
+                return Ok(RetrievedContext {
+                    context,
+                    documents: base_results,
+                });
+            }
+            RAGConfig::Advanced {
+                base_max_documents,
+                base_similarity_threshold,
+                related_max_documents,
+                related_similarity_threshold,
+            } => {
+                info!("TEMP LOG: Advanced RAG system started");
+                let vector = self.vectorizer.vectorize(query).await?;
+                let base_results = self
+                    .retriever
+                    .search(
+                        vector.clone(),
+                        *base_max_documents,
+                        *base_similarity_threshold,
+                    )
+                    .await?;
+                info!(
+                    "TEMP LOG: Documents quantity in base results: {}",
+                    base_results.len()
+                );
 
-        Ok(RetrievedContext { context, documents })
+                let mut all_results = base_results.clone();
+                let mut seen_ids = base_results
+                    .iter()
+                    .map(|doc| doc.point_id.clone())
+                    .collect::<HashSet<_>>();
+
+                for base_result in &base_results {
+                    let base_vector = match &base_result.vector {
+                        Some(vector) => {
+                            info!("TEMP LOG: Vector used from Document");
+                            vector.clone()
+                        }
+                        None => self.vectorizer.vectorize(&base_result.content).await?,
+                    };
+
+                    let related_results = self
+                        .retriever
+                        .search(
+                            base_vector,
+                            *related_max_documents,
+                            *related_similarity_threshold,
+                        )
+                        .await?;
+
+                    info!(
+                        "TEMP LOG: Documents quantity in related in ITERATION: {}",
+                        related_results.len()
+                    );
+
+                    for related_result in related_results {
+                        if seen_ids.insert(related_result.point_id.clone()) {
+                            info!("TEMP LOG: Related point is unique. All's good");
+                            all_results.push(related_result);
+                        }
+                    }
+                }
+
+                all_results.sort_by(|a, b| {
+                    b.score
+                        .partial_cmp(&a.score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                info!(
+                    "TEMP LOG: Documents quantity in the end of the search: {}",
+                    all_results.len()
+                );
+
+                let context = self.context_builder.build_context(all_results.clone())?;
+                return Ok(RetrievedContext {
+                    context,
+                    documents: all_results,
+                });
+            }
+        }
     }
 }
