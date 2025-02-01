@@ -1,11 +1,11 @@
 use chrono::Duration as ChronoDuration;
 use chrono::Utc;
-use core::ai::common::common::raw_llm_processing;
-use core::models::common::app_name::AppName;
-use core::models::common::system_roles::TheViperRoomRoleType;
-use core::state::llm_client_init_trait::LlmProcessing;
-use core::utils::common::get_system_role_or_fallback;
-use core::utils::common::LlmModel;
+use crate::ai::common::common::raw_llm_processing;
+use crate::models::common::app_name::AppName;
+use crate::models::common::system_roles::TheViperRoomRoleType;
+use crate::state::llm_client_init_trait::LlmProcessing;
+use crate::utils::common::get_system_role_or_fallback;
+use crate::utils::common::LlmModel;
 use grammers_client::types::Chat::{Channel, Group, User};
 use grammers_client::{types, Client as g_Client};
 use std::fs;

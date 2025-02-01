@@ -1,4 +1,4 @@
-use crate::default_message_handler::default_message_handler;
+use crate::default_message_handler::default_message_handler::default_message_handler;
 use crate::probiot_bot::probiot_bot_handlers::{
     probiot_callback_query_handler, probiot_command_handler,
 };
@@ -32,12 +32,12 @@ use teloxide::{dptree, Bot};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
-mod default_message_handler;
-mod probiot_bot;
-mod request_app_bot;
-mod tester_bot;
-mod the_viper_room_bot;
-mod w3a_bot;
+pub mod default_message_handler;
+pub mod probiot_bot;
+pub mod request_app_bot;
+pub mod tester_bot;
+pub mod the_viper_room_bot;
+pub mod w3a_bot;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -174,7 +174,7 @@ fn get_handlers(
             Update::filter_message().endpoint(default_message_handler),
             None,
         )),
-        AppName::TheViperRoom | AppName::RequestApp => Err(anyhow::anyhow!(
+        AppName::TheViperRoom | AppName::RequestApp | AppName::W3AWeb => Err(anyhow::anyhow!(
             "No Telegram bot implementation for app: {}",
             app_name.as_str()
         )),

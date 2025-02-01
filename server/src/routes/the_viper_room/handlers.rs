@@ -1,7 +1,7 @@
 use crate::routes::the_viper_room::local_utils::{
     generate_user_system_nickname, get_user_system_nickname,
 };
-use crate::routes::the_viper_room::news_block_creation::news_block_creation;
+use core::utils::the_viper_room::news_block_creation::news_block_creation;
 use axum::extract::State;
 use axum::Json;
 use core::grammers::grammers_functionality::{initialize_grammers_client, session_file_creation};

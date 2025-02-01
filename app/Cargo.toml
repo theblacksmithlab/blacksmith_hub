@@ -18,4 +18,3 @@ chrono.workspace = true
 grammers-client.workspace = true
 
 core = { path = "../core" }
-server = { path = "../server" }

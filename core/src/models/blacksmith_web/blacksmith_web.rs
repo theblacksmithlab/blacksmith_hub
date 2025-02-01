@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Debug, Clone)]
 pub struct BlacksmithWebUserAction {
     pub user_id: String,
-    pub message: String
+    pub text: String
 }
 
 #[derive(Serialize)]
