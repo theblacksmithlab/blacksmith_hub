@@ -7,18 +7,20 @@ use core::models::common::app_name::AppName;
 use uuid::Uuid;
 use core::utils::tg_bot::tg_bot::save_tts_payload;
 use core::utils::tg_bot::tg_bot::add_llm_response_to_cache;
+use core::utils::common::markdown_to_html;
 
 pub(crate) async fn default_message_handler(
-    text: String,
+    action_text: String,
     app_state: Arc<BlacksmithWebAppState>,
     user_id: i64,
     app_name: AppName,
 ) -> String {
+    info!("Got message: '{}' from user: {}", action_text, user_id);
     info!("Message received from user: {} is text message. Let's process it...", user_id);
 
     match process_user_raw_request(
         user_id,
-        text,
+        action_text,
         app_state.clone(),
         app_name.clone(),
     )
@@ -34,7 +36,7 @@ pub(crate) async fn default_message_handler(
                 .await
                 .unwrap_or_else(|_| llm_response.clone());
 
-            // let htmled_full_response = markdown_to_html(&full_response);
+            let htmled_full_response = markdown_to_html(&full_response);
 
             let message_id = Uuid::new_v4().to_string();
 
@@ -51,8 +53,8 @@ pub(crate) async fn default_message_handler(
 
             add_llm_response_to_cache(app_state.clone(), user_id, full_response.clone())
                 .await;
-            
-            llm_response
+
+            htmled_full_response
         }
         Err(err) => {
             error!("Error processing action text from user: {}", err);

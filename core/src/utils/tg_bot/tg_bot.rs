@@ -142,13 +142,28 @@ pub async fn append_footer_if_needed<T: TempCacheInit + Send + Sync>(
     if message_count > 0 && message_count % 3 == 0 {
         let footer_message = match app_name {
             AppName::ProbiotBot => {
-                get_message(AppsSystemMessages::Probiot(
+                get_message(
+                    AppsSystemMessages::Probiot(
                     ProbiotBotMessages::ResponseFooter,
-                ))
+                    )
+                )
                     .await?
-            }
+            },
             AppName::W3ABot => {
-                get_message(AppsSystemMessages::W3ABot(W3ABotMessages::ResponseFooter)).await?
+                get_message(
+                    AppsSystemMessages::W3ABot(
+                        W3ABotMessages::ResponseFooter,
+                    )
+                )
+                    .await?
+            },
+            AppName::W3AWeb => {
+                get_message(
+                    AppsSystemMessages::W3ABot(
+                        W3ABotMessages::ResponseFooter,
+                    )
+                )
+                    .await?
             }
             _ => "".to_string(),
         };

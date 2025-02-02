@@ -14,7 +14,6 @@ use std::env;
 use std::sync::Arc;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
-use core::models::common::app_name::AppName;
 
 #[tokio::main]
 async fn main() -> Result<()> {
