@@ -4,3 +4,4 @@ pub mod server;
 pub mod tg_bot;
 pub mod the_viper_room;
 pub mod blacksmith_web;
+pub mod qdrant_client_init_trait;

@@ -1,4 +1,4 @@
-use crate::default_message_handler::default_message_handler::default_message_handler;
+use core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;
 use crate::probiot_bot::probiot_bot_handlers::{
     probiot_callback_query_handler, probiot_command_handler,
 };
@@ -32,7 +32,6 @@ use teloxide::{dptree, Bot};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
-pub mod default_message_handler;
 pub mod probiot_bot;
 pub mod request_app_bot;
 pub mod tester_bot;

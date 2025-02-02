@@ -5,6 +5,7 @@ use tracing::log::info;
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use core::models::blacksmith_web::blacksmith_web::{BlacksmithWebUserAction, BlacksmithWebServerResponse};
 use core::models::common::app_name::AppName;
+use crate::routes::blacksmith_web::default_message_handler::default_message_handler;
 
 pub(crate) async fn handle_blacksmith_web_user_action(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
@@ -19,15 +20,13 @@ pub(crate) async fn handle_blacksmith_web_user_action(
         user_raw_request,
         chat_id
     );
-    
-    
-    if action_text == "test" {
-        Json(BlacksmithWebServerResponse{
-            text: "Всё работает! Отлично!".to_string(),
-        }) 
-    } else {
-        Json(BlacksmithWebServerResponse{
-            text: "И так все работает!".to_string(),
-        })
-    }
+
+    let response = default_message_handler(
+        action_text.to_string(),
+        blacksmith_web_app_state,
+        chat_id,
+        app_name
+    ).await;
+
+    Json(BlacksmithWebServerResponse { text: response })
 }

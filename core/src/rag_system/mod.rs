@@ -151,3 +151,20 @@ where
         }
     }
 }
+
+// Todo: Organize dynamic getting rag config depending on AppName
+pub fn get_default_rag_config() -> RAGConfig {
+    RAGConfig::Default {
+        max_documents: 12,
+        similarity_threshold: 0.3,
+    }
+}
+
+pub fn get_advanced_rag_config() -> RAGConfig {
+    RAGConfig::Advanced {
+        base_max_documents: 5,
+        base_similarity_threshold: 0.4,
+        related_max_documents: 5,
+        related_similarity_threshold: 0.4,
+    }
+}
