@@ -2,7 +2,6 @@ use crate::models::common::app_name::AppName;
 use crate::models::tg_bot::probiot_bot::qdrant_collections::ProbiotCollections;
 use crate::models::tg_bot::w3a_bot::qdrant_collections::W3ACollections;
 use strum::IntoEnumIterator;
-use crate::models::common::system_roles::AppsSystemRoles::W3A;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppsCollections {
