@@ -22,6 +22,7 @@ pub fn get_mapped_from_app_name_role_directory(app_name: &AppName) -> &str {
     match app_name {
         AppName::ProbiotBot => "probiot",
         AppName::W3ABot => "w3a",
+        AppName::W3AWeb => "w3a",
         AppName::RequestAppBot => "request_app",
         AppName::TheViperRoomBot => "the_viper_room",
         _ => app_name.as_str(),
