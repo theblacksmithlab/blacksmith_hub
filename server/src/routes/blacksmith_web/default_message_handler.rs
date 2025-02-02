@@ -11,12 +11,10 @@ use core::utils::tg_bot::tg_bot::add_llm_response_to_cache;
 pub(crate) async fn default_message_handler(
     msg: String,
     app_state: Arc<BlacksmithWebAppState>,
-    chat_id: String,
+    chat_id: i64,
     app_name: AppName,
 ) -> String {
     info!("Message received from user: {} is text message. Let's process it...", chat_id);
-
-    let chat_id = 12345i64;
 
     match process_user_raw_request(
         chat_id,
