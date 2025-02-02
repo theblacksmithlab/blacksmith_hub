@@ -16,6 +16,7 @@ pub async fn check_request_for_crap_content<T: LlmProcessing + Send + Sync>(
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::CrapDetection)),
         AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::CrapDetection)),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::CrapDetection)),
         _ => None,
     };
 

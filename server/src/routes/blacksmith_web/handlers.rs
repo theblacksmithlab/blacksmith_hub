@@ -2,6 +2,7 @@ use std::sync::Arc;
 use axum::extract::State;
 use axum::Json;
 use tracing::log::info;
+use tracing::warn;
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use core::models::blacksmith_web::blacksmith_web::{BlacksmithWebUserAction, BlacksmithWebServerResponse};
 use core::models::common::app_name::AppName;
@@ -11,20 +12,26 @@ pub(crate) async fn handle_blacksmith_web_user_action(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
     Json(action): Json<BlacksmithWebUserAction>,
 ) -> Json<BlacksmithWebServerResponse> {
-    let app_name = AppName::W3AWeb;
-    let chat_id = action.user_id;
+    let app_name: AppName = match action.app_name.as_str() {
+        "W3AWeb" => AppName::W3AWeb,
+        _ => {
+            warn!("Unsupported app type of the app: {}", action.app_name);
+            AppName::BlacksmithWeb
+        }
+    };
+    
+    let user_id = action.user_id;
     let action_text = action.text.as_str();
-    let user_raw_request = action.text.to_string();
     info!(
-        "Got message: {} from: {}",
-        user_raw_request,
-        chat_id
+        "Got message: {} from user: {}",
+        action_text,
+        user_id
     );
 
     let response = default_message_handler(
         action_text.to_string(),
         blacksmith_web_app_state,
-        chat_id,
+        user_id,
         app_name
     ).await;
 

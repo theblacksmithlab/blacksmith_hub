@@ -20,6 +20,7 @@ pub async fn clarify_request<T: LlmProcessing + Send + Sync>(
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::ClarifyRequest)),
         AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::ClarifyRequest)),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::ClarifyRequest)),
         _ => None,
     };
 

@@ -1,7 +1,7 @@
 use strum_macros::EnumIter;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, EnumIter)]
-pub enum ProbiotBotCollections {
+pub enum ProbiotCollections {
     BigData1,
     BigData2,
     Qa,
@@ -10,15 +10,15 @@ pub enum ProbiotBotCollections {
     ProbioCollection,
 }
 
-impl ProbiotBotCollections {
+impl ProbiotCollections {
     pub fn as_str(&self) -> &str {
         match self {
-            ProbiotBotCollections::BigData1 => "probiot_big_data_1",
-            ProbiotBotCollections::BigData2 => "probiot_big_data_2",
-            ProbiotBotCollections::Qa => "probio_qa",
-            ProbiotBotCollections::Products => "products",
-            ProbiotBotCollections::IllnessAndRelief => "illness_and_relief",
-            ProbiotBotCollections::ProbioCollection => "probio_collection",
+            ProbiotCollections::BigData1 => "probiot_big_data_1",
+            ProbiotCollections::BigData2 => "probiot_big_data_2",
+            ProbiotCollections::Qa => "probio_qa",
+            ProbiotCollections::Products => "products",
+            ProbiotCollections::IllnessAndRelief => "illness_and_relief",
+            ProbiotCollections::ProbioCollection => "probio_collection",
         }
     }
 }

@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, PartialEq)]
+use strum_macros::Display;
+
+#[derive(Debug, Clone, PartialEq, Display)]
 pub enum AppName {
     ProbiotBot,
     TheViperRoom,
@@ -7,7 +9,8 @@ pub enum AppName {
     RequestAppBot,
     TesterBot,
     W3ABot,
-    W3AWeb
+    W3AWeb,
+    BlacksmithWeb
 }
 
 impl AppName {
@@ -20,7 +23,8 @@ impl AppName {
             AppName::RequestAppBot => "request_app_bot",
             AppName::TesterBot => "tester_bot",
             AppName::W3ABot => "w3a_bot",
-            AppName::W3AWeb => "w3a_web"
+            AppName::W3AWeb => "w3a_web",
+            AppName::BlacksmithWeb => "blacksmith_web"
         }
     }
 }

@@ -112,6 +112,7 @@ pub async fn handle_valid_request<T: LlmProcessing + QdrantClientInit + Send + S
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::MainProcessing)),
         AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::MainProcessing)),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::MainProcessing)),
         _ => None,
     };
 
@@ -146,6 +147,7 @@ pub async fn handle_crap_request<T: LlmProcessing + Send + Sync>(
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::CrapRequestProcessing)),
         AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::CrapRequestProcessing)),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::CrapRequestProcessing)),
         _ => None,
     };
 

@@ -9,16 +9,16 @@ use core::utils::tg_bot::tg_bot::save_tts_payload;
 use core::utils::tg_bot::tg_bot::add_llm_response_to_cache;
 
 pub(crate) async fn default_message_handler(
-    msg: String,
+    text: String,
     app_state: Arc<BlacksmithWebAppState>,
-    chat_id: i64,
+    user_id: i64,
     app_name: AppName,
 ) -> String {
-    info!("Message received from user: {} is text message. Let's process it...", chat_id);
+    info!("Message received from user: {} is text message. Let's process it...", user_id);
 
     match process_user_raw_request(
-        chat_id,
-        msg,
+        user_id,
+        text,
         app_state.clone(),
         app_name.clone(),
     )
@@ -28,7 +28,7 @@ pub(crate) async fn default_message_handler(
             let full_response = append_footer_if_needed(
                 llm_response.clone(),
                 app_state.clone(),
-                chat_id,
+                user_id,
                 app_name.clone(),
             )
                 .await
@@ -40,24 +40,23 @@ pub(crate) async fn default_message_handler(
 
             save_tts_payload(
                 app_state.clone(),
-                chat_id,
+                user_id,
                 message_id.clone(),
                 llm_response.clone(),
             )
                 .await;
             
 
-            info!("Successfully processed text message from: {}", chat_id);
+            info!("Successfully processed action text from: {}", user_id);
 
-            add_llm_response_to_cache(app_state.clone(), chat_id, full_response.clone())
+            add_llm_response_to_cache(app_state.clone(), user_id, full_response.clone())
                 .await;
             
-            return llm_response;
+            llm_response
         }
         Err(err) => {
-            error!("Error in process_user_raw_request: {}", err);
-            return err.to_string();
+            error!("Error processing action text from user: {}", err);
+            err.to_string()
         }
     }
-
 }

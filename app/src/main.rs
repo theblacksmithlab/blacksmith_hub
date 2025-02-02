@@ -12,7 +12,7 @@ use crate::the_viper_room_bot::the_viper_room_bot_handlers::{
     the_viper_room_command_handler, the_viper_room_message_handler,
 };
 use crate::w3a_bot::w3a_bot_handlers::w3a_bot_command_handler;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_openai::Client as LLM_Client;
 use core::models::common::app_name::AppName;
 use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
         "request_app_bot" => AppName::RequestAppBot,
         "tester_bot" => AppName::TesterBot,
         "w3a_bot" => AppName::W3ABot,
-        "the_viper_room" | "request_app" => {
+        "the_viper_room" | "request_app" | "w3a_web" | "blacksmith_web" => {
             info!(
                 "No Telegram bot system implementation for app: {}",
                 app_name_str
@@ -113,7 +113,7 @@ async fn start_bot_with_handlers(
         AppName::RequestAppBot => Bot::new(env::var("TELOXIDE_TOKEN_REQUEST_APP")?),
         AppName::TesterBot => Bot::new(env::var("TELOXIDE_TOKEN_TESTER")?),
         AppName::W3ABot => Bot::new(env::var("TELOXIDE_TOKEN_W3A_BOT")?),
-        _ => return Err(anyhow::anyhow!("Unsupported app name")),
+        _ => return Err(anyhow::anyhow!("Unsupported app type of the app: {}", app_state.app_name)),
     };
 
     info!(
@@ -173,7 +173,7 @@ fn get_handlers(
             Update::filter_message().endpoint(default_message_handler),
             None,
         )),
-        AppName::TheViperRoom | AppName::RequestApp | AppName::W3AWeb => Err(anyhow::anyhow!(
+        AppName::TheViperRoom | AppName::RequestApp | AppName::W3AWeb | AppName::BlacksmithWeb => Err(anyhow!(
             "No Telegram bot implementation for app: {}",
             app_name.as_str()
         )),
