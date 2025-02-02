@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-pub struct TheViperRoomAppState {
+pub struct  TheViperRoomAppState {
     pub user_state: Mutex<HashMap<u64, AuthStages>>,
     pub llm_client: LLM_Client<OpenAIConfig>,
     pub user_data: Mutex<HashMap<u64, UserData>>,

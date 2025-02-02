@@ -6,23 +6,25 @@ use qdrant_client::qdrant::{point_id, vectors_output, SearchParamsBuilder, Searc
 use qdrant_client::Qdrant;
 use std::sync::Arc;
 use tracing::error;
+use crate::state::qdrant_client_init_trait::QdrantClientInit;
 
-pub struct QdrantRetriever {
-    client: Arc<Qdrant>,
+pub struct QdrantRetriever<T: QdrantClientInit> {
+    app_state: Arc<T>,
     collection_names: Vec<String>,
 }
 
-impl QdrantRetriever {
-    pub fn new(client: Arc<Qdrant>, collection_names: Vec<String>) -> Self {
-        Self {
-            client,
-            collection_names,
-        }
+impl<T: QdrantClientInit> QdrantRetriever<T> {
+    pub fn new(app_state: Arc<T>, collection_names: Vec<String>) -> Self {
+        Self { app_state, collection_names }
+    }
+
+    pub fn get_qdrant_client(&self) -> Arc<Qdrant> {
+        self.app_state.get_qdrant_client()
     }
 }
 
 #[async_trait]
-impl Retriever for QdrantRetriever {
+impl<T: QdrantClientInit + Send + Sync> Retriever for QdrantRetriever<T> {
     async fn search(
         &self,
         query_vector: Vec<f32>,
@@ -43,7 +45,7 @@ impl Retriever for QdrantRetriever {
             .params(SearchParamsBuilder::default().exact(true))
             .build();
 
-            match self.client.search_points(search_request).await {
+            match self.get_qdrant_client().search_points(search_request).await {
                 Ok(response) => {
                     let documents = response.result.into_iter().map(|point| {
                         let point_id = match point.id {

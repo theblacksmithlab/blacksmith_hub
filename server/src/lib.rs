@@ -15,11 +15,14 @@ use http::{HeaderValue, StatusCode};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{AllowHeaders, CorsLayer};
+use crate::routes::blacksmith_web::handlers::handle_blacksmith_web_user_action;
+use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 
 pub async fn start_server(
     server_app_state: Arc<ServerAppState>,
     request_app_state: Arc<RequestAppState>,
     the_viper_room_app_state: Arc<TheViperRoomAppState>,
+    blacksmith_web_app_state: Arc<BlacksmithWebAppState>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let allowed_origins = server_app_state
         .config
@@ -48,7 +51,7 @@ pub async fn start_server(
             "/get_user_avatar",
             get(get_user_avatar).options(|| async { StatusCode::OK }),
         )
-        .with_state(request_app_state.clone());
+        .with_state(request_app_state);
 
     // The Viper Room router
     let the_viper_room_routes = Router::new()
@@ -57,10 +60,19 @@ pub async fn start_server(
             post(handle_the_viper_room_user_action).options(|| async { StatusCode::OK }),
         )
         .with_state(the_viper_room_app_state);
+    
+    // Blacksmith Web Router
+    let blacksmith_web_router = Router::new()
+        .route(
+            "/blacksmith_web_user_action",
+            post(handle_blacksmith_web_user_action).options(|| async { StatusCode::OK }),
+        )
+        .with_state(blacksmith_web_app_state);
 
     let app = Router::new()
         .merge(request_app_routes)
         .merge(the_viper_room_routes)
+        .merge(blacksmith_web_router)
         .route("/*path", options(handle_options))
         .fallback(handler_404)
         .layer(cors);

@@ -1,24 +1,27 @@
-use crate::probiot_bot::probiot_bot_utils::{_get_default_rag_config, check_request_for_crap_content, clarify_request, get_advanced_rag_config};
+use crate::rag_system::get_default_rag_config;
+use crate::message_processing_flow::check_request_for_crap_content::check_request_for_crap_content;
+use crate::message_processing_flow::clarify_request::clarify_request;
 use anyhow::Result;
-use core::ai::common::common::raw_llm_processing;
-use core::ai::common::common::tokenize_and_truncate;
-use core::models::common::app_name::AppName;
-use core::models::common::qdrant_collection_manager::AppsCollections;
-use core::models::common::system_roles::ProbiotRoleType;
-use core::rag_system::get_results_via_rag_system::get_results_via_rag_system::get_results_via_rag_system;
-use core::state::tg_bot::app_state::BotAppState;
-use core::utils::common::get_system_role_or_fallback;
-use core::utils::common::LlmModel;
-use core::utils::tg_bot::tg_bot::{add_user_message_to_cache, get_cache_as_string};
+use crate::ai::common::common::raw_llm_processing;
+use crate::ai::common::common::tokenize_and_truncate;
+use crate::models::common::app_name::AppName;
+use crate::models::common::qdrant_collection_manager::AppsCollections;
+use crate::models::common::system_roles::ProbiotRoleType;
+use crate::rag_system::get_results_via_rag_system::get_results_via_rag_system::get_results_via_rag_system;
+use crate::utils::common::get_system_role_or_fallback;
+use crate::utils::common::LlmModel;
+use crate::utils::tg_bot::tg_bot::{add_user_message_to_cache, get_cache_as_string};
 use std::sync::Arc;
-use teloxide::types::ChatId;
 use tracing::{error, info};
-use core::models::common::system_roles::{AppsSystemRoles, W3ARoleType};
+use crate::models::common::system_roles::{AppsSystemRoles, W3ARoleType};
+use crate::state::llm_client_init_trait::LlmProcessing;
+use crate::state::qdrant_client_init_trait::QdrantClientInit;
+use crate::temp_cache::temp_cache_traits::TempCacheInit;
 
-pub async fn process_user_raw_request(
-    chat_id: ChatId,
+pub async fn process_user_raw_request<T: LlmProcessing + QdrantClientInit + TempCacheInit + Send + Sync>(
+    chat_id: i64,
     user_raw_request: String,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<T>,
     app_name: AppName,
 ) -> Result<String> {
     info!("Start processing user raw request...");
@@ -32,7 +35,7 @@ pub async fn process_user_raw_request(
         app_state.clone(),
         app_name.clone(),
     )
-    .await?;
+        .await?;
 
     let is_crap = check_request_for_crap_content(
         user_raw_request.clone(),
@@ -41,7 +44,7 @@ pub async fn process_user_raw_request(
         app_state.clone(),
         app_name.clone(),
     )
-    .await?;
+        .await?;
 
     if is_crap {
         info!("Crap request detected, sending message to handle_crap_request fn");
@@ -51,7 +54,7 @@ pub async fn process_user_raw_request(
             clarified_request.clone(),
             app_name.clone(),
         )
-        .await?;
+            .await?;
         Ok(response_for_crap_request)
     } else {
         info!("Valid request detected, sending message to handle_valid_request fn");
@@ -62,15 +65,15 @@ pub async fn process_user_raw_request(
             current_cache,
             app_name.clone(),
         )
-        .await?;
+            .await?;
         Ok(response_for_valid_request)
     }
 }
 
-pub async fn handle_valid_request(
+pub async fn handle_valid_request<T: LlmProcessing + QdrantClientInit + Send + Sync>(
     user_raw_request: String,
     clarified_request: String,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<T>,
     current_cache: String,
     app_name: AppName,
 ) -> Result<String> {
@@ -81,17 +84,17 @@ pub async fn handle_valid_request(
             .collect();
 
     // RAG system mode
-    let rag_config = _get_default_rag_config();
+    let rag_config = get_default_rag_config();
 
     info!("TEMP log: collection names: {:?}", collection_names);
-    
+
     let search_results = get_results_via_rag_system(
         clarified_request.clone(),
         collection_names,
         rag_config,
         app_state.clone(),
     )
-    .await?;
+        .await?;
 
     let rag_system_search_result_payload = search_results.context;
 
@@ -109,6 +112,7 @@ pub async fn handle_valid_request(
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::MainProcessing)),
         AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::MainProcessing)),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::MainProcessing)),
         _ => None,
     };
 
@@ -122,16 +126,16 @@ pub async fn handle_valid_request(
             "You are a helpful assistant".to_string()
         }
     };
-    
+
     let llm_response =
         raw_llm_processing(system_role, llm_message, app_state, LlmModel::Complex).await?;
 
     Ok(llm_response)
 }
 
-pub async fn handle_crap_request(
+pub async fn handle_crap_request<T: LlmProcessing + Send + Sync>(
     user_raw_request: String,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<T>,
     current_cache: String,
     app_name: AppName,
 ) -> Result<String> {
@@ -143,6 +147,7 @@ pub async fn handle_crap_request(
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::CrapRequestProcessing)),
         AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::CrapRequestProcessing)),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::CrapRequestProcessing)),
         _ => None,
     };
 

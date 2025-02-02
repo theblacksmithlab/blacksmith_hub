@@ -25,3 +25,4 @@ tiktoken-rs.workspace = true
 pulldown-cmark.workspace = true
 strum_macros.workspace = true
 strum.workspace = true
+uuid.workspace = true

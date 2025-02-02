@@ -1,4 +1,4 @@
-use crate::probiot_bot::probiot_bot_utils::get_and_remove_tts_payload;
+use core::utils::tg_bot::tg_bot::get_and_remove_tts_payload;
 use anyhow::Result;
 use core::ai::common::voice_processing::simple_tts;
 use core::models::common::system_messages::AppsSystemMessages;

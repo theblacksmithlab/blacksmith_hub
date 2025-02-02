@@ -6,13 +6,12 @@ use async_openai::Client as LLM_Client;
 use qdrant_client::Qdrant;
 use std::collections::HashMap;
 use std::sync::Arc;
-use teloxide::prelude::ChatId;
 use tokio::sync::Mutex;
 
 pub struct BotAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,
     pub podcast_manager: Arc<PodcastManager>,
-    pub temp_cache: Mutex<HashMap<ChatId, DialogueCache>>,
+    pub temp_cache: Mutex<HashMap<i64, DialogueCache>>,
     pub qdrant_client: Arc<Qdrant>,
     pub app_name: AppName,
 }

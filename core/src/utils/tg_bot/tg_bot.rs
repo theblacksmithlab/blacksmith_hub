@@ -8,12 +8,16 @@ use teloxide::dispatching::{Dispatcher, UpdateHandler};
 use teloxide::error_handlers::LoggingErrorHandler;
 use teloxide::net::Download;
 use teloxide::prelude::{ChatId, Message, Requester};
-use teloxide::types::ChatAction;
+use teloxide::types::{ChatAction, InlineKeyboardButton, InlineKeyboardMarkup};
 use teloxide::{dptree, Bot};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
+use crate::models::common::app_name::AppName;
+use crate::models::common::system_messages::{AppsSystemMessages, ProbiotBotMessages, W3ABotMessages};
+use crate::temp_cache::temp_cache_traits::TempCacheInit;
+use crate::utils::common::get_message;
 
 pub async fn check_username(bot: Bot, msg: Message) -> bool {
     if let Some(_username) = msg.chat.username() {
@@ -50,32 +54,31 @@ pub async fn run_bot_dispatcher(
     Err(anyhow::anyhow!("Bot dispatcher unexpectedly stopped"))
 }
 
-pub async fn add_user_message_to_cache(
-    app_state: Arc<BotAppState>,
-    user_id: ChatId,
+pub async fn add_user_message_to_cache<T: TempCacheInit + Send + Sync>(
+    app_state: Arc<T>,
+    user_id: i64,
     message: String,
 ) {
-    let mut cache = app_state.temp_cache.lock().await;
-    let chat_cache = cache
-        .entry(user_id)
-        .or_insert_with(|| DialogueCache::new(20));
+    let mut cache = app_state.get_temp_cache().lock().await;
+    let chat_cache = cache.entry(user_id).or_insert_with(|| DialogueCache::new(20));
     chat_cache.add_user_message(message);
 }
 
-pub async fn add_llm_response_to_cache(
-    app_state: Arc<BotAppState>,
-    user_id: ChatId,
+pub async fn add_llm_response_to_cache<T: TempCacheInit + Send + Sync>(
+    app_state: Arc<T>,
+    user_id: i64,
     llm_response: String,
 ) {
-    let mut cache = app_state.temp_cache.lock().await;
-    let chat_cache = cache
-        .entry(user_id)
-        .or_insert_with(|| DialogueCache::new(20));
+    let mut cache = app_state.get_temp_cache().lock().await;
+    let chat_cache = cache.entry(user_id).or_insert_with(|| DialogueCache::new(20));
     chat_cache.add_llm_response_to_cache(llm_response);
 }
 
-pub async fn get_cache_as_string(app_state: Arc<BotAppState>, user_id: ChatId) -> String {
-    let cache = app_state.temp_cache.lock().await;
+pub async fn get_cache_as_string<T: TempCacheInit + Send + Sync>(
+    app_state: Arc<T>,
+    user_id: i64,
+) -> String {
+    let cache = app_state.get_temp_cache().lock().await;
     cache
         .get(&user_id)
         .map(|chat_cache| chat_cache.get_cache_as_string())
@@ -99,8 +102,11 @@ pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> Result
     Ok(base_path.to_str().unwrap().to_string())
 }
 
-pub async fn get_user_message_count(app_state: &Arc<BotAppState>, user_id: ChatId) -> usize {
-    let cache = app_state.temp_cache.lock().await;
+pub async fn get_user_message_count<T: TempCacheInit + Send + Sync>(
+    app_state: &Arc<T>,
+    user_id: i64,
+) -> usize {
+    let cache = app_state.get_temp_cache().lock().await;
     cache
         .get(&user_id)
         .map(|chat_cache| chat_cache.count_user_messages())
@@ -123,4 +129,84 @@ pub async fn start_bots_chat_action(
 
 pub async fn stop_bots_chat_action(typing_flag: Arc<Mutex<bool>>) {
     *typing_flag.lock().await = false;
+}
+
+pub async fn append_footer_if_needed<T: TempCacheInit + Send + Sync>(
+    llm_response: String,
+    app_state: Arc<T>,
+    chat_id: i64,
+    app_name: AppName,
+) -> Result<String> {
+    let message_count = get_user_message_count(&app_state, chat_id).await;
+
+    if message_count > 0 && message_count % 3 == 0 {
+        let footer_message = match app_name {
+            AppName::ProbiotBot => {
+                get_message(
+                    AppsSystemMessages::Probiot(
+                    ProbiotBotMessages::ResponseFooter,
+                    )
+                )
+                    .await?
+            },
+            AppName::W3ABot => {
+                get_message(
+                    AppsSystemMessages::W3ABot(
+                        W3ABotMessages::ResponseFooter,
+                    )
+                )
+                    .await?
+            },
+            AppName::W3AWeb => {
+                get_message(
+                    AppsSystemMessages::W3ABot(
+                        W3ABotMessages::ResponseFooter,
+                    )
+                )
+                    .await?
+            }
+            _ => "".to_string(),
+        };
+
+        if !footer_message.is_empty() {
+            return Ok(format!("{}\n{}", llm_response, footer_message));
+        }
+    }
+
+    Ok(llm_response)
+}
+
+pub fn create_tts_button(chat_id: ChatId, message_id: String) -> InlineKeyboardMarkup {
+    let callback_data = format!("tts:{}:{}", chat_id, message_id);
+    InlineKeyboardMarkup::default().append_row(vec![InlineKeyboardButton::callback(
+        "Озвучить ответ",
+        &callback_data,
+    )])
+}
+
+pub async fn save_tts_payload<T: TempCacheInit + Send + Sync>(
+    app_state: Arc<T>,
+    chat_id: i64,
+    message_id: String,
+    tts_payload: String,
+) {
+    let mut cache = app_state.get_temp_cache().lock().await;
+    let dialogue_cache = cache
+        .entry(chat_id)
+        .or_insert_with(|| DialogueCache::new(100));
+    dialogue_cache.add_tts_payload(message_id, tts_payload);
+}
+
+pub async fn get_and_remove_tts_payload(
+    app_state: Arc<BotAppState>,
+    chat_id: ChatId,
+    message_id: String,
+) -> Option<String> {
+    let chat_id_as_integer = chat_id.0;
+    let mut cache = app_state.temp_cache.lock().await;
+    if let Some(dialogue_cache) = cache.get_mut(&chat_id_as_integer) {
+        dialogue_cache.get_and_remove_tts_payload(message_id)
+    } else {
+        None
+    }
 }

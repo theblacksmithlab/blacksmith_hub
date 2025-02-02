@@ -1,16 +1,16 @@
-use crate::routes::the_viper_room::news_block_creation_utils::{
+use crate::utils::the_viper_room::news_block_creation_utils::{
     get_dialogs, mix_podcast_with_music, processing_dialogs, summarize_updates,
     updates_file_creation,
 };
-use core::ai::common::common::raw_llm_processing;
-use core::ai::common::voice_processing::text_to_speech;
-use core::models::common::app_name::AppName;
-use core::models::common::system_messages::AppsSystemMessages;
-use core::models::common::system_messages::TheViperRoomBotMessages;
-use core::models::common::system_roles::TheViperRoomRoleType;
-use core::state::llm_client_init_trait::LlmProcessing;
-use core::utils::common::get_system_role_or_fallback;
-use core::utils::common::{get_message, LlmModel};
+use crate::ai::common::common::raw_llm_processing;
+use crate::ai::common::voice_processing::text_to_speech;
+use crate::models::common::app_name::AppName;
+use crate::models::common::system_messages::AppsSystemMessages;
+use crate::models::common::system_messages::TheViperRoomBotMessages;
+use crate::models::common::system_roles::TheViperRoomRoleType;
+use crate::state::llm_client_init_trait::LlmProcessing;
+use crate::utils::common::get_system_role_or_fallback;
+use crate::utils::common::{get_message, LlmModel};
 use grammers_client::Client as g_Client;
 use std::fs;
 use std::fs::{create_dir_all, read_dir, remove_file, rename};
