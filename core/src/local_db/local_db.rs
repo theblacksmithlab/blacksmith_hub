@@ -157,39 +157,40 @@ pub async fn create_blacksmith_labs_db_table(pool: &SqlitePool) -> Result<(), Er
     Ok(())
 }
 
-// pub async fn fetch_chat_history_from_db(
-//     pool: &SqlitePool,
-//     user_id: &str,
-//     app_name: &str,
-// ) -> Result<Vec<ChatMessage>, Error> {
-//     let messages = sqlx::query_as!(
-//         ChatMessage,
-//         "SELECT id, user_id, sender, message, app_name FROM chat_messages WHERE user_id = ? AND app_name = ? ORDER BY id ASC",
-//         user_id,
-//         app_name
-//     )
-//         .fetch_all(pool)
-//         .await?;
-// 
-//     Ok(messages)
-// }
-// 
-// pub async fn save_message_to_db(
-//     pool: &SqlitePool,
-//     user_id: &str,
-//     sender: &str,
-//     message: &str,
-//     app_name: &str,
-// ) -> Result<(), Error> {
-//     sqlx::query!(
-//         "INSERT INTO chat_messages (user_id, sender, message, app_name) VALUES (?, ?, ?, ?)",
-//         user_id,
-//         sender,
-//         message,
-//         app_name
-//     )
-//         .execute(pool)
-//         .await?;
-// 
-//     Ok(())
-// }
+pub async fn fetch_chat_history_from_db(
+    pool: &SqlitePool,
+    user_id: &str,
+    app_name: &str,
+) -> Result<Vec<ChatMessage>, Error> {
+    let messages = sqlx::query_as::<_, ChatMessage>(
+        "SELECT id, user_id, sender, message, app_name FROM chat_messages 
+         WHERE user_id = ? AND app_name = ? ORDER BY id ASC"
+    )
+        .bind(user_id)
+        .bind(app_name)
+        .fetch_all(pool)
+        .await?;
+
+    Ok(messages)
+}
+
+pub async fn save_message_to_db(
+    pool: &SqlitePool,
+    user_id: &str,
+    sender: &str,
+    message: &str,
+    app_name: &str,
+) -> Result<(), Error> {
+    sqlx::query(
+        "INSERT INTO chat_messages (user_id, sender, message, app_name) 
+         VALUES (?, ?, ?, ?)"
+    )
+        .bind(user_id)
+        .bind(sender)
+        .bind(message)
+        .bind(app_name)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}

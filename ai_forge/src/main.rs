@@ -43,12 +43,11 @@ async fn main() -> Result<()> {
     let llm_client = LLM_Client::new();
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    info!("database_url: {}", database_url);
 
-    if !Path::new("blacksmith_labs.db").exists() {
-        fs::File::create("blacksmith_labs.db")?;
-        info!("Database file blacksmith_labs.db created.");
-    }
+    // if !Path::new("blacksmith_labs.db").exists() {
+    //     fs::File::create("blacksmith_labs.db")?;
+    //     info!("Database file blacksmith_labs.db created.");
+    // }
     
     info!("Initializing Blacksmith Labs local_db pool...");
     let blacksmith_db_pool = SqlitePool::connect_with(

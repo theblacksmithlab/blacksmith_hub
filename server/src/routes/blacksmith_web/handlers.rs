@@ -10,7 +10,7 @@ use core::models::blacksmith_web::blacksmith_web::{BlacksmithWebUserAction, Blac
 use core::models::common::app_name::AppName;
 use crate::routes::blacksmith_web::default_message_handler::default_message_handler;
 use core::models::blacksmith_web::blacksmith_web::ChatMessage;
-// use core::local_db::local_db::fetch_chat_history_from_db;
+use core::local_db::local_db::fetch_chat_history_from_db;
 
 pub(crate) async fn handle_blacksmith_web_user_action(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
@@ -44,25 +44,25 @@ pub(crate) async fn handle_blacksmith_web_user_action(
     Json(BlacksmithWebServerResponse { text: response })
 }
 
-// pub(crate) async fn handle_blacksmith_web_chat_fetch(
-//     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
-//     Query(params): Query<HashMap<String, String>>,
-// ) -> Json<Vec<ChatMessage>> {
-//     let user_id = match params.get("user_id") {
-//         Some(id) => id.clone(),
-//         None => return Json(vec![]),
-//     };
-// 
-//     let app_name = match params.get("app_name") {
-//         Some(name) => match AppName::from_str(name) {
-//             Ok(app) => app,
-//             Err(_) => return Json(vec![]),
-//         },
-//         None => return Json(vec![]),
-//     };
-// 
-//     match fetch_chat_history_from_db(&blacksmith_web_app_state.local_db_pool, &user_id, app_name.as_str()).await {
-//         Ok(chat_history) => Json(chat_history),
-//         Err(_) => Json(vec![]),
-//     }
-// }
+pub(crate) async fn handle_blacksmith_web_chat_fetch(
+    State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<Vec<ChatMessage>> {
+    let user_id = match params.get("user_id") {
+        Some(id) => id.clone(),
+        None => return Json(vec![]),
+    };
+
+    let app_name = match params.get("app_name") {
+        Some(name) => match AppName::from_str(name) {
+            Ok(app) => app,
+            Err(_) => return Json(vec![]),
+        },
+        None => return Json(vec![]),
+    };
+
+    match fetch_chat_history_from_db(&blacksmith_web_app_state.local_db_pool, &user_id, app_name.as_str()).await {
+        Ok(chat_history) => Json(chat_history),
+        Err(_) => Json(vec![]),
+    }
+}
