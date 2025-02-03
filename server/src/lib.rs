@@ -41,17 +41,6 @@ pub async fn start_server(
         StatusCode::OK
     }
 
-    async fn handle_options_with_cors() -> impl IntoResponse {
-        (
-            StatusCode::NO_CONTENT,
-            [
-                ("Access-Control-Allow-Origin", "*"),
-                ("Access-Control-Allow-Methods", "GET, POST, OPTIONS"),
-                ("Access-Control-Allow-Headers", "Authorization, Content-Type"),
-            ],
-        )
-    }
-
     // Request App router
     let request_app_routes = Router::new()
         .route(
@@ -80,7 +69,7 @@ pub async fn start_server(
         )
         .route(
             "/blacksmith_web_chat_fetch",
-            get(handle_blacksmith_web_chat_fetch).options(handle_options_with_cors),
+            get(handle_blacksmith_web_chat_fetch).options(|| async { StatusCode::OK }),
         )
         .with_state(blacksmith_web_app_state);
 
