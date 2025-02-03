@@ -10,7 +10,8 @@ use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;
 use server::start_server;
-use std::env;
+use std::{env, fs};
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use sqlx::sqlite::SqliteConnectOptions;
@@ -42,14 +43,20 @@ async fn main() -> Result<()> {
     let llm_client = LLM_Client::new();
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    info!("database_url: {}", database_url);
 
+    if !Path::new("blacksmith_labs.db").exists() {
+        fs::File::create("blacksmith_labs.db")?;
+        info!("Database file blacksmith_labs.db created.");
+    }
+    
     info!("Initializing Blacksmith Labs local_db pool...");
     let blacksmith_db_pool = SqlitePool::connect_with(
         SqliteConnectOptions::from_str(&database_url)?
             .create_if_missing(true)
     ).await?;
     info!("Blacksmith Labs local_db pool initialized successfully");
-
+    
     info!("Creating Blacksmith Labs chat history table...");
     create_blacksmith_labs_db_table(&blacksmith_db_pool).await?;
     info!("Blacksmith Labs chat history table created successfully");

@@ -8,7 +8,7 @@ use uuid::Uuid;
 use core::utils::tg_bot::tg_bot::save_tts_payload;
 use core::utils::tg_bot::tg_bot::add_llm_response_to_cache;
 use core::utils::common::markdown_to_html;
-use core::local_db::local_db::save_message_to_db;
+// use core::local_db::local_db::save_message_to_db;
 
 pub(crate) async fn default_message_handler(
     action_text: String,
@@ -19,16 +19,16 @@ pub(crate) async fn default_message_handler(
     info!("Got message: '{}' from user: {}", action_text, user_id);
     info!("Message received from user: {} is text message. Let's process it...", user_id);
 
-    if let Err(e) = save_message_to_db(
-        app_state.get_db_pool(),
-        &user_id.to_string(),
-        "user",
-        &action_text,
-        &app_name.as_str(),
-    ).await {
-        error!("Failed to save user message to DB: {}", e);
-    }
-    
+    // if let Err(e) = save_message_to_db(
+    //     app_state.get_db_pool(),
+    //     &user_id.to_string(),
+    //     "user",
+    //     &action_text,
+    //     &app_name.as_str(),
+    // ).await {
+    //     error!("Failed to save user message to DB: {}", e);
+    // }
+
     match process_user_raw_request(
         user_id,
         action_text,
