@@ -7,9 +7,9 @@ use crate::state::llm_client_init_trait::LlmProcessing;
 use crate::utils::common::{get_system_role_or_fallback, LlmModel};
 
 pub async fn check_request_for_crap_content<T: LlmProcessing + Send + Sync>(
-    user_raw_request: String,
-    clarified_request: String,
-    current_cache: String,
+    user_raw_request: &str,
+    clarified_request: &str,
+    current_cache: &str,
     app_state: Arc<T>,
     app_name: AppName,
 ) -> anyhow::Result<bool> {
@@ -37,7 +37,7 @@ pub async fn check_request_for_crap_content<T: LlmProcessing + Send + Sync>(
     );
 
     let crap_detection_result =
-        raw_llm_processing_json(system_role, llm_message, app_state, LlmModel::Light).await?;
+        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light).await?;
 
     let is_crap: bool = match serde_json::from_str::<serde_json::Value>(&crap_detection_result) {
         Ok(json) => json

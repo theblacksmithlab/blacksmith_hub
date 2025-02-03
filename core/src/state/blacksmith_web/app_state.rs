@@ -10,7 +10,7 @@ use crate::models::common::dialogue_cache::DialogueCache;
 pub struct BlacksmithWebAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,
     pub qdrant_client: Arc<Qdrant>,
-    pub temp_cache: Mutex<HashMap<i64, DialogueCache>>,
+    pub temp_cache: Mutex<HashMap<String, DialogueCache>>,
     pub local_db_pool: Pool<Sqlite>,
 }
 

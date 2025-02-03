@@ -13,7 +13,7 @@ use tracing::info;
 
 pub async fn process_users_self_description(
     user_id: ChatId,
-    user_story_for_profile_creation: String,
+    user_story_for_profile_creation: &str,
     app_state: Arc<RequestAppState>,
 ) -> anyhow::Result<()> {
     let pool = &app_state.local_db_pool;
@@ -27,7 +27,7 @@ pub async fn process_users_self_description(
     );
 
     let users_about_text_str = raw_llm_processing_json(
-        system_role,
+        &system_role,
         user_story_for_profile_creation,
         app_state.clone(),
         LlmModel::Complex,

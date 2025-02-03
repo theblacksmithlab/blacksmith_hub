@@ -24,20 +24,20 @@ pub(crate) async fn handle_blacksmith_web_user_action(
         }
     };
     
+    info!("AppName: {}", app_name.to_string());
+    
     let user_id = action.user_id;
-    let action_text = action.text.as_str();
+    let action_text = action.text;
     info!(
         "Got message: {} from user: {}",
         action_text,
         user_id
     );
-
-    let temp_user_id = 1;
     
     let response = default_message_handler(
-        action_text.to_string(),
+        &action_text,
         blacksmith_web_app_state,
-        temp_user_id,
+        &user_id,
         app_name
     ).await;
 

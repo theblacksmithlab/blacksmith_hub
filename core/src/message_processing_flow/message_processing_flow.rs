@@ -19,28 +19,28 @@ use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
 
 pub async fn process_user_raw_request<T: LlmProcessing + QdrantClientInit + TempCacheInit + Send + Sync>(
-    chat_id: i64,
-    user_raw_request: String,
+    user_id: &str,
+    user_raw_request: &str,
     app_state: Arc<T>,
     app_name: AppName,
 ) -> Result<String> {
     info!("Start processing user raw request...");
-    add_user_message_to_cache(app_state.clone(), chat_id, user_raw_request.clone()).await;
+    add_user_message_to_cache(app_state.clone(), user_id, user_raw_request).await;
 
-    let current_cache = get_cache_as_string(app_state.clone(), chat_id).await;
+    let current_cache = get_cache_as_string(app_state.clone(), user_id).await;
 
     let clarified_request = clarify_request(
-        user_raw_request.clone(),
-        current_cache.clone(),
+        user_raw_request,
+        &current_cache,
         app_state.clone(),
         app_name.clone(),
     )
         .await?;
 
     let is_crap = check_request_for_crap_content(
-        user_raw_request.clone(),
-        clarified_request.clone(),
-        current_cache.clone(),
+        user_raw_request,
+        &clarified_request,
+        &current_cache,
         app_state.clone(),
         app_name.clone(),
     )
@@ -51,30 +51,32 @@ pub async fn process_user_raw_request<T: LlmProcessing + QdrantClientInit + Temp
         let response_for_crap_request = handle_crap_request(
             user_raw_request,
             app_state.clone(),
-            clarified_request.clone(),
+            &clarified_request,
             app_name.clone(),
         )
             .await?;
+        
         Ok(response_for_crap_request)
     } else {
         info!("Valid request detected, sending message to handle_valid_request fn");
         let response_for_valid_request = handle_valid_request(
             user_raw_request,
-            clarified_request,
+            &clarified_request,
             app_state,
-            current_cache,
+            &current_cache,
             app_name.clone(),
         )
             .await?;
+        
         Ok(response_for_valid_request)
     }
 }
 
 pub async fn handle_valid_request<T: LlmProcessing + QdrantClientInit + Send + Sync>(
-    user_raw_request: String,
-    clarified_request: String,
+    user_raw_request: &str,
+    clarified_request: &str,
     app_state: Arc<T>,
-    current_cache: String,
+    current_cache: &str,
     app_name: AppName,
 ) -> Result<String> {
     let collection_names: Vec<String> =
@@ -82,14 +84,13 @@ pub async fn handle_valid_request<T: LlmProcessing + QdrantClientInit + Send + S
             .iter()
             .map(|collection| collection.as_str().to_string())
             .collect();
-
-    // RAG system mode
+    
     let rag_config = get_default_rag_config();
 
     info!("TEMP log: collection names: {:?}", collection_names);
 
     let search_results = get_results_via_rag_system(
-        clarified_request.clone(),
+        clarified_request,
         collection_names,
         rag_config,
         app_state.clone(),
@@ -98,7 +99,7 @@ pub async fn handle_valid_request<T: LlmProcessing + QdrantClientInit + Send + S
 
     let rag_system_search_result_payload = search_results.context;
 
-    let processed_data = tokenize_and_truncate(rag_system_search_result_payload.clone())
+    let processed_data = tokenize_and_truncate(&rag_system_search_result_payload)
         .await
         .unwrap_or_else(|_| rag_system_search_result_payload);
 
@@ -128,15 +129,15 @@ pub async fn handle_valid_request<T: LlmProcessing + QdrantClientInit + Send + S
     };
 
     let llm_response =
-        raw_llm_processing(system_role, llm_message, app_state, LlmModel::Complex).await?;
+        raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Complex).await?;
 
     Ok(llm_response)
 }
 
 pub async fn handle_crap_request<T: LlmProcessing + Send + Sync>(
-    user_raw_request: String,
+    user_raw_request: &str,
     app_state: Arc<T>,
-    current_cache: String,
+    current_cache: &str,
     app_name: AppName,
 ) -> Result<String> {
     let llm_message = format!(
@@ -163,7 +164,7 @@ pub async fn handle_crap_request<T: LlmProcessing + Send + Sync>(
     };
 
     let llm_response =
-        raw_llm_processing(system_role, llm_message, app_state, LlmModel::Light).await?;
+        raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Light).await?;
 
     Ok(llm_response)
 }

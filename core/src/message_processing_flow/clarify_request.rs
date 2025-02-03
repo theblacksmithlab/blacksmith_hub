@@ -7,8 +7,8 @@ use crate::state::llm_client_init_trait::LlmProcessing;
 use crate::utils::common::{get_system_role_or_fallback, LlmModel};
 
 pub async fn clarify_request<T: LlmProcessing + Send + Sync>(
-    user_raw_request: String,
-    current_cache: String,
+    user_raw_request: &str,
+    current_cache: &str,
     app_state: Arc<T>,
     app_name: AppName,
 ) -> anyhow::Result<String> {
@@ -35,14 +35,14 @@ pub async fn clarify_request<T: LlmProcessing + Send + Sync>(
         }
     };
 
-    match raw_llm_processing(system_role, llm_message, app_state, LlmModel::Complex).await {
+    match raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Complex).await {
         Ok(clarified_request) => {
             info!("User's raw request clarified successfully");
             Ok(clarified_request)
         }
         Err(err) => {
             error!("Error in raw_llm_processing: {}", err);
-            Ok(user_raw_request)
+            Ok(user_raw_request.to_string())
         }
     }
 }

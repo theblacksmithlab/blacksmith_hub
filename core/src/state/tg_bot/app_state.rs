@@ -11,7 +11,7 @@ use tokio::sync::Mutex;
 pub struct BotAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,
     pub podcast_manager: Arc<PodcastManager>,
-    pub temp_cache: Mutex<HashMap<i64, DialogueCache>>,
+    pub temp_cache: Mutex<HashMap<String, DialogueCache>>,
     pub qdrant_client: Arc<Qdrant>,
     pub app_name: AppName,
 }

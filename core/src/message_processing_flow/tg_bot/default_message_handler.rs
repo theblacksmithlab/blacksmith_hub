@@ -4,7 +4,7 @@ use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::{CommonMessages, ProbiotBotMessages, W3ABotMessages};
 use crate::state::tg_bot::app_state::BotAppState;
-use crate::utils::common::{get_message, transcribe_voice_message};
+use crate::utils::common::{get_message, markdown_to_html, transcribe_voice_message};
 use crate::utils::tg_bot::tg_bot::{
     add_llm_response_to_cache, download_voice, start_bots_chat_action, stop_bots_chat_action,
 };
@@ -26,6 +26,7 @@ pub async fn default_message_handler(
     let app_name = &app_state.app_name;
     let chat_id = msg.chat.id;
     let chat_id_as_integer = chat_id.0;
+    let chat_id_as_str = chat_id_as_integer.to_string();
     let bot_data = bot.get_me().await?;
     let user_raw_request = msg.text().unwrap_or("Empty request").to_string();
     info!(
@@ -71,8 +72,8 @@ pub async fn default_message_handler(
                 Ok(Some(user_voice_transcribed)) => {
                     info!("Voice message transcribed successfully...");
                     match process_user_raw_request(
-                        chat_id_as_integer,
-                        user_voice_transcribed,
+                        &chat_id_as_str,
+                        &user_voice_transcribed,
                         app_state.clone(),
                         app_name.clone(),
                     )
@@ -80,9 +81,9 @@ pub async fn default_message_handler(
                     {
                         Ok(llm_response) => {
                             let full_response = append_footer_if_needed(
-                                llm_response.clone(),
+                                &llm_response,
                                 app_state.clone(),
-                                chat_id_as_integer,
+                                &chat_id_as_str,
                                 app_name.clone(),
                             )
                             .await
@@ -92,16 +93,16 @@ pub async fn default_message_handler(
 
                             save_tts_payload(
                                 app_state.clone(),
-                                chat_id_as_integer,
-                                message_id.clone(),
-                                llm_response.clone(),
+                                chat_id,
+                                &message_id,
+                                &llm_response,
                             )
                             .await;
 
                             stop_bots_chat_action(typing_flag).await;
 
-                            bot.send_message(chat_id, full_response.clone())
-                                .reply_markup(create_tts_button(chat_id, message_id))
+                            bot.send_message(chat_id, &full_response)
+                                .reply_markup(create_tts_button(chat_id, &message_id))
                                 .await?;
 
                             info!(
@@ -111,8 +112,8 @@ pub async fn default_message_handler(
 
                             add_llm_response_to_cache(
                                 app_state.clone(),
-                                chat_id_as_integer,
-                                full_response.clone(),
+                                &chat_id_as_str,
+                                &full_response,
                             )
                             .await;
                         }
@@ -147,7 +148,7 @@ pub async fn default_message_handler(
             }
         } else if let Some(text) = msg.text() {
             info!(
-                "Message received from @{} is text message. Let's process it...",
+                "Message received from @{} is a text message. Let's process it...",
                 msg.chat.username().unwrap_or("Anonymous User")
             );
 
@@ -161,8 +162,8 @@ pub async fn default_message_handler(
             .await;
 
             match process_user_raw_request(
-                chat_id_as_integer,
-                text.to_string(),
+                &chat_id_as_str,
+                text,
                 app_state.clone(),
                 app_name.clone(),
             )
@@ -170,30 +171,30 @@ pub async fn default_message_handler(
             {
                 Ok(llm_response) => {
                     let full_response = append_footer_if_needed(
-                        llm_response.clone(),
+                        &llm_response,
                         app_state.clone(),
-                        chat_id_as_integer,
+                        &chat_id_as_str,
                         app_name.clone(),
                     )
                     .await
                     .unwrap_or_else(|_| llm_response.clone());
 
-                    // let htmled_full_response = markdown_to_html(&full_response);
+                    let htmled_full_response = markdown_to_html(&full_response);
 
                     let message_id = Uuid::new_v4().to_string();
 
                     save_tts_payload(
                         app_state.clone(),
-                        chat_id_as_integer,
-                        message_id.clone(),
-                        llm_response.clone(),
+                        chat_id,
+                        &message_id,
+                        &llm_response,
                     )
                     .await;
 
                     stop_bots_chat_action(typing_flag).await;
 
-                    bot.send_message(chat_id, full_response.clone())
-                        .reply_markup(create_tts_button(chat_id, message_id))
+                    bot.send_message(chat_id, &htmled_full_response)
+                        .reply_markup(create_tts_button(chat_id, &message_id))
                         .parse_mode(ParseMode::Html)
                         .await?;
 
@@ -202,7 +203,7 @@ pub async fn default_message_handler(
                         msg.chat.username().unwrap_or("Anonymous User")
                     );
 
-                    add_llm_response_to_cache(app_state.clone(), chat_id_as_integer, full_response.clone())
+                    add_llm_response_to_cache(app_state.clone(), &chat_id_as_str, &full_response)
                         .await;
                 }
                 Err(err) => {
