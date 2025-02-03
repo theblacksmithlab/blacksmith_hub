@@ -19,6 +19,10 @@ pub(crate) async fn default_message_handler(
     info!("Got message: '{}' from user: {}", action_text, user_id);
     info!("Message received from user: {} is text message. Let's process it...", user_id);
 
+    info!(
+    "Saving message: user_id={}, sender={}, message={}, app_name={}",
+    user_id, "user", "action_text", app_name
+);
     if let Err(e) = save_message_to_db(
         app_state.get_db_pool(),
         user_id,

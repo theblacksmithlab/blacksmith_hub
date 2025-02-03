@@ -61,6 +61,7 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
         None => return Json(vec![]),
     };
 
+    info!("Fetching history for user_id={} and app_name={}", user_id, app_name);
     match fetch_chat_history_from_db(&blacksmith_web_app_state.local_db_pool, &user_id, app_name.as_str()).await {
         Ok(chat_history) => Json(chat_history),
         Err(_) => Json(vec![]),

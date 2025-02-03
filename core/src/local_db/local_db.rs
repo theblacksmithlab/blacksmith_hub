@@ -162,8 +162,10 @@ pub async fn fetch_chat_history_from_db(
     user_id: &str,
     app_name: &str,
 ) -> Result<Vec<ChatMessage>, Error> {
+    info!("Executing query: SELECT id, user_id, sender, message, app_name FROM chat_messages WHERE user_id = '{}' AND app_name = '{}'", user_id, app_name);
+
     let messages = sqlx::query_as::<_, ChatMessage>(
-        "SELECT id, user_id, sender, message, app_name FROM chat_messages 
+        "SELECT id, user_id, sender, message, app_name FROM chat_messages
          WHERE user_id = ? AND app_name = ? ORDER BY id ASC"
     )
         .bind(user_id)
@@ -182,7 +184,7 @@ pub async fn save_message_to_db(
     app_name: &str,
 ) -> Result<(), Error> {
     sqlx::query(
-        "INSERT INTO chat_messages (user_id, sender, message, app_name) 
+        "INSERT INTO chat_messages (user_id, sender, message, app_name)
          VALUES (?, ?, ?, ?)"
     )
         .bind(user_id)
