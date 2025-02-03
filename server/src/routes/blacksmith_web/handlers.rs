@@ -16,10 +16,10 @@ pub(crate) async fn handle_blacksmith_web_user_action(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
     Json(action): Json<BlacksmithWebUserAction>,
 ) -> Json<BlacksmithWebServerResponse> {
-    let app_name: AppName = match action.app_name.as_str() {
-        "W3AWeb" => AppName::W3AWeb,
-        _ => {
-            warn!("Unsupported app type of the app: {}", action.app_name);
+    let app_name = match AppName::from_str(&action.app_name) {
+        Ok(app) => app,
+        Err(_) => {
+            warn!("Unsupported app type: {}", action.app_name);
             AppName::BlacksmithWeb
         }
     };
