@@ -15,7 +15,7 @@ use http::{HeaderValue, StatusCode};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{AllowHeaders, CorsLayer};
-use crate::routes::blacksmith_web::handlers::handle_blacksmith_web_user_action;
+use crate::routes::blacksmith_web::handlers::{handle_blacksmith_web_chat_fetch, handle_blacksmith_web_user_action};
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 
 pub async fn start_server(
@@ -66,6 +66,10 @@ pub async fn start_server(
         .route(
             "/blacksmith_web_user_action",
             post(handle_blacksmith_web_user_action).options(|| async { StatusCode::OK }),
+        )
+        .route(
+            "/blacksmith_web_chat_fetch",
+            get(handle_blacksmith_web_chat_fetch).options(|| async { StatusCode::OK }),
         )
         .with_state(blacksmith_web_app_state);
 

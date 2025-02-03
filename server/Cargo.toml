@@ -13,5 +13,6 @@ axum-server.workspace = true
 lazy_static.workspace = true
 teloxide.workspace = true
 uuid.workspace = true
+sqlx.workspace = true
 
 core = { path = "../core" }

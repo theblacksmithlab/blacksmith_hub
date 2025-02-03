@@ -11,9 +11,13 @@ use dotenv::dotenv;
 use qdrant_client::Qdrant;
 use server::start_server;
 use std::env;
+use std::str::FromStr;
 use std::sync::Arc;
+use sqlx::sqlite::SqliteConnectOptions;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
+use sqlx::SqlitePool;
+use core::local_db::local_db::create_blacksmith_labs_db_table;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -37,13 +41,30 @@ async fn main() -> Result<()> {
 
     let llm_client = LLM_Client::new();
 
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
+    info!("Initializing Blacksmith Labs local_db pool...");
+    let blacksmith_db_pool = SqlitePool::connect_with(
+        SqliteConnectOptions::from_str(&database_url)?
+            .create_if_missing(true)
+    ).await?;
+    info!("Blacksmith Labs local_db pool initialized successfully");
+
+    info!("Creating Blacksmith Labs chat history table...");
+    create_blacksmith_labs_db_table(&blacksmith_db_pool).await?;
+    info!("Blacksmith Labs chat history table created successfully");
+    
     let server_app_state = Arc::new(ServerAppState::new(config.clone()));
     let request_app_state = Arc::new(RequestAppState::new(
         qdrant_client.clone(),
         llm_client.clone(),
     ));
     let the_viper_room_app_state = Arc::new(TheViperRoomAppState::new(llm_client.clone()));
-    let blacksmith_web_app_state = Arc::new(BlacksmithWebAppState::new(llm_client.clone(), qdrant_client.clone()));
+    let blacksmith_web_app_state = Arc::new(BlacksmithWebAppState::new(
+        llm_client.clone(),
+        qdrant_client.clone(),
+        blacksmith_db_pool.clone()
+    ));
 
     info!("Initializing local_db pool...");
     let local_db_pool = create_db_pool().await?;
@@ -57,7 +78,7 @@ async fn main() -> Result<()> {
     info!("Trying to create local_db table...");
     create_table(&request_app_state.local_db_pool).await?;
     info!("Local_db table created successfully");
-
+    
     info!("Starting server...");
     tokio::spawn(async move {
         if let Err(e) = start_server(

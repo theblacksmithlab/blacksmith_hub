@@ -1,10 +1,11 @@
 use crate::state::request_app::app_state::{AdditionalInfo, RegistrationInfo, UserProfile};
-use sqlx::Error;
+use sqlx::{Error, SqlitePool};
 use sqlx::{FromRow, Pool, Sqlite};
 use std::path::Path;
 use teloxide::prelude::ChatId;
 use tokio::sync::Mutex;
 use tracing::info;
+use crate::models::blacksmith_web::blacksmith_web::ChatMessage;
 
 #[derive(Debug, FromRow)]
 struct DbUserProfile {
@@ -138,4 +139,57 @@ pub async fn get_user_profile_from_db(
     } else {
         Ok(None)
     }
+}
+
+pub async fn create_blacksmith_labs_db_table(pool: &SqlitePool) -> Result<(), Error> {
+    sqlx::query!(
+        "CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            sender TEXT NOT NULL,
+            message TEXT NOT NULL,
+            app_name TEXT NOT NULL
+        )"
+    )
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn fetch_chat_history_from_db(
+    pool: &SqlitePool,
+    user_id: &str,
+    app_name: &str,
+) -> Result<Vec<ChatMessage>, Error> {
+    let messages = sqlx::query_as!(
+        ChatMessage,
+        "SELECT id, user_id, sender, message, app_name FROM chat_messages WHERE user_id = ? AND app_name = ? ORDER BY id ASC",
+        user_id,
+        app_name
+    )
+        .fetch_all(pool)
+        .await?;
+
+    Ok(messages)
+}
+
+pub async fn save_message_to_db(
+    pool: &SqlitePool,
+    user_id: &str,
+    sender: &str,
+    message: &str,
+    app_name: &str,
+) -> Result<(), Error> {
+    sqlx::query!(
+        "INSERT INTO chat_messages (user_id, sender, message, app_name) VALUES (?, ?, ?, ?)",
+        user_id,
+        sender,
+        message,
+        app_name
+    )
+        .execute(pool)
+        .await?;
+
+    Ok(())
 }
