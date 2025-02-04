@@ -24,10 +24,9 @@ pub(crate) async fn handle_blacksmith_web_user_action(
         }
     };
     
-    info!("AppName: {}", app_name.to_string());
-    
     let user_id = action.user_id;
     let action_text = action.text;
+    
     info!(
         "Got message: {} from user: {}",
         action_text,
@@ -53,8 +52,6 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
         Some(id) => id.clone(),
         None => return Json(vec![]),
     };
-
-    info!("TEMP log: User ID: {}", user_id);
     
     let app_name = match params.get("app_name") {
         Some(name) => match AppName::from_str(name) {
@@ -63,10 +60,8 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
         },
         None => return Json(vec![]),
     };
-    
-    info!("Temp log: App name: {}", app_name);
 
-    info!("Fetching history for user_id={} and app_name={}", user_id, app_name);
+    info!("Fetching history for user_id={} with app_name={}", user_id, app_name);
     match fetch_chat_history_from_db(&blacksmith_web_app_state.local_db_pool, &user_id, app_name.as_str()).await {
         Ok(chat_history) => Json(chat_history),
         Err(_) => Json(vec![]),

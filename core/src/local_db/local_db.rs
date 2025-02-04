@@ -194,5 +194,42 @@ pub async fn save_message_to_db(
         .execute(pool)
         .await?;
 
+    delete_old_messages(pool, user_id, app_name, 100).await?;
+    
+    Ok(())
+}
+
+pub async fn delete_old_messages(
+    pool: &SqlitePool,
+    user_id: &str,
+    app_name: &str,
+    max_messages: i64
+) -> Result<(), Error> {
+    let count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM chat_messages WHERE user_id = ? AND app_name = ?"
+    )
+        .bind(user_id)
+        .bind(app_name)
+        .fetch_one(pool)
+        .await?;
+
+    if count.0 > max_messages {
+        let excess = count.0 - max_messages;
+
+        info!("Deleting {} oldest messages for user_id={} and app_name={}", excess, user_id, app_name);
+
+        sqlx::query(
+            "DELETE FROM chat_messages WHERE id IN (
+                SELECT id FROM chat_messages WHERE user_id = ? AND app_name = ?
+                ORDER BY id ASC LIMIT ?
+            )"
+        )
+            .bind(user_id)
+            .bind(app_name)
+            .bind(excess)
+            .execute(pool)
+            .await?;
+    }
+
     Ok(())
 }
