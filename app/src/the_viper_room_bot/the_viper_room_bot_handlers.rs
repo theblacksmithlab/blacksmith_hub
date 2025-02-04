@@ -11,7 +11,7 @@ use core::utils::common::get_message;
 use std::path::Path;
 use std::sync::Arc;
 use std::{env, fs};
-use teloxide::prelude::{ChatId, Message, Requester};
+use teloxide::prelude::{Message, Requester};
 use teloxide::Bot;
 use tracing::info;
 

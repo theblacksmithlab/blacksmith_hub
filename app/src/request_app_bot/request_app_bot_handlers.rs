@@ -1,4 +1,3 @@
-use core::models::common::app_name::AppName;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::CommonMessages;
 use core::models::tg_bot::request_app_bot::request_app_bot_commands::RequestAppBotCommands;
@@ -31,9 +30,7 @@ pub(crate) async fn request_app_message_handler(
     app_state: Arc<BotAppState>,
 ) -> anyhow::Result<()> {
     let user_id = msg.chat.id;
-    let user_id_as_integer = user_id.0;
     let user_id_as_str = user_id.to_string();
-    let _initiator_app_name = AppName::RequestAppBot.as_str().to_string();
 
     let user_message = msg.text().unwrap_or_default();
 

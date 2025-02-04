@@ -4,7 +4,7 @@ use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::{CommonMessages, ProbiotBotMessages, W3ABotMessages};
 use crate::state::tg_bot::app_state::BotAppState;
-use crate::utils::common::{convert_markdown_to_telegram, get_message, markdown_to_html, transcribe_voice_message};
+use crate::utils::common::{convert_markdown_to_telegram, get_message, transcribe_voice_message};
 use crate::utils::tg_bot::tg_bot::{
     add_llm_response_to_cache, download_voice, start_bots_chat_action, stop_bots_chat_action,
 };
