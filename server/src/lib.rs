@@ -29,7 +29,7 @@ pub async fn start_server(
         .cors
         .allowed_origins
         .iter()
-        .map(|origin| origin.parse::<HeaderValue>().unwrap())
+        .filter_map(|origin| origin.parse::<HeaderValue>().ok())
         .collect::<Vec<_>>();
 
     let cors = CorsLayer::new()
@@ -37,9 +37,9 @@ pub async fn start_server(
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(AllowHeaders::any());
 
-    async fn handle_options() -> impl IntoResponse {
-        StatusCode::OK
-    }
+    // async fn handle_options() -> impl IntoResponse {
+    //     StatusCode::OK
+    // }
 
     // Request App router
     let request_app_routes = Router::new()
@@ -77,7 +77,7 @@ pub async fn start_server(
         .merge(request_app_routes)
         .merge(the_viper_room_routes)
         .merge(blacksmith_web_router)
-        .route("/*path", options(handle_options))
+        .route("/*path", options(|| async { StatusCode::OK }))
         .fallback(handler_404)
         .layer(cors);
 
