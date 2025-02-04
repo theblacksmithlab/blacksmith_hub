@@ -343,17 +343,36 @@ pub fn split_text_into_chunks(text: &str, max_chars: usize) -> Vec<String> {
     let mut chunks = Vec::new();
     let mut current_chunk = String::new();
     let mut char_count = 0;
+    let mut last_boundary = None;
+    let search_range = 200;
 
     for (i, c) in text.chars().enumerate() {
         current_chunk.push(c);
         char_count += 1;
         
+        if c == '.' || c == '!' || c == '?' {
+            last_boundary = Some(char_count);
+        }
+        
         if char_count >= max_chars {
-            if c == '.' || c == '!' || c == '?' || i == text.len() - 1 {
-                chunks.push(current_chunk.clone());
-                current_chunk.clear();
-                char_count = 0;
+            if let Some(boundary) = last_boundary {
+                if char_count - boundary <= search_range {
+                    let valid_chunk: String = current_chunk.chars().take(boundary).collect();
+                    chunks.push(valid_chunk);
+                    
+                    current_chunk = current_chunk.chars().skip(boundary).collect();
+                    char_count = current_chunk.chars().count();
+                    last_boundary = None;
+                    continue;
+                }
             }
+            
+            let valid_chunk: String = current_chunk.chars().take(max_chars).collect();
+            chunks.push(valid_chunk);
+            
+            current_chunk = current_chunk.chars().skip(max_chars).collect();
+            char_count = current_chunk.chars().count();
+            last_boundary = None;
         }
     }
     
