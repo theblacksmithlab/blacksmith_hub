@@ -15,7 +15,6 @@ use http::{HeaderValue, StatusCode};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{AllowHeaders, CorsLayer};
-use tracing::info;
 use crate::routes::blacksmith_web::handlers::{handle_blacksmith_web_chat_fetch, handle_blacksmith_web_user_action};
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 
@@ -96,8 +95,6 @@ pub async fn start_server(
     )
     .parse()
     .expect("Invalid host or port configuration");
-
-    info!("CORS origins: {:?}", allowed_origins);
     
     axum_server::bind_rustls(addr, tls_config)
         .serve(app.into_make_service())
