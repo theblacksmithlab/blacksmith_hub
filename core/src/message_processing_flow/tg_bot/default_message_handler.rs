@@ -4,7 +4,7 @@ use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::{CommonMessages, ProbiotBotMessages, W3ABotMessages};
 use crate::state::tg_bot::app_state::BotAppState;
-use crate::utils::common::{get_message, markdown_to_html, transcribe_voice_message};
+use crate::utils::common::{convert_markdown_to_telegram, get_message, markdown_to_html, transcribe_voice_message};
 use crate::utils::tg_bot::tg_bot::{
     add_llm_response_to_cache, download_voice, start_bots_chat_action, stop_bots_chat_action,
 };
@@ -179,7 +179,7 @@ pub async fn default_message_handler(
                     .await
                     .unwrap_or_else(|_| llm_response.clone());
 
-                    let htmled_full_response = markdown_to_html(&full_response);
+                    let converted_to_markdown_v2_full_response = convert_markdown_to_telegram(&full_response);
 
                     let message_id = Uuid::new_v4().to_string();
 
@@ -193,9 +193,9 @@ pub async fn default_message_handler(
 
                     stop_bots_chat_action(typing_flag).await;
 
-                    bot.send_message(chat_id, &htmled_full_response)
+                    bot.send_message(chat_id, &converted_to_markdown_v2_full_response)
                         .reply_markup(create_tts_button(chat_id, &message_id))
-                        .parse_mode(ParseMode::Html)
+                        .parse_mode(ParseMode::MarkdownV2)
                         .await?;
 
                     info!(

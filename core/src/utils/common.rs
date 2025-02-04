@@ -400,3 +400,26 @@ pub fn markdown_to_html(markdown: &str) -> String {
     html::push_html(&mut html_output, parser);
     html_output
 }
+
+pub fn convert_markdown_to_telegram(markdown: &str) -> String {
+    markdown
+        .replace("_", "\\_") // Экранируем подчеркивания
+        .replace("*", "\\*") // Экранируем звездочки
+        .replace("[", "\\[") // Экранируем квадратные скобки
+        .replace("]", "\\]")
+        .replace("(", "\\(")
+        .replace(")", "\\)")
+        .replace("~", "\\~") // Экранируем тильду
+        .replace("`", "\\`") // Экранируем бектик
+        .replace(">", "\\>") // Экранируем ">"
+        .replace("#", "\\#") // Экранируем #
+        .replace("+", "\\+") // Экранируем +
+        .replace("-", "\\-") // Экранируем -
+        .replace("=", "\\=") // Экранируем =
+        .replace("|", "\\|") // Экранируем |
+        .replace("{", "\\{") // Экранируем {
+        .replace("}", "\\}") // Экранируем }
+        .replace(".", "\\.") // Экранируем .
+        .replace("!", "\\!") // Экранируем !
+}
+
