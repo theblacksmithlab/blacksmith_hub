@@ -48,11 +48,14 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Json<Vec<ChatMessage>> {
+    info!("Fetching chat history for web application");
     let user_id = match params.get("user_id") {
         Some(id) => id.clone(),
         None => return Json(vec![]),
     };
 
+    info!("TEMP log: User ID: {}", user_id);
+    
     let app_name = match params.get("app_name") {
         Some(name) => match AppName::from_str(name) {
             Ok(app) => app,
@@ -60,6 +63,8 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
         },
         None => return Json(vec![]),
     };
+    
+    info!("Temp log: App name: {}", app_name);
 
     info!("Fetching history for user_id={} and app_name={}", user_id, app_name);
     match fetch_chat_history_from_db(&blacksmith_web_app_state.local_db_pool, &user_id, app_name.as_str()).await {
