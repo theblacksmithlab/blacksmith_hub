@@ -18,6 +18,8 @@ use tokio::time::{sleep, Duration};
 use core::ai::common::voice_processing::simple_tts;
 use uuid::Uuid;
 use anyhow::Result;
+use base64::{engine::general_purpose::STANDARD, Engine};
+
 
 pub(crate) async fn handle_blacksmith_web_user_action(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
@@ -97,35 +99,35 @@ pub(crate) async fn handle_blacksmith_web_tts_input(
 
             if let Err(e) = audio_response.save(&audio_file_path).await {
                 warn!("Failed to save audio file: {}", e);
-                return Json(BlacksmithWebTTSResponse { audio_data: vec![] });
+                return Json(BlacksmithWebTTSResponse { audio_data: String::new() });
             }
 
-            match read_audio_file(&audio_file_path) {
+            match read_audio_file_as_base64(&audio_file_path) {
                 Ok(audio_data) => {
                     if let Err(e) = fs::remove_file(&audio_file_path) {
                         warn!("Failed to delete temp file {}: {}", audio_file_path, e);
                     }
 
                     info!("TEMP log: input text transcribed successfully");
-                    
+
                     Json(BlacksmithWebTTSResponse { audio_data })
                 }
                 Err(e) => {
                     warn!("Failed to read audio file: {}", e);
-                    Json(BlacksmithWebTTSResponse { audio_data: vec![] })
+                    Json(BlacksmithWebTTSResponse { audio_data: String::new() })
                 }
             }
         }
         Err(e) => {
             warn!("TTS generation failed: {}", e);
-            Json(BlacksmithWebTTSResponse { audio_data: vec![] })
+            Json(BlacksmithWebTTSResponse { audio_data: String::new() })
         }
     }
 }
 
-fn read_audio_file(path: &str) -> Result<Vec<u8>> {
+fn read_audio_file_as_base64(path: &str) -> Result<String> {
     let mut file = File::open(path)?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
-    Ok(buffer)
+    Ok(STANDARD.encode(&buffer))
 }
