@@ -6,11 +6,12 @@ use axum::Json;
 use tracing::log::info;
 use tracing::warn;
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
-use core::models::blacksmith_web::blacksmith_web::{BlacksmithWebUserAction, BlacksmithWebServerResponse};
+use core::models::blacksmith_web::blacksmith_web::{BlacksmithWebUserAction, BlacksmithWebServerResponse, BlacksmithWebTTSRequest, BlacksmithWebTTSResponse};
 use core::models::common::app_name::AppName;
 use crate::routes::blacksmith_web::default_message_handler::default_message_handler;
 use core::models::blacksmith_web::blacksmith_web::ChatMessage;
 use core::local_db::local_db::fetch_chat_history_from_db;
+use tokio::time::{sleep, Duration};
 
 pub(crate) async fn handle_blacksmith_web_user_action(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
@@ -66,4 +67,22 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
         Ok(chat_history) => Json(chat_history),
         Err(_) => Json(vec![]),
     }
+}
+
+pub(crate) async fn handle_blacksmith_web_tts_input(
+    State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
+    Json(action): Json<BlacksmithWebTTSRequest>,
+) -> Json<BlacksmithWebTTSResponse> {
+    let user_id = action.user_id;
+    let action_text = action.text;
+
+    info!(
+        "Got message: {} from user: {}",
+        action_text,
+        user_id
+    );
+
+    sleep(Duration::from_secs(5)).await;
+    
+    Json(BlacksmithWebTTSResponse { audio_data: "All's good!".to_string() })
 }
