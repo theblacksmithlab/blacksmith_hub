@@ -100,13 +100,13 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
 }
 
 pub async fn simple_tts<T: LlmProcessing + Send + Sync>(
-    text: String,
+    text: &str,
     app_state: Arc<T>,
 ) -> anyhow::Result<CreateSpeechResponse> {
     let llm_client = app_state.get_llm_client().clone();
 
     let request = CreateSpeechRequestArgs::default()
-        .input(&text)
+        .input(text)
         .voice(Voice::Onyx)
         .model(SpeechModel::Tts1Hd)
         .speed(1.3)

@@ -21,7 +21,7 @@ pub struct BlacksmithWebServerResponse {
 
 #[derive(Serialize)]
 pub struct BlacksmithWebTTSResponse {
-    pub audio_data: String,
+    pub audio_data: Vec<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]

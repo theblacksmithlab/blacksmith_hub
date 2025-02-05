@@ -64,7 +64,7 @@ pub(crate) async fn probiot_callback_query_handler(
                             .await;
 
                     if let Some(tts_payload) = tts_payload {
-                        match simple_tts(tts_payload, app_state.clone()).await {
+                        match simple_tts(&tts_payload, app_state.clone()).await {
                             Ok(audio_response) => {
                                 let audio_file_path = format!("tmp/{}.mp3", message_id);
                                 audio_response.save(&audio_file_path).await?;
