@@ -1,4 +1,3 @@
-use core::models::common::app_name::AppName;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::CommonMessages;
 use core::models::tg_bot::request_app_bot::request_app_bot_commands::RequestAppBotCommands;
@@ -31,16 +30,15 @@ pub(crate) async fn request_app_message_handler(
     app_state: Arc<BotAppState>,
 ) -> anyhow::Result<()> {
     let user_id = msg.chat.id;
-    let user_id_as_integer = user_id.0;
-    let _initiator_app_name = AppName::RequestAppBot.as_str().to_string();
+    let user_id_as_str = user_id.to_string();
 
     let user_message = msg.text().unwrap_or_default();
 
     let llm_response = "This is an LLM response".to_string();
 
-    add_user_message_to_cache(app_state.clone(), user_id_as_integer, String::from(user_message)).await;
+    add_user_message_to_cache(app_state.clone(), &user_id_as_str, user_message).await;
 
-    let current_cache = get_cache_as_string(app_state.clone(), user_id_as_integer).await;
+    let current_cache = get_cache_as_string(app_state.clone(), &user_id_as_str).await;
 
     let bot_msg = format!("Текущий кэш:\n{}", current_cache);
 
@@ -48,9 +46,9 @@ pub(crate) async fn request_app_message_handler(
         .parse_mode(teloxide::types::ParseMode::Html)
         .await?;
 
-    add_llm_response_to_cache(app_state.clone(), user_id_as_integer, llm_response).await;
+    add_llm_response_to_cache(app_state.clone(), &user_id_as_str, &llm_response).await;
 
-    let current_cache_2 = get_cache_as_string(app_state.clone(), user_id_as_integer).await;
+    let current_cache_2 = get_cache_as_string(app_state.clone(), &user_id_as_str).await;
 
     let bot_msg_2 = format!("Текущий кэш после LLM response:\n{}", current_cache_2);
 

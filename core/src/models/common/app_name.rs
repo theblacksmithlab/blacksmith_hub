@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use strum_macros::Display;
 
 #[derive(Debug, Clone, PartialEq, Display)]
@@ -25,6 +26,25 @@ impl AppName {
             AppName::W3ABot => "w3a_bot",
             AppName::W3AWeb => "w3a_web",
             AppName::BlacksmithWeb => "blacksmith_web"
+        }
+    }
+}
+
+impl FromStr for AppName {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "probiot_bot" => Ok(AppName::ProbiotBot),
+            "the_viper_room" => Ok(AppName::TheViperRoom),
+            "the_viper_room_bot" => Ok(AppName::TheViperRoomBot),
+            "request_app" => Ok(AppName::RequestApp),
+            "request_app_bot" => Ok(AppName::RequestAppBot),
+            "tester_bot" => Ok(AppName::TesterBot),
+            "w3a_bot" => Ok(AppName::W3ABot),
+            "w3a_web" => Ok(AppName::W3AWeb),
+            "blacksmith_web" => Ok(AppName::BlacksmithWeb),
+            _ => Err(()),
         }
     }
 }

@@ -147,8 +147,8 @@ pub(crate) async fn updates_file_creation<T: LlmProcessing + Send + Sync>(
     for file_path in txt_files.clone() {
         let content = read_file_safe(&file_path)?;
         let response = raw_llm_processing(
-            system_role.clone(),
-            content,
+            &system_role,
+            &content,
             app_state.clone(),
             LlmModel::Complex,
         )
@@ -188,8 +188,8 @@ pub(crate) async fn summarize_updates<T: LlmProcessing + Send + Sync>(
         format!("Адресат: {}\nТекст обновлений: {}", nickname, updates);
 
     let updates_summarized = raw_llm_processing(
-        system_role,
-        updates_with_nickname_provided,
+        &system_role,
+        &updates_with_nickname_provided,
         app_state.clone(),
         LlmModel::Complex,
     )
@@ -243,11 +243,11 @@ pub(crate) async fn get_latest_messages<T: LlmProcessing + Send + Sync>(
             break;
         }
         if !message.text().is_empty() {
-            let text = message.text().to_string();
+            let text = message.text();
 
             let llm_response = raw_llm_processing(
-                system_role.clone(),
-                text.clone(),
+                &system_role,
+                text,
                 app_state.clone(),
                 LlmModel::Light,
             )

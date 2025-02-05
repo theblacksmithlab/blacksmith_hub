@@ -61,8 +61,8 @@ pub(crate) async fn activate_search_manager(
     );
 
     let llm_order_processing = raw_llm_processing_json(
-        system_role,
-        message_for_llm,
+        &system_role,
+        &message_for_llm,
         app_state.clone(),
         LlmModel::Complex,
     )

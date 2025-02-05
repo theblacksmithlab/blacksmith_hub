@@ -20,7 +20,7 @@ use tracing::{error, info};
 
 pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
     client: &g_Client,
-    user_id: u64,
+    user_id: &str,
     app_state: Arc<T>,
     nickname: String,
     need_caption: bool,
@@ -96,8 +96,8 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
         );
 
         let mut caption = raw_llm_processing(
-            system_role,
-            podcast_text,
+            &system_role,
+            &podcast_text,
             app_state.clone(),
             LlmModel::Light,
         )

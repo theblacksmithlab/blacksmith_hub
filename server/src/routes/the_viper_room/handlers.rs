@@ -24,6 +24,7 @@ pub(crate) async fn handle_the_viper_room_user_action(
     Json(command): Json<TheViperRoomUserAction>,
 ) -> Json<TheViperRoomServerResponse> {
     let user_id = command.user_id as u64;
+    let user_id_as_str = user_id.to_string();
     let action = command.action;
     let action_step = command.action_step;
     let username = command.username.unwrap_or(String::from("anonymous_user"));
@@ -233,7 +234,7 @@ pub(crate) async fn handle_the_viper_room_user_action(
                     if let Some(client) = state.client.as_ref() {
                         return match news_block_creation(
                             client,
-                            user_id,
+                            &user_id_as_str,
                             the_viper_room_app_state.clone(),
                             nickname,
                             false,

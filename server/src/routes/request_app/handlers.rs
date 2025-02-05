@@ -115,7 +115,7 @@ pub(crate) async fn handle_user_action(
         } else if state.creating_profile {
             return handle_state_creating_profile_menu(app_state.clone(), user_id, action).await;
         } else if state.creating_profile_process {
-            return handle_state_creating_profile_process(app_state.clone(), user_id, action).await;
+            return handle_state_creating_profile_process(app_state.clone(), user_id, &action).await;
         }
     }
 
@@ -509,9 +509,9 @@ pub(crate) async fn handle_state_creating_profile_menu(
 pub(crate) async fn handle_state_creating_profile_process(
     app_state: Arc<RequestAppState>,
     user_id: ChatId,
-    action: String,
+    action: &str,
 ) -> Json<ServerResponse> {
-    match action.as_str() {
+    match action {
         "Назад" => {
             update_request_app_user_state(app_state.clone(), user_id, |state| {
                 state.creating_request_process = false;

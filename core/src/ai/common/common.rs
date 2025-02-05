@@ -21,8 +21,8 @@ use tiktoken_rs::cl100k_base;
 use tracing::info;
 
 pub async fn raw_llm_processing_json<T: LlmProcessing + Send + Sync>(
-    system_role: String,
-    request: String,
+    system_role: &str,
+    request: &str,
     app_state: Arc<T>,
     model: LlmModel,
 ) -> Result<String> {
@@ -34,7 +34,7 @@ pub async fn raw_llm_processing_json<T: LlmProcessing + Send + Sync>(
         .temperature(0.2)
         .messages([
             ChatCompletionRequestSystemMessageArgs::default()
-                .content(system_role.as_str())
+                .content(system_role)
                 .build()?
                 .into(),
             ChatCompletionRequestUserMessageArgs::default()
@@ -60,8 +60,8 @@ pub async fn raw_llm_processing_json<T: LlmProcessing + Send + Sync>(
 }
 
 pub async fn raw_llm_processing<T: LlmProcessing + Send + Sync>(
-    system_role: String,
-    request: String,
+    system_role: &str,
+    request: &str,
     app_state: Arc<T>,
     model: LlmModel,
 ) -> Result<String> {
@@ -73,7 +73,7 @@ pub async fn raw_llm_processing<T: LlmProcessing + Send + Sync>(
         .temperature(0.2)
         .messages([
             ChatCompletionRequestSystemMessageArgs::default()
-                .content(system_role.as_str())
+                .content(system_role)
                 .build()?
                 .into(),
             ChatCompletionRequestUserMessageArgs::default()
@@ -113,8 +113,8 @@ pub async fn process_users_self_description(
     );
 
     let users_about_text_str = raw_llm_processing_json(
-        system_role,
-        user_story_for_profile_creation,
+        &system_role,
+        &user_story_for_profile_creation,
         app_state.clone(),
         LlmModel::Complex,
     )
@@ -188,7 +188,7 @@ pub async fn vectorize(data: String, app_state: Arc<RequestAppState>) -> Result<
     Ok(embedding)
 }
 
-pub async fn tokenize_and_truncate(data: String) -> Result<String> {
+pub async fn tokenize_and_truncate(data: &str) -> Result<String> {
     let bpe = cl100k_base()?;
 
     let tokens = bpe.encode_ordinary(&*data);

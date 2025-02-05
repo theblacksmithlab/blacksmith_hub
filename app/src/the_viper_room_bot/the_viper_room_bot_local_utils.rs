@@ -21,7 +21,7 @@ pub(crate) async fn generate_podcast(
     bot: Bot,
     user_id: ChatId,
     app_state: Arc<BotAppState>,
-    app_tg_account_id: ChatId,
+    app_tg_account_id: &str,
     nickname: String,
     chat_username: &str,
 ) -> anyhow::Result<()> {
@@ -37,7 +37,7 @@ pub(crate) async fn generate_podcast(
 
     let podcast = news_block_creation(
         &g_client,
-        app_tg_account_id.0 as u64,
+        app_tg_account_id,
         app_state,
         nickname,
         true,
@@ -84,7 +84,7 @@ pub(crate) async fn schedule_podcast(
     bot: Bot,
     user_id: ChatId,
     app_state: Arc<BotAppState>,
-    app_tg_account_id: ChatId,
+    app_tg_account_id: Arc<String>,
     nickname: String,
     session_data: Vec<u8>,
 ) -> anyhow::Result<()> {
@@ -125,43 +125,47 @@ pub(crate) async fn schedule_podcast(
     let seconds = duration_until_podcast_time.num_seconds() % 60;
 
     let mut stop_rx = app_state.podcast_manager.stop_rx.clone();
-
-    tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                _ = interval.tick() => {
-                    let g_client = match initialize_grammers_client(session_data.clone()).await {
-                        Ok(g_client) => {
-                            if let Err(e) = g_client.is_authorized().await {
-                                error!("Client authorization failed: {:?}", e);
+    
+    tokio::spawn({
+        let app_tg_account_id = Arc::clone(&app_tg_account_id);
+        
+        async move {
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        let g_client = match initialize_grammers_client(session_data.clone()).await {
+                            Ok(g_client) => {
+                                if let Err(e) = g_client.is_authorized().await {
+                                    error!("Client authorization failed: {:?}", e);
+                                    continue;
+                                }
+                                g_client
+                            },
+                            Err(e) => {
+                                error!("Failed to initialize grammers client: {:?}", e);
                                 continue;
                             }
-                            g_client
-                        },
-                        Err(e) => {
-                            error!("Failed to initialize grammers client: {:?}", e);
-                            continue;
-                        }
-                    };
+                        };
 
-                    if let Err(e) = generate_podcast(
-                        g_client,
-                        bot.clone(),
-                        user_id,
-                        app_state.clone(),
-                        app_tg_account_id,
-                        nickname.clone(),
-                        &chat_username
-                     ).await {
-                        error!("Error in podcast generation: {:?}", e);
+                        if let Err(e) = generate_podcast(
+                            g_client,
+                            bot.clone(),
+                            user_id,
+                            app_state.clone(),
+                            &app_tg_account_id,
+                            nickname.clone(),
+                            &chat_username
+                         ).await {
+                            error!("Error in podcast generation: {:?}", e);
+                        }
                     }
-                }
-                Ok(_) = stop_rx.changed() => {
-                    if *stop_rx.borrow() {
-                        let mut is_running = app_state.podcast_manager.state.is_running.lock().await;
-                        *is_running = false;
-                        info!("Stopping daily podcast generation task");
-                        break;
+                    Ok(_) = stop_rx.changed() => {
+                        if *stop_rx.borrow() {
+                            let mut is_running = app_state.podcast_manager.state.is_running.lock().await;
+                            *is_running = false;
+                            info!("Stopping daily podcast generation task");
+                            break;
+                        }
                     }
                 }
             }

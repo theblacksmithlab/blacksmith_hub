@@ -11,7 +11,7 @@ use core::utils::common::get_message;
 use std::path::Path;
 use std::sync::Arc;
 use std::{env, fs};
-use teloxide::prelude::{ChatId, Message, Requester};
+use teloxide::prelude::{Message, Requester};
 use teloxide::Bot;
 use tracing::info;
 
@@ -36,16 +36,12 @@ pub(crate) async fn the_viper_room_command_handler(
         .parse()
         .expect("LORD_ADMIN_ID must be a valid integer");
 
-    let app_tg_account_id = ChatId(
-        env::var("APP_TG_ACCOUNT_ID")
-            .expect("APP_TG_ACCOUNT_ID must be set in environment")
-            .parse()
-            .expect("APP_TG_ACCOUNT_ID must be a valid integer"),
-    );
+    let app_tg_account_id = Arc::new(env::var("APP_TG_ACCOUNT_ID")
+        .expect("APP_TG_ACCOUNT_ID must be set in environment"));
 
     let session_path = format!(
         "common_res/the_viper_room/grammers_system_session/{}.session",
-        app_tg_account_id.0
+        app_tg_account_id
     );
 
     if !Path::new(&session_path).exists() {
@@ -78,7 +74,7 @@ pub(crate) async fn the_viper_room_command_handler(
                 bot.clone(),
                 user_id,
                 app_state.clone(),
-                app_tg_account_id,
+                &app_tg_account_id,
                 nickname,
                 "the_viper_room",
             )
@@ -93,7 +89,7 @@ pub(crate) async fn the_viper_room_command_handler(
                 bot.clone(),
                 user_id,
                 app_state.clone(),
-                app_tg_account_id,
+                &app_tg_account_id,
                 nickname,
                 "nervosettestchat",
             )

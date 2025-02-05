@@ -24,8 +24,8 @@ pub async fn generate_user_system_nickname(
     );
 
     raw_llm_processing(
-        system_role,
-        user_data,
+        &system_role,
+        &user_data,
         the_viper_room_app_state,
         LlmModel::Complex,
     )

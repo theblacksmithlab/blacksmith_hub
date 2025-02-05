@@ -9,7 +9,7 @@ use crate::state::llm_client_init_trait::LlmProcessing;
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 
 pub async fn get_results_via_rag_system<T: LlmProcessing + QdrantClientInit + Send + Sync>(
-    input_data: String,
+    input_data: &str,
     collection_names: Vec<String>,
     config: RAGConfig,
     app_state: Arc<T>,
@@ -22,7 +22,7 @@ pub async fn get_results_via_rag_system<T: LlmProcessing + QdrantClientInit + Se
 
     let rag_system = RAGSystem::new(vectorizer, retriever, context_builder, config);
 
-    let result = rag_system.process(&input_data).await?;
+    let result = rag_system.process(input_data).await?;
 
     let total_resulting_docs_quantity = result.documents.len();
     info!(

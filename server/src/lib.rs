@@ -15,7 +15,7 @@ use http::{HeaderValue, StatusCode};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{AllowHeaders, CorsLayer};
-use crate::routes::blacksmith_web::handlers::handle_blacksmith_web_user_action;
+use crate::routes::blacksmith_web::handlers::{handle_blacksmith_web_chat_fetch, handle_blacksmith_web_user_action};
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 
 pub async fn start_server(
@@ -29,17 +29,19 @@ pub async fn start_server(
         .cors
         .allowed_origins
         .iter()
-        .map(|origin| origin.parse::<HeaderValue>().unwrap())
+        .filter_map(|origin| origin.parse::<HeaderValue>().ok())
         .collect::<Vec<_>>();
 
     let cors = CorsLayer::new()
-        .allow_origin(allowed_origins)
+        .allow_origin(allowed_origins.clone())
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-        .allow_headers(AllowHeaders::any());
+        .allow_headers(AllowHeaders::any())
+        .allow_credentials(false);
+    
 
-    async fn handle_options() -> impl IntoResponse {
-        StatusCode::OK
-    }
+    // async fn handle_options() -> impl IntoResponse {
+    //     StatusCode::OK
+    // }
 
     // Request App router
     let request_app_routes = Router::new()
@@ -67,13 +69,17 @@ pub async fn start_server(
             "/blacksmith_web_user_action",
             post(handle_blacksmith_web_user_action).options(|| async { StatusCode::OK }),
         )
+        .route(
+            "/blacksmith_web_chat_fetch",
+            get(handle_blacksmith_web_chat_fetch).options(|| async { StatusCode::OK }),
+        )
         .with_state(blacksmith_web_app_state);
 
     let app = Router::new()
         .merge(request_app_routes)
         .merge(the_viper_room_routes)
         .merge(blacksmith_web_router)
-        .route("/*path", options(handle_options))
+        .route("/*path", options(|| async { StatusCode::OK }))
         .fallback(handler_404)
         .layer(cors);
 
@@ -89,7 +95,7 @@ pub async fn start_server(
     )
     .parse()
     .expect("Invalid host or port configuration");
-
+    
     axum_server::bind_rustls(addr, tls_config)
         .serve(app.into_make_service())
         .await?;
