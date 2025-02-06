@@ -9,7 +9,7 @@ use axum::Json;
 use tracing::log::info;
 use tracing::warn;
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
-use core::models::blacksmith_web::blacksmith_web::{BlacksmithWebUserAction, BlacksmithWebServerResponse, BlacksmithWebTTSRequest, BlacksmithWebTTSResponse};
+use core::models::blacksmith_web::blacksmith_web::{BlacksmithWebUserRequest, BlacksmithWebServerResponse, BlacksmithWebTTSRequest, BlacksmithWebTTSResponse};
 use core::models::common::app_name::AppName;
 use core::message_processing_flow::web::default_message_handler::default_message_handler;
 use core::models::blacksmith_web::blacksmith_web::ChatMessage;
@@ -20,9 +20,9 @@ use uuid::Uuid;
 use anyhow::Result;
 use base64::{engine::general_purpose::STANDARD, Engine};
 
-pub(crate) async fn handle_blacksmith_web_user_action(
+pub(crate) async fn handle_blacksmith_web_user_request(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
-    Json(action): Json<BlacksmithWebUserAction>,
+    Json(action): Json<BlacksmithWebUserRequest>,
 ) -> Json<BlacksmithWebServerResponse> {
     let app_name = match AppName::from_str(&action.app_name) {
         Ok(app) => app,
@@ -76,7 +76,7 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
     }
 }
 
-pub(crate) async fn handle_blacksmith_web_tts_input(
+pub(crate) async fn handle_blacksmith_web_tts_request(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
     Json(action): Json<BlacksmithWebTTSRequest>,
 ) -> Json<BlacksmithWebTTSResponse> {

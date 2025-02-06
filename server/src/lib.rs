@@ -1,7 +1,7 @@
 pub mod routes;
 
 use crate::routes::request_app::handlers::handle_user_action;
-use crate::routes::the_viper_room::handlers::handle_the_viper_room_user_action;
+use crate::routes::the_viper_room::handlers::handle_the_viper_room_user_request;
 use axum::http::Method;
 use axum::response::IntoResponse;
 use axum::routing::{get, options, post};
@@ -15,7 +15,7 @@ use http::{HeaderValue, StatusCode};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{AllowHeaders, CorsLayer};
-use crate::routes::blacksmith_web::handlers::{handle_blacksmith_web_chat_fetch, handle_blacksmith_web_tts_input, handle_blacksmith_web_user_action};
+use crate::routes::blacksmith_web::handlers::{handle_blacksmith_web_chat_fetch, handle_blacksmith_web_tts_request, handle_blacksmith_web_user_request};
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 
 pub async fn start_server(
@@ -53,24 +53,24 @@ pub async fn start_server(
     // The Viper Room router
     let the_viper_room_routes = Router::new()
         .route(
-            "/the_viper_room_user_action",
-            post(handle_the_viper_room_user_action).options(|| async { StatusCode::OK }),
+            "/the_viper_room_user_request",
+            post(handle_the_viper_room_user_request).options(|| async { StatusCode::OK }),
         )
         .with_state(the_viper_room_app_state);
     
     // Blacksmith Web Router
     let blacksmith_web_router = Router::new()
         .route(
-            "/blacksmith_web_user_action",
-            post(handle_blacksmith_web_user_action).options(|| async { StatusCode::OK }),
+            "/blacksmith_web_user_request",
+            post(handle_blacksmith_web_user_request).options(|| async { StatusCode::OK }),
         )
         .route(
             "/blacksmith_web_chat_fetch",
             get(handle_blacksmith_web_chat_fetch).options(|| async { StatusCode::OK }),
         )
         .route(
-            "/blacksmith_web_tts_input",
-            post(handle_blacksmith_web_tts_input).options(|| async { StatusCode::OK }),
+            "/blacksmith_web_tts_request",
+            post(handle_blacksmith_web_tts_request).options(|| async { StatusCode::OK }),
         )
         .with_state(blacksmith_web_app_state);
 
