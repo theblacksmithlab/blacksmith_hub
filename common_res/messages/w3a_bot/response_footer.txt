@@ -1,4 +1,4 @@
 
 _____________________________________
 
-Response footer if needed
+A placeholder for response footer if needed

@@ -37,6 +37,7 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
             .speed(1.3)
             .build()?;
 
+        info!("Starting OpenAI voice generation...");
         let response = llm_client.audio().speech(request).await?;
         let audio_file_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
         response.save(&audio_file_path).await?;
@@ -100,13 +101,13 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
 }
 
 pub async fn simple_tts<T: LlmProcessing + Send + Sync>(
-    text: String,
+    text: &str,
     app_state: Arc<T>,
 ) -> anyhow::Result<CreateSpeechResponse> {
     let llm_client = app_state.get_llm_client().clone();
 
     let request = CreateSpeechRequestArgs::default()
-        .input(&text)
+        .input(text)
         .voice(Voice::Onyx)
         .model(SpeechModel::Tts1Hd)
         .speed(1.3)

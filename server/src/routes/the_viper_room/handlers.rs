@@ -19,7 +19,7 @@ use std::fs::{read, remove_file};
 use std::sync::Arc;
 use tracing::info;
 
-pub(crate) async fn handle_the_viper_room_user_action(
+pub(crate) async fn handle_the_viper_room_user_request(
     State(the_viper_room_app_state): State<Arc<TheViperRoomAppState>>,
     Json(command): Json<TheViperRoomUserAction>,
 ) -> Json<TheViperRoomServerResponse> {

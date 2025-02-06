@@ -174,6 +174,8 @@ pub(crate) async fn summarize_updates<T: LlmProcessing + Send + Sync>(
     app_state: Arc<T>,
     nickname: String,
 ) -> Result<String, anyhow::Error> {
+    info!("Starting updates summarization...");
+    
     let system_role = get_system_role_or_fallback(
         &AppName::TheViperRoom,
         TheViperRoomRoleType::CreatingPodcast,

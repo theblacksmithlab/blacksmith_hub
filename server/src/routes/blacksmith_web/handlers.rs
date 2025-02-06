@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::fs;
+use std::fs::File;
+use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;
 use axum::extract::{Query, State};
@@ -6,15 +9,20 @@ use axum::Json;
 use tracing::log::info;
 use tracing::warn;
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
-use core::models::blacksmith_web::blacksmith_web::{BlacksmithWebUserAction, BlacksmithWebServerResponse};
+use core::models::blacksmith_web::blacksmith_web::{BlacksmithWebUserRequest, BlacksmithWebServerResponse, BlacksmithWebTTSRequest, BlacksmithWebTTSResponse};
 use core::models::common::app_name::AppName;
-use crate::routes::blacksmith_web::default_message_handler::default_message_handler;
+use core::message_processing_flow::web::default_message_handler::default_message_handler;
 use core::models::blacksmith_web::blacksmith_web::ChatMessage;
 use core::local_db::local_db::fetch_chat_history_from_db;
+use tokio::time::{sleep, Duration};
+use core::ai::common::voice_processing::simple_tts;
+use uuid::Uuid;
+use anyhow::Result;
+use base64::{engine::general_purpose::STANDARD, Engine};
 
-pub(crate) async fn handle_blacksmith_web_user_action(
+pub(crate) async fn handle_blacksmith_web_user_request(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
-    Json(action): Json<BlacksmithWebUserAction>,
+    Json(action): Json<BlacksmithWebUserRequest>,
 ) -> Json<BlacksmithWebServerResponse> {
     let app_name = match AppName::from_str(&action.app_name) {
         Ok(app) => app,
@@ -66,4 +74,59 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
         Ok(chat_history) => Json(chat_history),
         Err(_) => Json(vec![]),
     }
+}
+
+pub(crate) async fn handle_blacksmith_web_tts_request(
+    State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
+    Json(action): Json<BlacksmithWebTTSRequest>,
+) -> Json<BlacksmithWebTTSResponse> {
+    let user_id = action.user_id;
+    let action_text = action.text;
+
+    info!(
+        "Got TTS request for text: {} from user: {}",
+        action_text,
+        user_id
+    );
+
+    sleep(Duration::from_secs(1)).await;
+    
+    match simple_tts(&action_text, blacksmith_web_app_state.clone()).await {
+        Ok(audio_response) => {
+            let temp_file_id = Uuid::new_v4().to_string();
+            let audio_file_path = format!("tmp/{}.mp3", temp_file_id);
+
+            if let Err(e) = audio_response.save(&audio_file_path).await {
+                warn!("Failed to save audio file: {}", e);
+                return Json(BlacksmithWebTTSResponse { audio_data: String::new() });
+            }
+
+            match read_audio_file_as_base64(&audio_file_path) {
+                Ok(audio_data) => {
+                    if let Err(e) = fs::remove_file(&audio_file_path) {
+                        warn!("Failed to delete temp file {}: {}", audio_file_path, e);
+                    }
+
+                    info!("TEMP log: input text transcribed successfully");
+
+                    Json(BlacksmithWebTTSResponse { audio_data })
+                }
+                Err(e) => {
+                    warn!("Failed to read audio file: {}", e);
+                    Json(BlacksmithWebTTSResponse { audio_data: String::new() })
+                }
+            }
+        }
+        Err(e) => {
+            warn!("TTS generation failed: {}", e);
+            Json(BlacksmithWebTTSResponse { audio_data: String::new() })
+        }
+    }
+}
+
+fn read_audio_file_as_base64(path: &str) -> Result<String> {
+    let mut file = File::open(path)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    Ok(STANDARD.encode(&buffer))
 }

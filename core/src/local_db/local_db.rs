@@ -1,11 +1,73 @@
+use std::{env, fs};
+use std::path::Path;
+use std::str::FromStr;
+use anyhow::Context;
 use crate::state::request_app::app_state::{AdditionalInfo, RegistrationInfo, UserProfile};
 use sqlx::{Error, Executor, SqlitePool};
 use sqlx::{FromRow, Pool, Sqlite};
-use std::path::Path;
+use sqlx::sqlite::SqliteConnectOptions;
 use teloxide::prelude::ChatId;
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{info, warn};
 use crate::models::blacksmith_web::blacksmith_web::ChatMessage;
+
+pub async fn setup_blacksmith_lab_db() -> anyhow::Result<SqlitePool> {
+    let blacksmith_lab_database_url = env::var("BLACKSMITH_LAB_DATABASE_URL")
+        .context("Error: BLACKSMITH_LAB_DATABASE_URL must be set")?;
+
+    let db_path = "blacksmith_lab.db";
+
+    if !Path::new(db_path).exists() {
+        fs::File::create(db_path)
+            .context("Error creating local db file for Blacksmith Lab")?;
+        warn!("Blacksmith Lab local_db file {} created.", db_path);
+    }
+
+    let pool = SqlitePool::connect_with(
+        SqliteConnectOptions::from_str(&blacksmith_lab_database_url)
+            .context("Error: invalid DATABASE_URL format")?
+            .create_if_missing(true)
+    ).await.context("Error connecting to db pool")?;
+
+    info!("Blacksmith Lab local_db pool initialized successfully");
+
+    create_blacksmith_lab_db_table(&pool)
+        .await
+        .context("Error creating table in Blacksmith Lab local db")?;
+
+    info!("Blacksmith Lab table created successfully");
+
+    Ok(pool)
+}
+
+pub async fn setup_request_app_db() -> anyhow::Result<SqlitePool> {
+    let request_app_database_url = env::var("REQUEST_APP_DATABASE_URL")
+        .context("Error: REQUEST_APP_DATABASE_URL must be set")?;
+
+    let db_path = "request_app.db";
+
+    if !Path::new(db_path).exists() {
+        fs::File::create(db_path)
+            .context("Error creating local db file for Request App")?;
+        warn!("Request App local_db file {} created.", db_path);
+    }
+
+    let pool = SqlitePool::connect_with(
+        SqliteConnectOptions::from_str(&request_app_database_url)
+            .context("Error: invalid DATABASE_URL format")?
+            .create_if_missing(true)
+    ).await.context("Error connecting to db pool")?;
+
+    info!("Request App local_db pool initialized successfully");
+
+    create_request_app_db_table(&pool)
+        .await
+        .context("Error creating table in Request App local db")?;
+
+    info!("Request App table created successfully");
+
+    Ok(pool)
+}
 
 #[derive(Debug, FromRow)]
 struct DbUserProfile {
@@ -18,40 +80,22 @@ struct DbUserProfile {
     interests: Option<String>,
 }
 
-pub(crate) async fn initialize_database() -> Result<(), Error> {
-    if !Path::new("user_profiles.db").exists() {
-        std::fs::File::create("user_profiles.db")?;
-    }
+pub async fn create_request_app_db_table(pool: &SqlitePool) -> Result<(), Error> {
+    let query = r#"
+        CREATE TABLE IF NOT EXISTS user_profiles (
+            user_id INTEGER PRIMARY KEY,
+            first_name TEXT,
+            last_name TEXT,
+            age INTEGER,
+            gender TEXT,
+            city_of_residence TEXT,
+            interests TEXT
+        );
+    "#;
+
+    sqlx::query(query).execute(pool).await?;
+
     Ok(())
-}
-
-pub async fn create_db_pool() -> Result<Pool<Sqlite>, Error> {
-    initialize_database().await?;
-    let pool = sqlx::SqlitePool::connect("sqlite:user_profiles.db").await?;
-    Ok(pool)
-}
-
-pub async fn create_table(pool: &Mutex<Option<Pool<Sqlite>>>) -> Result<(), Error> {
-    let pool = pool.lock().await;
-    if let Some(pool) = &*pool {
-        let query = r#"
-            CREATE TABLE IF NOT EXISTS user_profiles (
-                user_id INTEGER PRIMARY KEY,
-                first_name TEXT,
-                last_name TEXT,
-                age INTEGER,
-                gender TEXT,
-                city_of_residence TEXT,
-                interests TEXT
-            );
-        "#;
-
-        sqlx::query(query).execute(pool).await?;
-
-        Ok(())
-    } else {
-        Err(Error::Configuration("DB pool is not initialized".into()))
-    }
 }
 
 pub(crate) async fn save_user_profile(
@@ -91,8 +135,6 @@ pub(crate) async fn save_user_profile(
             .bind(interests)
             .execute(pool)
             .await?;
-
-        info!("TEMP: Fn: save_user_profile | User_profile saved to local_bd");
 
         Ok(())
     } else {
@@ -141,7 +183,7 @@ pub async fn get_user_profile_from_db(
     }
 }
 
-pub async fn create_blacksmith_labs_db_table(pool: &SqlitePool) -> Result<(), Error> {
+pub async fn create_blacksmith_lab_db_table(pool: &SqlitePool) -> Result<(), Error> {
     let query = "
         CREATE TABLE IF NOT EXISTS chat_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -216,7 +258,7 @@ pub async fn delete_old_messages(
     if count.0 > max_messages {
         let excess = count.0 - max_messages;
 
-        info!("Deleting {} oldest messages for user_id={} and app_name={}", excess, user_id, app_name);
+        info!("Deleting {} oldest messages for user_id={} AND app_name={}", excess, user_id, app_name);
 
         sqlx::query(
             "DELETE FROM chat_messages WHERE id IN (

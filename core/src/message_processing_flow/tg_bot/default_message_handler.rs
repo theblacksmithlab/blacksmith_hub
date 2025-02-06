@@ -29,13 +29,14 @@ pub async fn default_message_handler(
     let chat_id_as_str = chat_id_as_integer.to_string();
     let bot_data = bot.get_me().await?;
     let user_raw_request = msg.text().unwrap_or("Empty request").to_string();
-    info!(
+
+    if msg.chat.is_private() {
+        info!(
         "Got message: {} from: @{}",
         user_raw_request,
         msg.chat.username().unwrap_or("Anonymous User")
     );
-
-    if msg.chat.is_private() {
+        
         if let Some(voice) = msg.voice() {
             info!(
                 "Message received from @{} is voice message. Let's process it...",
@@ -228,10 +229,6 @@ pub async fn default_message_handler(
             bot.send_message(chat_id, bot_msg).await?;
         }
     } else {
-        info!(
-            "Got message from @{} in public chat. User invited for private messaging",
-            msg.chat.username().unwrap_or("Anonymous User")
-        );
         if user_raw_request.contains(&format!(
             "@{}",
             bot_data.user.clone().username.unwrap_or_default()
@@ -242,6 +239,11 @@ pub async fn default_message_handler(
                 .map(|user| user.id == bot_data.id)
                 .unwrap_or(false))
         {
+            info!(
+            "Got message from @{} in public chat. User invited for private messaging",
+            msg.chat.username().unwrap_or("Anonymous User")
+            );
+            
             if let Some(message_enum) = match app_name {
                 AppName::ProbiotBot => Some(AppsSystemMessages::Probiot(
                     ProbiotBotMessages::PrivateChatInvitation,
