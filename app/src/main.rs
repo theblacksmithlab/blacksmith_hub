@@ -24,7 +24,8 @@ use core::state::tg_bot::app_state::BotAppState;
 use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;
-use std::env;
+use std::{env, fs};
+use std::path::PathBuf;
 use std::sync::Arc;
 use teloxide::dispatching::{HandlerExt, UpdateFilterExt, UpdateHandler};
 use teloxide::prelude::Update;
@@ -65,6 +66,10 @@ async fn main() -> Result<()> {
         _ => return Err(anyhow::anyhow!("Unknown APP_NAME: {}", app_name_str)),
     };
 
+    if let Err(e) = reset_tmp_dir() {
+        error!("Failed to clean tmp directory: {}", e);
+    }
+    
     let qdrant_client = Arc::new(
         Qdrant::from_url(&env::var("QDRANT_URL")?)
             .api_key(env::var("QDRANT_API_KEY")?)
@@ -178,4 +183,15 @@ fn get_handlers(
             app_name.as_str()
         )),
     }
+}
+
+fn reset_tmp_dir() -> std::io::Result<()> {
+    let base_tmp = PathBuf::from("tmp");
+
+    if base_tmp.exists() {
+        fs::remove_dir_all(&base_tmp)?;
+    }
+
+    fs::create_dir_all(&base_tmp)?;
+    Ok(())
 }

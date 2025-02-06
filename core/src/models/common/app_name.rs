@@ -1,3 +1,5 @@
+use std::env;
+use std::path::PathBuf;
 use std::str::FromStr;
 use strum_macros::Display;
 
@@ -46,5 +48,12 @@ impl FromStr for AppName {
             "blacksmith_web" => Ok(AppName::BlacksmithWeb),
             _ => Err(()),
         }
+    }
+}
+
+impl AppName {
+    pub fn temp_dir(&self) -> PathBuf {
+        let base_dir = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        base_dir.join("tmp").join(self.as_str())
     }
 }

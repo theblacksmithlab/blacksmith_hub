@@ -1,7 +1,7 @@
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::state::tg_bot::app_state::BotAppState;
 use anyhow::Result;
-use std::env;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use teloxide::dispatching::{Dispatcher, UpdateHandler};
@@ -85,21 +85,36 @@ pub async fn get_cache_as_string<T: TempCacheInit + Send + Sync>(
         .unwrap_or_else(|| "[]".to_string())
 }
 
-pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> Result<String> {
-    let base_path = env::current_dir()?.join(save_path);
+// pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> Result<String> {
+//     let base_path = env::current_dir()?.join(save_path);
+// 
+//     if let Some(parent_dir) = base_path.parent() {
+//         tokio::fs::create_dir_all(parent_dir).await?;
+//     }
+// 
+//     let mut destination = File::create(&base_path).await?;
+// 
+//     let file = bot.get_file(file_id).await?;
+//     bot.download_file(&file.path, &mut destination).await?;
+// 
+//     destination.flush().await?;
+// 
+//     Ok(base_path.to_str().unwrap().to_string())
+// }
 
-    if let Some(parent_dir) = base_path.parent() {
+pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &Path) -> Result<String> {
+    if let Some(parent_dir) = save_path.parent() {
         tokio::fs::create_dir_all(parent_dir).await?;
     }
-
-    let mut destination = File::create(&base_path).await?;
-
+    
+    let mut destination = File::create(save_path).await?;
+    
     let file = bot.get_file(file_id).await?;
     bot.download_file(&file.path, &mut destination).await?;
-
+    
     destination.flush().await?;
-
-    Ok(base_path.to_str().unwrap().to_string())
+    
+    Ok(save_path.to_string_lossy().into_owned())
 }
 
 pub async fn get_user_message_count<T: TempCacheInit + Send + Sync>(
