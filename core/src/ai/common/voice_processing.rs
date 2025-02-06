@@ -9,7 +9,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use tracing::{error, info, warn};
 
-pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
+pub async fn podcast_tts<T: LlmProcessing + Send + Sync>(
     text: String,
     user_tmp_dir: String,
     app_state: Arc<T>,

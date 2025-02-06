@@ -3,7 +3,7 @@ use crate::utils::the_viper_room::news_block_creation_utils::{
     updates_file_creation,
 };
 use crate::ai::common::common::raw_llm_processing;
-use crate::ai::common::voice_processing::text_to_speech;
+use crate::ai::common::voice_processing::podcast_tts;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::TheViperRoomBotMessages;
@@ -36,7 +36,7 @@ pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
 
     let podcast_text = summarize_updates(user_tmp_dir.clone(), app_state.clone(), nickname).await?;
 
-    let audio_path = text_to_speech(
+    let audio_path = podcast_tts(
         podcast_text.clone(),
         user_tmp_dir.clone(),
         app_state.clone(),

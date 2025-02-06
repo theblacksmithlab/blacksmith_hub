@@ -19,7 +19,7 @@ use tracing::log::info;
 pub(crate) async fn generate_podcast(
     g_client: g_Client,
     bot: Bot,
-    user_id: ChatId,
+    chat_id: ChatId,
     app_state: Arc<BotAppState>,
     app_tg_account_id: &str,
     nickname: String,
@@ -28,10 +28,10 @@ pub(crate) async fn generate_podcast(
     info!("Starting podcast generation by /podcast cmd...");
 
     if !g_client.is_authorized().await? {
-        bot.send_message(user_id, "System g_Client is NOT okay!")
+        bot.send_message(chat_id, "System g_Client is NOT okay!")
             .await?;
     } else {
-        bot.send_message(user_id, "System g_Client is okay!")
+        bot.send_message(chat_id, "System g_Client is okay!")
             .await?;
     }
 
