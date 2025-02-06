@@ -87,7 +87,7 @@ pub async fn handle_valid_request<T: LlmProcessing + QdrantClientInit + Send + S
     
     let rag_config = get_default_rag_config();
 
-    info!("TEMP log: collection names: {:?}", collection_names);
+    info!("TEMP log: Collections names for RAG system: {:?}", collection_names);
 
     let search_results = get_results_via_rag_system(
         clarified_request,

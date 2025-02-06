@@ -11,7 +11,7 @@ use tracing::warn;
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use core::models::blacksmith_web::blacksmith_web::{BlacksmithWebUserAction, BlacksmithWebServerResponse, BlacksmithWebTTSRequest, BlacksmithWebTTSResponse};
 use core::models::common::app_name::AppName;
-use crate::routes::blacksmith_web::default_message_handler::default_message_handler;
+use core::message_processing_flow::web::default_message_handler::default_message_handler;
 use core::models::blacksmith_web::blacksmith_web::ChatMessage;
 use core::local_db::local_db::fetch_chat_history_from_db;
 use tokio::time::{sleep, Duration};
@@ -19,7 +19,6 @@ use core::ai::common::voice_processing::simple_tts;
 use uuid::Uuid;
 use anyhow::Result;
 use base64::{engine::general_purpose::STANDARD, Engine};
-
 
 pub(crate) async fn handle_blacksmith_web_user_action(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,

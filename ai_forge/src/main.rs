@@ -2,7 +2,6 @@ use anyhow::Result;
 use async_openai::Client as LLM_Client;
 use config::{Config, File};
 use core::config::server_config::AppConfig;
-use core::local_db::local_db::{create_db_pool, create_table};
 use core::state::request_app::app_state::RequestAppState;
 use core::state::server::app_state::ServerAppState;
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
@@ -10,15 +9,12 @@ use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;
 use server::start_server;
-use std::{env, fs};
-use std::path::Path;
-use std::str::FromStr;
+use std::env;
 use std::sync::Arc;
-use sqlx::sqlite::SqliteConnectOptions;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
-use sqlx::SqlitePool;
-use core::local_db::local_db::create_blacksmith_lab_db_table;
+use core::local_db::local_db::setup_blacksmith_lab_db;
+use core::local_db::local_db::setup_request_app_db;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -42,23 +38,8 @@ async fn main() -> Result<()> {
 
     let llm_client = LLM_Client::new();
 
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-
-    if !Path::new("blacksmith_lab.db").exists() {
-        fs::File::create("blacksmith_lab.db")?;
-        info!("Database file blacksmith_labs.db created.");
-    }
-    
-    info!("Initializing Blacksmith Lab local_db pool...");
-    let blacksmith_lab_db_pool = SqlitePool::connect_with(
-        SqliteConnectOptions::from_str(&database_url)?
-            .create_if_missing(true)
-    ).await?;
-    info!("Blacksmith Lab local_db pool initialized successfully");
-    
-    info!("Creating Blacksmith Lab chat history table...");
-    create_blacksmith_lab_db_table(&blacksmith_lab_db_pool).await?;
-    info!("Blacksmith Lab chat history table created successfully");
+    let blacksmith_lab_db_pool = setup_blacksmith_lab_db().await?;
+    let _request_app_db_pool = setup_request_app_db().await?;
     
     let server_app_state = Arc::new(ServerAppState::new(config.clone()));
     let request_app_state = Arc::new(RequestAppState::new(
@@ -71,19 +52,6 @@ async fn main() -> Result<()> {
         qdrant_client.clone(),
         blacksmith_lab_db_pool.clone()
     ));
-
-    info!("Initializing local_db pool...");
-    let local_db_pool = create_db_pool().await?;
-    info!("Local_db pool initialized successfully");
-
-    {
-        let mut db_pool = request_app_state.local_db_pool.lock().await;
-        *db_pool = Some(local_db_pool);
-    }
-
-    info!("Trying to create local_db table...");
-    create_table(&request_app_state.local_db_pool).await?;
-    info!("Local_db table created successfully");
     
     info!("Starting server...");
     tokio::spawn(async move {
