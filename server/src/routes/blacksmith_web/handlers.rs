@@ -81,7 +81,9 @@ pub(crate) async fn handle_blacksmith_web_tts_request(
     Json(request): Json<BlacksmithWebTTSRequest>,
 ) -> Json<BlacksmithWebTTSResponse> {
     let user_id = request.user_id;
-    let action_text = request.text;
+    let request_text = request.text;
+    
+    // TODO: prepare action_text for TTS 
 
     let app_name = match AppName::from_str(&request.app_name) {
         Ok(app) => app,
@@ -96,11 +98,11 @@ pub(crate) async fn handle_blacksmith_web_tts_request(
     
     info!(
         "Got TTS request for text: {} from user: {}",
-        action_text,
+        request_text,
         user_id
     );
     
-    match simple_tts(&action_text, blacksmith_web_app_state.clone()).await {
+    match simple_tts(&request_text, blacksmith_web_app_state.clone()).await {
         Ok(audio_response) => {
             let temp_file_id = Uuid::new_v4().to_string();
             let audio_file_path = temp_dir.join(format!("{}.mp3", temp_file_id));
