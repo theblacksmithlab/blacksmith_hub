@@ -37,11 +37,6 @@ pub async fn start_server(
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(AllowHeaders::any())
         .allow_credentials(false);
-    
-
-    // async fn handle_options() -> impl IntoResponse {
-    //     StatusCode::OK
-    // }
 
     // Request App router
     let request_app_routes = Router::new()
