@@ -383,11 +383,9 @@ pub fn split_text_into_chunks(text: &str, max_chars: usize) -> Vec<String> {
     chunks
 }
 
-pub fn convert_to_wav(file_path: &str) -> Result<String, anyhow::Error> {
-    let mut path = std::path::PathBuf::from(file_path);
-    path.set_extension("wav");
-
-    let wav_path = path.to_str().unwrap();
+pub fn convert_to_wav(file_path: &Path) -> Result<PathBuf> {
+    let mut wav_path = file_path.to_path_buf();
+    wav_path.set_extension("wav");
 
     let output = Command::new("ffmpeg")
         .arg("-i")
@@ -398,7 +396,7 @@ pub fn convert_to_wav(file_path: &str) -> Result<String, anyhow::Error> {
         .output();
 
     match output {
-        Ok(output) if output.status.success() => Ok(wav_path.to_string()),
+        Ok(output) if output.status.success() => Ok(wav_path),
         Ok(output) => Err(anyhow::anyhow!(
             "FFmpeg conversion failed: {}",
             String::from_utf8_lossy(&output.stderr)
@@ -420,7 +418,7 @@ pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
     }
 }
 
-pub async fn transcribe_voice_message(file_path: &str) -> Result<Option<String>> {
+pub async fn transcribe_voice_message(file_path: &Path) -> Result<Option<String>> {
     check_whisper_installed()?;
 
     let wav_path = convert_to_wav(file_path)?;
@@ -428,7 +426,9 @@ pub async fn transcribe_voice_message(file_path: &str) -> Result<Option<String>>
     let transcription = speech_to_text(&wav_path).await?;
 
     remove_file(file_path).ok();
+    info!("Successfully removed file: {:?}", file_path);
     remove_file(&wav_path).ok();
+    info!("Successfully removed file: {:?}", &wav_path);
 
     if transcription.trim().is_empty() {
         info!("Voice message transcription is empty, looks like user sent message by mistake");

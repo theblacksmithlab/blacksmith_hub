@@ -29,7 +29,9 @@ pub async fn default_message_handler(
     let chat_id_as_str = chat_id_as_integer.to_string();
     let bot_data = bot.get_me().await?;
     let user_raw_request = msg.text().unwrap_or("Empty request").to_string();
-
+    let temp_dir = app_name.temp_dir();
+    info!("TEMP log: temp dir: {:?}", temp_dir);
+    
     if msg.chat.is_private() {
         info!(
         "Got message: {} from: @{}",
@@ -52,22 +54,23 @@ pub async fn default_message_handler(
             )
             .await;
 
-            let file_path =
-                match download_voice(&bot, &voice.file.id, &format!("tmp/{}.ogg", voice.file.id))
-                    .await
-                {
-                    Ok(path) => path,
-                    Err(err) => {
-                        error!("Failed to download voice message: {}", err);
-                        let bot_msg = get_message(AppsSystemMessages::Common(
-                            CommonMessages::ErrorDownloadingVoiceMessageFile,
-                        ))
+            let file_path = app_name.temp_dir().join(format!("{}.ogg", voice.file.id));
+
+            match download_voice(&bot, &voice.file.id, &file_path)
+                .await
+            {
+                Ok(path) => path,
+                Err(err) => {
+                    error!("Failed to download voice message: {}", err);
+                    let bot_msg = get_message(AppsSystemMessages::Common(
+                        CommonMessages::ErrorDownloadingVoiceMessageFile,
+                    ))
                         .await?;
-                        stop_bots_chat_action(typing_flag).await;
-                        bot.send_message(chat_id, bot_msg).await?;
-                        return Ok(());
-                    }
-                };
+                    stop_bots_chat_action(typing_flag).await;
+                    bot.send_message(chat_id, bot_msg).await?;
+                    return Ok(());
+                }
+            };
 
             match transcribe_voice_message(&file_path).await {
                 Ok(Some(user_voice_transcribed)) => {

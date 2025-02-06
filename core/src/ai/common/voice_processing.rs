@@ -3,9 +3,10 @@ use crate::utils::common::split_text_into_chunks;
 use async_openai::types::{CreateSpeechRequestArgs, CreateSpeechResponse, SpeechModel, Voice};
 use chrono::{Duration, Utc};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use anyhow::anyhow;
 use tracing::{error, info, warn};
 
 pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
@@ -118,11 +119,11 @@ pub async fn simple_tts<T: LlmProcessing + Send + Sync>(
     Ok(response)
 }
 
-pub async fn speech_to_text(file_path: &str) -> anyhow::Result<String> {
-    if !std::path::Path::new(file_path).exists() {
-        return Err(anyhow::anyhow!(
+pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
+    if !file_path.exists() {
+        return Err(anyhow!(
             "Voice message file not found: {}",
-            file_path
+            file_path.display()
         ));
     }
 
@@ -149,11 +150,11 @@ pub async fn speech_to_text(file_path: &str) -> anyhow::Result<String> {
         Ok(output) => {
             let stderr = String::from_utf8_lossy(&output.stderr);
             error!("Whisper CLI failed: {}", stderr);
-            Err(anyhow::anyhow!("Whisper CLI failed: {}", stderr))
+            Err(anyhow!("Whisper CLI failed: {}", stderr))
         }
         Err(err) => {
             error!("Failed to execute Whisper CLI: {}", err);
-            Err(anyhow::anyhow!("Failed to execute Whisper CLI: {}", err))
+            Err(anyhow!("Failed to execute Whisper CLI: {}", err))
         }
     }
 }
