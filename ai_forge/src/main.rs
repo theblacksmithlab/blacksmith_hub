@@ -10,14 +10,15 @@ use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;
 use server::start_server;
-use std::env;
+use std::{env, fs};
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use sqlx::sqlite::SqliteConnectOptions;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 use sqlx::SqlitePool;
-use core::local_db::local_db::create_blacksmith_labs_db_table;
+use core::local_db::local_db::create_blacksmith_lab_db_table;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -43,21 +44,21 @@ async fn main() -> Result<()> {
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
-    // if !Path::new("blacksmith_labs.db").exists() {
-    //     fs::File::create("blacksmith_labs.db")?;
-    //     info!("Database file blacksmith_labs.db created.");
-    // }
+    if !Path::new("blacksmith_lab.db").exists() {
+        fs::File::create("blacksmith_lab.db")?;
+        info!("Database file blacksmith_labs.db created.");
+    }
     
-    info!("Initializing Blacksmith Labs local_db pool...");
-    let blacksmith_db_pool = SqlitePool::connect_with(
+    info!("Initializing Blacksmith Lab local_db pool...");
+    let blacksmith_lab_db_pool = SqlitePool::connect_with(
         SqliteConnectOptions::from_str(&database_url)?
             .create_if_missing(true)
     ).await?;
-    info!("Blacksmith Labs local_db pool initialized successfully");
+    info!("Blacksmith Lab local_db pool initialized successfully");
     
-    info!("Creating Blacksmith Labs chat history table...");
-    create_blacksmith_labs_db_table(&blacksmith_db_pool).await?;
-    info!("Blacksmith Labs chat history table created successfully");
+    info!("Creating Blacksmith Lab chat history table...");
+    create_blacksmith_lab_db_table(&blacksmith_lab_db_pool).await?;
+    info!("Blacksmith Lab chat history table created successfully");
     
     let server_app_state = Arc::new(ServerAppState::new(config.clone()));
     let request_app_state = Arc::new(RequestAppState::new(
@@ -68,7 +69,7 @@ async fn main() -> Result<()> {
     let blacksmith_web_app_state = Arc::new(BlacksmithWebAppState::new(
         llm_client.clone(),
         qdrant_client.clone(),
-        blacksmith_db_pool.clone()
+        blacksmith_lab_db_pool.clone()
     ));
 
     info!("Initializing local_db pool...");

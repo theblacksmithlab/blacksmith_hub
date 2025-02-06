@@ -112,7 +112,7 @@ async fn start_bot_with_handlers(
         AppName::TheViperRoomBot => Bot::new(env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM")?),
         AppName::RequestAppBot => Bot::new(env::var("TELOXIDE_TOKEN_REQUEST_APP")?),
         AppName::TesterBot => Bot::new(env::var("TELOXIDE_TOKEN_TESTER")?),
-        AppName::W3ABot => Bot::new(env::var("TELOXIDE_TOKEN_W3A_BOT")?),
+        AppName::W3ABot => Bot::new(env::var("TELOXIDE_TOKEN_W3A")?),
         _ => return Err(anyhow::anyhow!("Unsupported app type of the app: {}", app_state.app_name)),
     };
 

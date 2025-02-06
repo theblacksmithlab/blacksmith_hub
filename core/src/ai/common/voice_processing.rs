@@ -37,6 +37,7 @@ pub async fn text_to_speech<T: LlmProcessing + Send + Sync>(
             .speed(1.3)
             .build()?;
 
+        info!("Starting OpenAI voice generation...");
         let response = llm_client.audio().speech(request).await?;
         let audio_file_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
         response.save(&audio_file_path).await?;

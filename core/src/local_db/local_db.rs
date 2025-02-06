@@ -27,7 +27,7 @@ pub(crate) async fn initialize_database() -> Result<(), Error> {
 
 pub async fn create_db_pool() -> Result<Pool<Sqlite>, Error> {
     initialize_database().await?;
-    let pool = sqlx::SqlitePool::connect("sqlite:user_profiles.db").await?;
+    let pool = SqlitePool::connect("sqlite:user_profiles.db").await?;
     Ok(pool)
 }
 
@@ -92,8 +92,6 @@ pub(crate) async fn save_user_profile(
             .execute(pool)
             .await?;
 
-        info!("TEMP: Fn: save_user_profile | User_profile saved to local_bd");
-
         Ok(())
     } else {
         Err(Error::Configuration("DB pool is not initialized".into()))
@@ -141,7 +139,7 @@ pub async fn get_user_profile_from_db(
     }
 }
 
-pub async fn create_blacksmith_labs_db_table(pool: &SqlitePool) -> Result<(), Error> {
+pub async fn create_blacksmith_lab_db_table(pool: &SqlitePool) -> Result<(), Error> {
     let query = "
         CREATE TABLE IF NOT EXISTS chat_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -216,7 +214,7 @@ pub async fn delete_old_messages(
     if count.0 > max_messages {
         let excess = count.0 - max_messages;
 
-        info!("Deleting {} oldest messages for user_id={} and app_name={}", excess, user_id, app_name);
+        info!("Deleting {} oldest messages for user_id={} AND app_name={}", excess, user_id, app_name);
 
         sqlx::query(
             "DELETE FROM chat_messages WHERE id IN (
