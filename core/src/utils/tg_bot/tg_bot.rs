@@ -1,7 +1,14 @@
+use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
+use crate::models::common::system_messages::{
+    AppsSystemMessages, ProbiotBotMessages, W3ABotMessages,
+};
 use crate::state::tg_bot::app_state::BotAppState;
+use crate::temp_cache::temp_cache_traits::TempCacheInit;
+use crate::utils::common::get_message;
 use anyhow::Result;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use teloxide::dispatching::{Dispatcher, UpdateHandler};
@@ -14,10 +21,6 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use crate::models::common::app_name::AppName;
-use crate::models::common::system_messages::{AppsSystemMessages, ProbiotBotMessages, W3ABotMessages};
-use crate::temp_cache::temp_cache_traits::TempCacheInit;
-use crate::utils::common::get_message;
 
 pub async fn check_username(bot: Bot, msg: Message) -> bool {
     if let Some(_username) = msg.chat.username() {
@@ -60,7 +63,9 @@ pub async fn add_user_message_to_cache<T: TempCacheInit + Send + Sync>(
     message: &str,
 ) {
     let mut cache = app_state.get_temp_cache().lock().await;
-    let chat_cache = cache.entry(user_id.to_string()).or_insert_with(|| DialogueCache::new(20));
+    let chat_cache = cache
+        .entry(user_id.to_string())
+        .or_insert_with(|| DialogueCache::new(20));
     chat_cache.add_user_message(message.to_string());
 }
 
@@ -70,7 +75,9 @@ pub async fn add_llm_response_to_cache<T: TempCacheInit + Send + Sync>(
     llm_response: &str,
 ) {
     let mut cache = app_state.get_temp_cache().lock().await;
-    let chat_cache = cache.entry(user_id.to_string()).or_insert_with(|| DialogueCache::new(20));
+    let chat_cache = cache
+        .entry(user_id.to_string())
+        .or_insert_with(|| DialogueCache::new(20));
     chat_cache.add_llm_response_to_cache(llm_response.to_string());
 }
 
@@ -85,35 +92,18 @@ pub async fn get_cache_as_string<T: TempCacheInit + Send + Sync>(
         .unwrap_or_else(|| "[]".to_string())
 }
 
-// pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &str) -> Result<String> {
-//     let base_path = env::current_dir()?.join(save_path);
-// 
-//     if let Some(parent_dir) = base_path.parent() {
-//         tokio::fs::create_dir_all(parent_dir).await?;
-//     }
-// 
-//     let mut destination = File::create(&base_path).await?;
-// 
-//     let file = bot.get_file(file_id).await?;
-//     bot.download_file(&file.path, &mut destination).await?;
-// 
-//     destination.flush().await?;
-// 
-//     Ok(base_path.to_str().unwrap().to_string())
-// }
-
 pub async fn download_voice(bot: &Bot, file_id: &str, save_path: &Path) -> Result<String> {
     if let Some(parent_dir) = save_path.parent() {
         tokio::fs::create_dir_all(parent_dir).await?;
     }
-    
+
     let mut destination = File::create(save_path).await?;
-    
+
     let file = bot.get_file(file_id).await?;
     bot.download_file(&file.path, &mut destination).await?;
-    
+
     destination.flush().await?;
-    
+
     Ok(save_path.to_string_lossy().into_owned())
 }
 
@@ -157,28 +147,16 @@ pub async fn append_footer_if_needed<T: TempCacheInit + Send + Sync>(
     if message_count > 0 && message_count % 3 == 0 {
         let footer_message = match app_name {
             AppName::ProbiotBot => {
-                get_message(
-                    AppsSystemMessages::Probiot(
+                get_message(AppsSystemMessages::Probiot(
                     ProbiotBotMessages::ResponseFooter,
-                    )
-                )
-                    .await?
-            },
+                ))
+                .await?
+            }
             AppName::W3ABot => {
-                get_message(
-                    AppsSystemMessages::W3ABot(
-                        W3ABotMessages::ResponseFooter,
-                    )
-                )
-                    .await?
-            },
+                get_message(AppsSystemMessages::W3ABot(W3ABotMessages::ResponseFooter)).await?
+            }
             AppName::W3AWeb => {
-                get_message(
-                    AppsSystemMessages::W3ABot(
-                        W3ABotMessages::ResponseFooter,
-                    )
-                )
-                    .await?
+                get_message(AppsSystemMessages::W3ABot(W3ABotMessages::ResponseFooter)).await?
             }
             _ => "".to_string(),
         };
@@ -225,4 +203,15 @@ pub async fn get_and_remove_tts_payload(
     } else {
         None
     }
+}
+
+pub fn reset_tmp_dir() -> std::io::Result<()> {
+    let base_tmp = PathBuf::from("tmp");
+
+    if base_tmp.exists() {
+        fs::remove_dir_all(&base_tmp)?;
+    }
+
+    fs::create_dir_all(&base_tmp)?;
+    Ok(())
 }

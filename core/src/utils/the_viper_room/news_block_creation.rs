@@ -1,7 +1,3 @@
-use crate::utils::the_viper_room::news_block_creation_utils::{
-    get_dialogs, mix_podcast_with_music, processing_dialogs, summarize_updates,
-    updates_file_creation,
-};
 use crate::ai::common::common::raw_llm_processing;
 use crate::ai::common::voice_processing::podcast_tts;
 use crate::models::common::app_name::AppName;
@@ -11,6 +7,10 @@ use crate::models::common::system_roles::TheViperRoomRoleType;
 use crate::state::llm_client_init_trait::LlmProcessing;
 use crate::utils::common::get_system_role_or_fallback;
 use crate::utils::common::{get_message, LlmModel};
+use crate::utils::the_viper_room::news_block_creation_utils::{
+    get_dialogs, mix_podcast_with_music, processing_dialogs, summarize_updates,
+    updates_file_creation,
+};
 use grammers_client::Client as g_Client;
 use std::fs;
 use std::fs::{create_dir_all, read_dir, remove_file, rename};

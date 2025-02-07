@@ -3,10 +3,10 @@ use crate::rag_system::retriever::QdrantRetriever;
 use crate::rag_system::types::{RAGConfig, RetrievedContext};
 use crate::rag_system::vectorizer::OpenAIVectorizer;
 use crate::rag_system::RAGSystem;
-use std::sync::Arc;
-use tracing::info;
 use crate::state::llm_client_init_trait::LlmProcessing;
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
+use std::sync::Arc;
+use tracing::info;
 
 pub async fn get_results_via_rag_system<T: LlmProcessing + QdrantClientInit + Send + Sync>(
     input_data: &str,

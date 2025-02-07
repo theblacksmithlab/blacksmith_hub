@@ -1,7 +1,7 @@
 use crate::ai::common::voice_processing::speech_to_text;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
-use crate::models::request_app::request_app::{AvatarRequest, AvatarResponse};
+use crate::models::common::avatar_request_response::{AvatarRequest, AvatarResponse};
 use crate::state::request_app::app_state::{RequestAppState, UserProfile, UserStates};
 use crate::state::the_viper_room::app_state::{AuthStages, TheViperRoomAppState, UserData};
 use crate::vector_db::vector_db::restore_request_from_qdrant;
@@ -243,6 +243,10 @@ pub async fn get_message(message_enum: AppsSystemMessages) -> Result<String> {
             Path::new("common_res/messages/w3a_bot").to_path_buf(),
             msg.as_str().to_string(),
         ),
+        AppsSystemMessages::GrootBot(msg) => (
+            Path::new("common_res/messages/groot_bot").to_path_buf(),
+            msg.as_str().to_string(),
+        ),
     };
 
     let path = base_path.join(format!("{}.txt", message_name));
@@ -320,10 +324,10 @@ pub async fn get_user_avatar(
 //     let mut chunks = Vec::new();
 //     let mut current_pos = 0;
 //     let text_len = text.len();
-// 
+//
 //     while current_pos < text_len {
 //         let max_end_pos = std::cmp::min(current_pos + max_chars, text_len);
-// 
+//
 //         let substring = &text[current_pos..max_end_pos];
 //         let end_pos =
 //             if let Some(period_pos) = substring.rfind(|c| c == '.' || c == '!' || c == '?') {
@@ -331,11 +335,11 @@ pub async fn get_user_avatar(
 //             } else {
 //                 max_end_pos
 //             };
-// 
+//
 //         chunks.push(text[current_pos..end_pos].to_string());
 //         current_pos = end_pos;
 //     }
-// 
+//
 //     chunks
 // }
 
@@ -346,36 +350,36 @@ pub fn split_text_into_chunks(text: &str, max_chars: usize) -> Vec<String> {
     let mut last_boundary = None;
     let search_range = 200;
 
-    for (i, c) in text.chars().enumerate() {
+    for c in text.chars() {
         current_chunk.push(c);
         char_count += 1;
-        
+
         if c == '.' || c == '!' || c == '?' {
             last_boundary = Some(char_count);
         }
-        
+
         if char_count >= max_chars {
             if let Some(boundary) = last_boundary {
                 if char_count - boundary <= search_range {
                     let valid_chunk: String = current_chunk.chars().take(boundary).collect();
                     chunks.push(valid_chunk);
-                    
+
                     current_chunk = current_chunk.chars().skip(boundary).collect();
                     char_count = current_chunk.chars().count();
                     last_boundary = None;
                     continue;
                 }
             }
-            
+
             let valid_chunk: String = current_chunk.chars().take(max_chars).collect();
             chunks.push(valid_chunk);
-            
+
             current_chunk = current_chunk.chars().skip(max_chars).collect();
             char_count = current_chunk.chars().count();
             last_boundary = None;
         }
     }
-    
+
     if !current_chunk.is_empty() {
         chunks.push(current_chunk);
     }
@@ -465,4 +469,3 @@ pub fn convert_markdown_to_telegram(markdown: &str) -> String {
         .replace(".", "\\.")
         .replace("!", "\\!")
 }
-

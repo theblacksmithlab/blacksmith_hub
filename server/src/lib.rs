@@ -1,5 +1,9 @@
 pub mod routes;
 
+use crate::routes::blacksmith_web::handlers::{
+    handle_blacksmith_web_chat_fetch, handle_blacksmith_web_tts_request,
+    handle_blacksmith_web_user_request,
+};
 use crate::routes::request_app::handlers::handle_user_action;
 use crate::routes::the_viper_room::handlers::handle_the_viper_room_user_request;
 use axum::http::Method;
@@ -7,6 +11,7 @@ use axum::response::IntoResponse;
 use axum::routing::{get, options, post};
 use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
+use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use core::state::request_app::app_state::RequestAppState;
 use core::state::server::app_state::ServerAppState;
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
@@ -15,8 +20,6 @@ use http::{HeaderValue, StatusCode};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{AllowHeaders, CorsLayer};
-use crate::routes::blacksmith_web::handlers::{handle_blacksmith_web_chat_fetch, handle_blacksmith_web_tts_request, handle_blacksmith_web_user_request};
-use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 
 pub async fn start_server(
     server_app_state: Arc<ServerAppState>,
@@ -56,8 +59,12 @@ pub async fn start_server(
             "/the_viper_room_user_request",
             post(handle_the_viper_room_user_request).options(|| async { StatusCode::OK }),
         )
+        .route(
+            "/the_viper_room_avatar_request", 
+            get(get_user_avatar).options(|| async { StatusCode::OK }),
+        )
         .with_state(the_viper_room_app_state);
-    
+
     // Blacksmith Web Router
     let blacksmith_web_router = Router::new()
         .route(
@@ -94,7 +101,7 @@ pub async fn start_server(
     )
     .parse()
     .expect("Invalid host or port configuration");
-    
+
     axum_server::bind_rustls(addr, tls_config)
         .serve(app.into_make_service())
         .await?;

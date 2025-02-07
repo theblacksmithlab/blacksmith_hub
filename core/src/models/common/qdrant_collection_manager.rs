@@ -22,12 +22,8 @@ impl AppsCollections {
             AppName::ProbiotBot => ProbiotCollections::iter()
                 .map(AppsCollections::Probiot)
                 .collect(),
-            AppName::W3ABot => W3ACollections::iter()
-                .map(AppsCollections::W3A)
-                .collect(),
-            AppName::W3AWeb => W3ACollections::iter()
-                .map(AppsCollections::W3A)
-                .collect(),
+            AppName::W3ABot => W3ACollections::iter().map(AppsCollections::W3A).collect(),
+            AppName::W3AWeb => W3ACollections::iter().map(AppsCollections::W3A).collect(),
             _ => vec![], // Return an empty vector if no collections are defined for the application
         }
     }

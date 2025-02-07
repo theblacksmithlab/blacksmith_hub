@@ -2,10 +2,10 @@ use anyhow::anyhow;
 use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
 use core::grammers::grammers_functionality::initialize_grammers_client;
 use core::state::tg_bot::app_state::BotAppState;
-use grammers_client::types::{attributes::Attribute, InputMessage};
-use grammers_client::Client as g_Client;
 use core::utils::the_viper_room::news_block_creation::news_block_creation;
 use core::utils::the_viper_room::news_block_creation_utils::generate_waveform;
+use grammers_client::types::{attributes::Attribute, InputMessage};
+use grammers_client::Client as g_Client;
 use std::fs::{read_to_string, remove_file};
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,14 +35,8 @@ pub(crate) async fn generate_podcast(
             .await?;
     }
 
-    let podcast = news_block_creation(
-        &g_client,
-        app_tg_account_id,
-        app_state,
-        nickname,
-        true,
-    )
-    .await?;
+    let podcast =
+        news_block_creation(&g_client, app_tg_account_id, app_state, nickname, true).await?;
 
     let uploaded_file = g_client.upload_file(&podcast).await?;
 
@@ -125,10 +119,10 @@ pub(crate) async fn schedule_podcast(
     let seconds = duration_until_podcast_time.num_seconds() % 60;
 
     let mut stop_rx = app_state.podcast_manager.stop_rx.clone();
-    
+
     tokio::spawn({
         let app_tg_account_id = Arc::clone(&app_tg_account_id);
-        
+
         async move {
             loop {
                 tokio::select! {

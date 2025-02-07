@@ -7,6 +7,26 @@ pub enum AppsSystemMessages {
     RequestAppBot(RequestAppBotMessages),
     Common(CommonMessages),
     W3ABot(W3ABotMessages),
+    GrootBot(GrootBotMessages),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GrootBotMessages {
+    StartMessage,
+    PrivateCmdUsedInPublicChat,
+    NoRightsForUseCmd,
+    StartCmdInPrivateChat,
+}
+
+impl GrootBotMessages {
+    pub fn as_str(&self) -> &str {
+        match self {
+            GrootBotMessages::StartMessage => "start_message",
+            GrootBotMessages::PrivateCmdUsedInPublicChat => "private_cmd_used_in_public_chat",
+            GrootBotMessages::NoRightsForUseCmd => "no_rights_for_use_cmd",
+            GrootBotMessages::StartCmdInPrivateChat => "start_cmd_in_private_chat",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -45,8 +65,6 @@ pub enum ProbiotBotMessages {
     StartMessage,
     PrivateChatInvitation,
     ResponseFooter,
-    // Todo: Get rid of CrapRequestResponse hard-coded message
-    CrapRequestResponse,
 }
 
 impl ProbiotBotMessages {
@@ -55,7 +73,6 @@ impl ProbiotBotMessages {
             ProbiotBotMessages::StartMessage => "start_message",
             ProbiotBotMessages::PrivateChatInvitation => "private_chat_invitation",
             ProbiotBotMessages::ResponseFooter => "response_footer",
-            ProbiotBotMessages::CrapRequestResponse => "response_for_crap_request",
         }
     }
 }

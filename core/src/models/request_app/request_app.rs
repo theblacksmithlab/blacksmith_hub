@@ -14,13 +14,3 @@ pub struct ServerResponse {
     pub action_buttons: Vec<String>,
     pub can_input: bool,
 }
-
-#[derive(Deserialize, Debug)]
-pub struct AvatarRequest {
-    pub user_id: i64,
-}
-
-#[derive(Serialize)]
-pub struct AvatarResponse {
-    pub avatar_url: Option<String>,
-}

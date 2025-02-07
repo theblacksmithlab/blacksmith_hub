@@ -13,7 +13,8 @@ pub enum AppName {
     TesterBot,
     W3ABot,
     W3AWeb,
-    BlacksmithWeb
+    BlacksmithWeb,
+    GrootBot,
 }
 
 impl AppName {
@@ -27,7 +28,8 @@ impl AppName {
             AppName::TesterBot => "tester_bot",
             AppName::W3ABot => "w3a_bot",
             AppName::W3AWeb => "w3a_web",
-            AppName::BlacksmithWeb => "blacksmith_web"
+            AppName::BlacksmithWeb => "blacksmith_web",
+            AppName::GrootBot => "groot_bot",
         }
     }
 }
@@ -46,6 +48,7 @@ impl FromStr for AppName {
             "w3a_bot" => Ok(AppName::W3ABot),
             "w3a_web" => Ok(AppName::W3AWeb),
             "blacksmith_web" => Ok(AppName::BlacksmithWeb),
+            "groot_bot" => Ok(AppName::GrootBot),
             _ => Err(()),
         }
     }

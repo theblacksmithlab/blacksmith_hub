@@ -4,14 +4,14 @@ use serde::{Deserialize, Serialize};
 pub struct BlacksmithWebUserRequest {
     pub user_id: String,
     pub text: String,
-    pub app_name: String
+    pub app_name: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct BlacksmithWebTTSRequest {
     pub user_id: String,
     pub text: String,
-    pub app_name: String
+    pub app_name: String,
 }
 
 #[derive(Serialize)]

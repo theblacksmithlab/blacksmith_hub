@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use crate::models::common::dialogue_cache::DialogueCache;
 use async_openai::config::OpenAIConfig;
 use async_openai::Client as LLM_Client;
 use qdrant_client::Qdrant;
 use sqlx::{Pool, Sqlite};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::models::common::dialogue_cache::DialogueCache;
 
 pub struct BlacksmithWebAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,

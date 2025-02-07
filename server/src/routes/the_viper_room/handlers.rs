@@ -1,7 +1,6 @@
 use crate::routes::the_viper_room::local_utils::{
     generate_user_system_nickname, get_user_system_nickname,
 };
-use core::utils::the_viper_room::news_block_creation::news_block_creation;
 use axum::extract::State;
 use axum::Json;
 use core::grammers::grammers_functionality::{initialize_grammers_client, session_file_creation};
@@ -14,6 +13,7 @@ use core::state::the_viper_room::app_state_operation::{
     reset_user_state, reset_user_state_with_message,
 };
 use core::utils::common::{update_the_viper_room_user_data, update_the_viper_room_user_state};
+use core::utils::the_viper_room::news_block_creation::news_block_creation;
 use std::env;
 use std::fs::{read, remove_file};
 use std::sync::Arc;

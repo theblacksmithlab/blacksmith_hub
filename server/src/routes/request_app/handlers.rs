@@ -115,7 +115,8 @@ pub(crate) async fn handle_user_action(
         } else if state.creating_profile {
             return handle_state_creating_profile_menu(app_state.clone(), user_id, action).await;
         } else if state.creating_profile_process {
-            return handle_state_creating_profile_process(app_state.clone(), user_id, &action).await;
+            return handle_state_creating_profile_process(app_state.clone(), user_id, &action)
+                .await;
         }
     }
 

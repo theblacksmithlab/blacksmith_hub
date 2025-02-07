@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use tracing::error;
 use crate::ai::common::common::raw_llm_processing_json;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::{AppsSystemRoles, ProbiotRoleType, W3ARoleType};
 use crate::state::llm_client_init_trait::LlmProcessing;
 use crate::utils::common::{get_system_role_or_fallback, LlmModel};
+use std::sync::Arc;
+use tracing::error;
 
 pub async fn check_request_for_crap_content<T: LlmProcessing + Send + Sync>(
     user_raw_request: &str,

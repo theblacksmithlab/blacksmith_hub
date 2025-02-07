@@ -1,11 +1,11 @@
-use chrono::Duration as ChronoDuration;
-use chrono::Utc;
 use crate::ai::common::common::raw_llm_processing;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::TheViperRoomRoleType;
 use crate::state::llm_client_init_trait::LlmProcessing;
 use crate::utils::common::get_system_role_or_fallback;
 use crate::utils::common::LlmModel;
+use chrono::Duration as ChronoDuration;
+use chrono::Utc;
 use grammers_client::types::Chat::{Channel, Group, User};
 use grammers_client::{types, Client as g_Client};
 use std::fs;
@@ -35,13 +35,13 @@ pub(crate) async fn get_dialogs(client: &g_Client) -> Result<Vec<types::Dialog>,
     while let Some(dialog) = dialogs.next().await? {
         match dialog.chat() {
             // deactivated by default
-            Group(group) => {
+            Group(_group) => {
                 // // In case there is a need to process updates from group chats
                 // groups.push(dialog.clone());
                 // info!("Group: {} (ID: {})", group.title(), group.id());
             }
             // deactivated by default
-            User(user) => {
+            User(_user) => {
                 // // In case there is a need to process updates from private chats
                 // private_chats.push(dialog.clone());
                 // info!("Private chat: {} (ID: {})", user.first_name(), user.id());
@@ -146,13 +146,9 @@ pub(crate) async fn updates_file_creation<T: LlmProcessing + Send + Sync>(
 
     for file_path in txt_files.clone() {
         let content = read_file_safe(&file_path)?;
-        let response = raw_llm_processing(
-            &system_role,
-            &content,
-            app_state.clone(),
-            LlmModel::Complex,
-        )
-        .await?;
+        let response =
+            raw_llm_processing(&system_role, &content, app_state.clone(), LlmModel::Complex)
+                .await?;
         writeln!(updates_file, "\n{}\n", response)?;
         info!("{} file processed successfully!", file_path.display());
     }
@@ -175,7 +171,7 @@ pub(crate) async fn summarize_updates<T: LlmProcessing + Send + Sync>(
     nickname: String,
 ) -> Result<String, anyhow::Error> {
     info!("Starting updates summarization...");
-    
+
     let system_role = get_system_role_or_fallback(
         &AppName::TheViperRoom,
         TheViperRoomRoleType::CreatingPodcast,
@@ -247,13 +243,8 @@ pub(crate) async fn get_latest_messages<T: LlmProcessing + Send + Sync>(
         if !message.text().is_empty() {
             let text = message.text();
 
-            let llm_response = raw_llm_processing(
-                &system_role,
-                text,
-                app_state.clone(),
-                LlmModel::Light,
-            )
-            .await?;
+            let llm_response =
+                raw_llm_processing(&system_role, text, app_state.clone(), LlmModel::Light).await?;
 
             if llm_response.trim() == "skip" {
                 continue;
