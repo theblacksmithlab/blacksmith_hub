@@ -4,6 +4,7 @@ members = [
     "server",
     "ai_forge",
     "app",
+    "tools",
 ]
 default-members = ["ai_forge"]
 
