@@ -461,11 +461,11 @@ pub async fn session_file_creation(
                     )
                     .await;
 
-                    // Local copy of user's session (TURNED OFF!!!)
-                    client
-                        .session()
-                        .save_to_file(&session_file_path)
-                        .expect("Failed to save session file");
+                    // // Local copy of user's session (TURNED OFF!!!)
+                    // client
+                    //     .session()
+                    //     .save_to_file(&session_file_path)
+                    //     .expect("Failed to save session file");
 
                     if !client
                         .is_authorized()
@@ -477,11 +477,11 @@ pub async fn session_file_creation(
                         info!("Client is ok!");
                     }
 
-                    // if let Err(e) = fs::remove_file(&session_file_path) {
-                    //     info!("Failed to remove session file: {}", e);
-                    // } else {
-                    //     info!("Successfully removed session file for user: {}", user_id);
-                    // }
+                    if let Err(e) = fs::remove_file(&session_file_path) {
+                        info!("Failed to remove session file: {}", e);
+                    } else {
+                        info!("Successfully removed session file for user: {}", user_id);
+                    }
 
                     return Json(TheViperRoomServerResponse {
                         message: format!(
