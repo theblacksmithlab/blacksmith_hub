@@ -1,5 +1,5 @@
 use std::process::Command;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs;
 use core::ai::common::voice_processing::speech_to_text;
 
@@ -116,20 +116,70 @@ async fn transcribe_wav_to_txt(input_wav: &Path, output_txt: &Path) -> Result<()
         return Err(format!("WAV file not found: {}", input_wav.display()));
     }
 
-    match speech_to_text(input_wav).await {
-        Ok(transcription) => {
-            if transcription.trim().is_empty() {
-                println!("Empty transcription for: {}", input_wav.display());
-                return Ok(());
-            }
-            
-            if let Err(e) = fs::write(output_txt, &transcription) {
-                return Err(format!("Failed to write transcription to {}: {}", output_txt.display(), e));
-            }
+    let chunk_dir = input_wav.with_file_name("chunks");
+    let chunks = split_audio(input_wav, &chunk_dir)?;
 
-            println!("Successfully transcribed: {} -> {}", input_wav.display(), output_txt.display());
-            Ok(())
+    let mut transcription_result = String::new();
+
+    for chunk in &chunks {
+        println!("Transcribing chunk: {}", chunk.display());
+
+        match speech_to_text(chunk).await {
+            Ok(transcription) => {
+                if !transcription.trim().is_empty() {
+                    transcription_result.push_str(&transcription);
+                    transcription_result.push('\n');
+                } else {
+                    println!("Empty transcription for chunk: {}", chunk.display());
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to transcribe {}: {}", chunk.display(), e);
+            }
         }
-        Err(e) => Err(format!("Failed to transcribe {}: {}", input_wav.display(), e)),
     }
+
+    if transcription_result.trim().is_empty() {
+        return Err("Final transcription is empty.".to_string());
+    }
+
+    if let Err(e) = fs::write(output_txt, &transcription_result) {
+        return Err(format!("Failed to write transcription to {}: {}", output_txt.display(), e));
+    }
+
+    println!("Successfully transcribed full audio: {} -> {}", input_wav.display(), output_txt.display());
+    Ok(())
+}
+
+fn split_audio(input_wav: &Path, output_dir: &Path) -> Result<Vec<PathBuf>, String> {
+    if !output_dir.exists() {
+        fs::create_dir_all(output_dir).map_err(|e| format!("Failed to create chunk directory: {}", e))?;
+    }
+
+    let chunk_pattern = output_dir.join("chunk_%03d.wav");
+
+    let status = Command::new("ffmpeg")
+        .args([
+            "-i", input_wav.to_str().unwrap(),
+            "-f", "segment",
+            "-segment_time", "30",
+            "-c", "copy",
+            chunk_pattern.to_str().unwrap(),
+        ])
+        .status()
+        .map_err(|e| format!("Failed to execute FFmpeg: {}", e))?;
+
+    if !status.success() {
+        return Err("FFmpeg failed to split audio".to_string());
+    }
+
+    let mut chunks = Vec::new();
+    for entry in fs::read_dir(output_dir).map_err(|e| format!("Failed to read chunk directory: {}", e))? {
+        let path = entry.map_err(|e| format!("Failed to read chunk entry: {}", e))?.path();
+        if path.extension().unwrap_or_default() == "wav" {
+            chunks.push(path);
+        }
+    }
+    chunks.sort();
+    Ok(chunks)
 }
