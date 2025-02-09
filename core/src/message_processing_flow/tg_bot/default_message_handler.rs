@@ -29,8 +29,6 @@ pub async fn default_message_handler(
     let chat_id_as_str = chat_id_as_integer.to_string();
     let bot_data = bot.get_me().await?;
     let user_raw_request = msg.text().unwrap_or("Empty request").to_string();
-    let temp_dir = app_name.temp_dir();
-    info!("TEMP log: temp dir: {:?}", temp_dir);
 
     if msg.chat.is_private() {
         info!(
