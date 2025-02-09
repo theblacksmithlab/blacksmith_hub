@@ -7,6 +7,52 @@ pub enum AppsSystemMessages {
     RequestAppBot(RequestAppBotMessages),
     Common(CommonMessages),
     W3ABot(W3ABotMessages),
+    GrootBot(GrootBotMessages),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GrootBotMessages {
+    StartMessage,
+    PrivateCmdUsedInPublicChat,
+    NoRightsForUseCmd,
+    StartCmdInPrivateChat,
+    About,
+    Ask,
+    AlertForViolatorChannels,
+    AlertForBlackListed,
+    DemoBotSystemMessage,
+    DefaultScamAlert,
+    AnonymousUserAlert,
+    ScamDomainAlert,
+    MediaRestrictionAlert,
+    LLMCheckAlert,
+    NoUsernameForChatAlert,
+    ManualMessage,
+    ResultsTempMessage,
+}
+
+impl GrootBotMessages {
+    pub fn as_str(&self) -> &str {
+        match self {
+            GrootBotMessages::StartMessage => "start_message",
+            GrootBotMessages::PrivateCmdUsedInPublicChat => "private_cmd_used_in_public_chat",
+            GrootBotMessages::NoRightsForUseCmd => "no_rights_for_use_cmd",
+            GrootBotMessages::StartCmdInPrivateChat => "start_cmd_in_private_chat",
+            GrootBotMessages::About => "about",
+            GrootBotMessages::Ask => "ask",
+            GrootBotMessages::AlertForViolatorChannels => "alert_for_violator_channels",
+            GrootBotMessages::AlertForBlackListed => "alert_for_black_listed",
+            GrootBotMessages::DemoBotSystemMessage => "demo_bot_system_message",
+            GrootBotMessages::DefaultScamAlert => "default_scam_alert",
+            GrootBotMessages::AnonymousUserAlert => "anonymous_user_alert",
+            GrootBotMessages::ScamDomainAlert => "scam_domain_alert",
+            GrootBotMessages::MediaRestrictionAlert => "media_restriction_alert",
+            GrootBotMessages::LLMCheckAlert => "llm_check_alert",
+            GrootBotMessages::NoUsernameForChatAlert => "no_username_for_chat_alert",
+            GrootBotMessages::ManualMessage => "manual_message",
+            GrootBotMessages::ResultsTempMessage => "results_temp_message",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -45,8 +91,6 @@ pub enum ProbiotBotMessages {
     StartMessage,
     PrivateChatInvitation,
     ResponseFooter,
-    // Todo: Get rid of CrapRequestResponse hard-coded message
-    CrapRequestResponse,
 }
 
 impl ProbiotBotMessages {
@@ -55,7 +99,6 @@ impl ProbiotBotMessages {
             ProbiotBotMessages::StartMessage => "start_message",
             ProbiotBotMessages::PrivateChatInvitation => "private_chat_invitation",
             ProbiotBotMessages::ResponseFooter => "response_footer",
-            ProbiotBotMessages::CrapRequestResponse => "response_for_crap_request",
         }
     }
 }

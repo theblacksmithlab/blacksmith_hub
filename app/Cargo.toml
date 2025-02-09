@@ -14,5 +14,9 @@ tracing.workspace = true
 qdrant-client.workspace = true
 chrono.workspace = true
 grammers-client.workspace = true
+serde_json.workspace = true
+unicode-segmentation.workspace = true
+emojis.workspace = true
+regex.workspace = true
 
 core = { path = "../core" }

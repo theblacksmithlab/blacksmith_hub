@@ -1,5 +1,4 @@
 use crate::message_processing_flow::message_processing_flow::process_user_raw_request;
-use crate::utils::tg_bot::tg_bot::{append_footer_if_needed, create_tts_button, save_tts_payload};
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::{CommonMessages, ProbiotBotMessages, W3ABotMessages};
@@ -8,6 +7,7 @@ use crate::utils::common::{convert_markdown_to_telegram, get_message, transcribe
 use crate::utils::tg_bot::tg_bot::{
     add_llm_response_to_cache, download_voice, start_bots_chat_action, stop_bots_chat_action,
 };
+use crate::utils::tg_bot::tg_bot::{append_footer_if_needed, create_tts_button, save_tts_payload};
 use std::sync::Arc;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Requester};
@@ -31,14 +31,14 @@ pub async fn default_message_handler(
     let user_raw_request = msg.text().unwrap_or("Empty request").to_string();
     let temp_dir = app_name.temp_dir();
     info!("TEMP log: temp dir: {:?}", temp_dir);
-    
+
     if msg.chat.is_private() {
         info!(
-        "Got message: {} from: @{}",
-        user_raw_request,
-        msg.chat.username().unwrap_or("Anonymous User")
-    );
-        
+            "Got message: {} from: @{}",
+            user_raw_request,
+            msg.chat.username().unwrap_or("Anonymous User")
+        );
+
         if let Some(voice) = msg.voice() {
             info!(
                 "Message received from @{} is voice message. Let's process it...",
@@ -56,16 +56,14 @@ pub async fn default_message_handler(
 
             let file_path = app_name.temp_dir().join(format!("{}.ogg", voice.file.id));
 
-            match download_voice(&bot, &voice.file.id, &file_path)
-                .await
-            {
+            match download_voice(&bot, &voice.file.id, &file_path).await {
                 Ok(path) => path,
                 Err(err) => {
                     error!("Failed to download voice message: {}", err);
                     let bot_msg = get_message(AppsSystemMessages::Common(
                         CommonMessages::ErrorDownloadingVoiceMessageFile,
                     ))
-                        .await?;
+                    .await?;
                     stop_bots_chat_action(typing_flag).await;
                     bot.send_message(chat_id, bot_msg).await?;
                     return Ok(());
@@ -183,17 +181,12 @@ pub async fn default_message_handler(
                     .await
                     .unwrap_or_else(|_| llm_response.clone());
 
-                    let converted_to_markdown_v2_full_response = convert_markdown_to_telegram(&full_response);
+                    let converted_to_markdown_v2_full_response =
+                        convert_markdown_to_telegram(&full_response);
 
                     let message_id = Uuid::new_v4().to_string();
 
-                    save_tts_payload(
-                        app_state.clone(),
-                        chat_id,
-                        &message_id,
-                        &llm_response,
-                    )
-                    .await;
+                    save_tts_payload(app_state.clone(), chat_id, &message_id, &llm_response).await;
 
                     stop_bots_chat_action(typing_flag).await;
 
@@ -243,10 +236,10 @@ pub async fn default_message_handler(
                 .unwrap_or(false))
         {
             info!(
-            "Got message from @{} in public chat. User invited for private messaging",
-            msg.chat.username().unwrap_or("Anonymous User")
+                "Got message from @{} in public chat. User invited for private messaging",
+                msg.chat.username().unwrap_or("Anonymous User")
             );
-            
+
             if let Some(message_enum) = match app_name {
                 AppName::ProbiotBot => Some(AppsSystemMessages::Probiot(
                     ProbiotBotMessages::PrivateChatInvitation,

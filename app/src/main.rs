@@ -1,4 +1,4 @@
-use core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;
+use crate::groot_bot::groot_bot_handlers::{groot_bot_command_handler, groot_bot_message_handler};
 use crate::probiot_bot::probiot_bot_handlers::{
     probiot_callback_query_handler, probiot_command_handler,
 };
@@ -14,18 +14,20 @@ use crate::the_viper_room_bot::the_viper_room_bot_handlers::{
 use crate::w3a_bot::w3a_bot_handlers::w3a_bot_command_handler;
 use anyhow::{anyhow, Result};
 use async_openai::Client as LLM_Client;
+use core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;
 use core::models::common::app_name::AppName;
+use core::models::tg_bot::groot_bot::groot_bot_commands::GrootBotCommands;
 use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
 use core::models::tg_bot::request_app_bot::request_app_bot_commands::RequestAppBotCommands;
 use core::models::tg_bot::tester_bot::tester_bot_commands::TesterBotCommands;
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
 use core::models::tg_bot::w3a_bot::w3a_bot_commands::W3ABotCommands;
 use core::state::tg_bot::app_state::BotAppState;
+use core::utils::tg_bot::tg_bot::reset_tmp_dir;
 use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;
-use std::{env, fs};
-use std::path::PathBuf;
+use std::env;
 use std::sync::Arc;
 use teloxide::dispatching::{HandlerExt, UpdateFilterExt, UpdateHandler};
 use teloxide::prelude::Update;
@@ -33,6 +35,7 @@ use teloxide::{dptree, Bot};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
+pub mod groot_bot;
 pub mod probiot_bot;
 pub mod request_app_bot;
 pub mod tester_bot;
@@ -56,6 +59,7 @@ async fn main() -> Result<()> {
         "request_app_bot" => AppName::RequestAppBot,
         "tester_bot" => AppName::TesterBot,
         "w3a_bot" => AppName::W3ABot,
+        "groot_bot" => AppName::GrootBot,
         "the_viper_room" | "request_app" | "w3a_web" | "blacksmith_web" => {
             info!(
                 "No Telegram bot system implementation for app: {}",
@@ -67,7 +71,7 @@ async fn main() -> Result<()> {
     };
 
     if let Err(e) = reset_tmp_dir() {
-        error!("Failed to clean tmp directory: {}", e);
+        error!("Failed to reset tmp directory: {}", e);
     }
     
     let qdrant_client = Arc::new(
@@ -78,11 +82,17 @@ async fn main() -> Result<()> {
 
     let llm_client = LLM_Client::new();
 
-    let app_state = Arc::new(BotAppState::new(
-        llm_client,
-        qdrant_client,
-        app_name.clone(),
-    ));
+    let app_state = if app_name == AppName::GrootBot {
+        Arc::new(
+            BotAppState::with_groot_bot_options(llm_client, qdrant_client, app_name.clone()).await,
+        )
+    } else {
+        Arc::new(BotAppState::new(
+            llm_client,
+            qdrant_client,
+            app_name.clone(),
+        ))
+    };
 
     let handlers = match get_handlers(&app_name) {
         Ok(handlers) => handlers,
@@ -93,11 +103,7 @@ async fn main() -> Result<()> {
     };
 
     if let Err(err) = start_bot_with_handlers(app_state, handlers).await {
-        error!(
-            "Failed to start bot for app {}: {}",
-            app_name.as_str(),
-            err
-        );
+        error!("Failed to start bot for app {}: {}", app_name.as_str(), err);
     }
 
     Ok(())
@@ -118,7 +124,13 @@ async fn start_bot_with_handlers(
         AppName::RequestAppBot => Bot::new(env::var("TELOXIDE_TOKEN_REQUEST_APP")?),
         AppName::TesterBot => Bot::new(env::var("TELOXIDE_TOKEN_TESTER")?),
         AppName::W3ABot => Bot::new(env::var("TELOXIDE_TOKEN_W3A")?),
-        _ => return Err(anyhow::anyhow!("Unsupported app type of the app: {}", app_state.app_name)),
+        AppName::GrootBot => Bot::new(env::var("TELOXIDE_TOKEN_GROOT")?),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Unsupported app type of the app: {}",
+                app_state.app_name
+            ))
+        }
     };
 
     info!(
@@ -178,20 +190,18 @@ fn get_handlers(
             Update::filter_message().endpoint(default_message_handler),
             None,
         )),
-        AppName::TheViperRoom | AppName::RequestApp | AppName::W3AWeb | AppName::BlacksmithWeb => Err(anyhow!(
-            "No Telegram bot implementation for app: {}",
-            app_name.as_str()
+        AppName::GrootBot => Ok((
+            Update::filter_message()
+                .filter_command::<GrootBotCommands>()
+                .endpoint(groot_bot_command_handler),
+            Update::filter_message().endpoint(groot_bot_message_handler),
+            None,
         )),
+        AppName::TheViperRoom | AppName::RequestApp | AppName::W3AWeb | AppName::BlacksmithWeb => {
+            Err(anyhow!(
+                "No Telegram bot implementation for app: {}",
+                app_name.as_str()
+            ))
+        }
     }
-}
-
-fn reset_tmp_dir() -> std::io::Result<()> {
-    let base_tmp = PathBuf::from("tmp");
-
-    if base_tmp.exists() {
-        fs::remove_dir_all(&base_tmp)?;
-    }
-
-    fs::create_dir_all(&base_tmp)?;
-    Ok(())
 }

@@ -1,15 +1,15 @@
-use std::{env, fs};
-use std::path::Path;
-use std::str::FromStr;
-use anyhow::Context;
+use crate::models::blacksmith_web::blacksmith_web::ChatMessage;
 use crate::state::request_app::app_state::{AdditionalInfo, RegistrationInfo, UserProfile};
+use anyhow::Context;
+use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{Error, Executor, SqlitePool};
 use sqlx::{FromRow, Pool, Sqlite};
-use sqlx::sqlite::SqliteConnectOptions;
+use std::path::Path;
+use std::str::FromStr;
+use std::{env, fs};
 use teloxide::prelude::ChatId;
 use tokio::sync::Mutex;
 use tracing::{info, warn};
-use crate::models::blacksmith_web::blacksmith_web::ChatMessage;
 
 pub async fn setup_blacksmith_lab_db() -> anyhow::Result<SqlitePool> {
     let blacksmith_lab_database_url = env::var("BLACKSMITH_LAB_DATABASE_URL")
@@ -18,16 +18,17 @@ pub async fn setup_blacksmith_lab_db() -> anyhow::Result<SqlitePool> {
     let db_path = "blacksmith_lab.db";
 
     if !Path::new(db_path).exists() {
-        fs::File::create(db_path)
-            .context("Error creating local db file for Blacksmith Lab")?;
+        fs::File::create(db_path).context("Error creating local db file for Blacksmith Lab")?;
         warn!("Blacksmith Lab local_db file {} created.", db_path);
     }
 
     let pool = SqlitePool::connect_with(
         SqliteConnectOptions::from_str(&blacksmith_lab_database_url)
             .context("Error: invalid DATABASE_URL format")?
-            .create_if_missing(true)
-    ).await.context("Error connecting to db pool")?;
+            .create_if_missing(true),
+    )
+    .await
+    .context("Error connecting to db pool")?;
 
     info!("Blacksmith Lab local_db pool initialized successfully");
 
@@ -47,16 +48,17 @@ pub async fn setup_request_app_db() -> anyhow::Result<SqlitePool> {
     let db_path = "request_app.db";
 
     if !Path::new(db_path).exists() {
-        fs::File::create(db_path)
-            .context("Error creating local db file for Request App")?;
+        fs::File::create(db_path).context("Error creating local db file for Request App")?;
         warn!("Request App local_db file {} created.", db_path);
     }
 
     let pool = SqlitePool::connect_with(
         SqliteConnectOptions::from_str(&request_app_database_url)
             .context("Error: invalid DATABASE_URL format")?
-            .create_if_missing(true)
-    ).await.context("Error connecting to db pool")?;
+            .create_if_missing(true),
+    )
+    .await
+    .context("Error connecting to db pool")?;
 
     info!("Request App local_db pool initialized successfully");
 
@@ -208,12 +210,12 @@ pub async fn fetch_chat_history_from_db(
 
     let messages = sqlx::query_as::<_, ChatMessage>(
         "SELECT id, user_id, sender, message, app_name FROM chat_messages
-         WHERE user_id = ? AND app_name = ? ORDER BY id ASC"
+         WHERE user_id = ? AND app_name = ? ORDER BY id ASC",
     )
-        .bind(user_id)
-        .bind(app_name)
-        .fetch_all(pool)
-        .await?;
+    .bind(user_id)
+    .bind(app_name)
+    .fetch_all(pool)
+    .await?;
 
     Ok(messages)
 }
@@ -227,17 +229,17 @@ pub async fn save_message_to_db(
 ) -> Result<(), Error> {
     sqlx::query(
         "INSERT INTO chat_messages (user_id, sender, message, app_name)
-         VALUES (?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?)",
     )
-        .bind(user_id)
-        .bind(sender)
-        .bind(message)
-        .bind(app_name)
-        .execute(pool)
-        .await?;
+    .bind(user_id)
+    .bind(sender)
+    .bind(message)
+    .bind(app_name)
+    .execute(pool)
+    .await?;
 
     delete_old_messages(pool, user_id, app_name, 100).await?;
-    
+
     Ok(())
 }
 
@@ -245,32 +247,34 @@ pub async fn delete_old_messages(
     pool: &SqlitePool,
     user_id: &str,
     app_name: &str,
-    max_messages: i64
+    max_messages: i64,
 ) -> Result<(), Error> {
-    let count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM chat_messages WHERE user_id = ? AND app_name = ?"
-    )
-        .bind(user_id)
-        .bind(app_name)
-        .fetch_one(pool)
-        .await?;
+    let count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM chat_messages WHERE user_id = ? AND app_name = ?")
+            .bind(user_id)
+            .bind(app_name)
+            .fetch_one(pool)
+            .await?;
 
     if count.0 > max_messages {
         let excess = count.0 - max_messages;
 
-        info!("Deleting {} oldest messages for user_id={} AND app_name={}", excess, user_id, app_name);
+        info!(
+            "Deleting {} oldest messages for user_id={} AND app_name={}",
+            excess, user_id, app_name
+        );
 
         sqlx::query(
             "DELETE FROM chat_messages WHERE id IN (
                 SELECT id FROM chat_messages WHERE user_id = ? AND app_name = ?
                 ORDER BY id ASC LIMIT ?
-            )"
+            )",
         )
-            .bind(user_id)
-            .bind(app_name)
-            .bind(excess)
-            .execute(pool)
-            .await?;
+        .bind(user_id)
+        .bind(app_name)
+        .bind(excess)
+        .execute(pool)
+        .await?;
     }
 
     Ok(())

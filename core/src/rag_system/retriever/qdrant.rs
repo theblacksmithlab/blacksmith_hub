@@ -1,12 +1,12 @@
 use crate::rag_system::types::{Document, DocumentMetadata, PointId};
 use crate::rag_system::Retriever;
+use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use anyhow::Result;
 use async_trait::async_trait;
 use qdrant_client::qdrant::{point_id, vectors_output, SearchParamsBuilder, SearchPointsBuilder};
 use qdrant_client::Qdrant;
 use std::sync::Arc;
 use tracing::error;
-use crate::state::qdrant_client_init_trait::QdrantClientInit;
 
 pub struct QdrantRetriever<T: QdrantClientInit> {
     app_state: Arc<T>,
@@ -15,7 +15,10 @@ pub struct QdrantRetriever<T: QdrantClientInit> {
 
 impl<T: QdrantClientInit> QdrantRetriever<T> {
     pub fn new(app_state: Arc<T>, collection_names: Vec<String>) -> Self {
-        Self { app_state, collection_names }
+        Self {
+            app_state,
+            collection_names,
+        }
     }
 
     pub fn get_qdrant_client(&self) -> Arc<Qdrant> {

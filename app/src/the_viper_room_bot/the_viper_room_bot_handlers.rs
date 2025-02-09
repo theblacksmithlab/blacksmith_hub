@@ -36,8 +36,9 @@ pub(crate) async fn the_viper_room_command_handler(
         .parse()
         .expect("LORD_ADMIN_ID must be a valid integer");
 
-    let app_tg_account_id = Arc::new(env::var("APP_TG_ACCOUNT_ID")
-        .expect("APP_TG_ACCOUNT_ID must be set in environment"));
+    let app_tg_account_id = Arc::new(
+        env::var("APP_TG_ACCOUNT_ID").expect("APP_TG_ACCOUNT_ID must be set in environment"),
+    );
 
     let session_path = format!(
         "common_res/the_viper_room/grammers_system_session/{}.session",

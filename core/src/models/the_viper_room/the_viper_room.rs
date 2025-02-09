@@ -43,13 +43,3 @@ pub enum AuthStage {
     SignedOut,
     MiniAppInitConfirmed,
 }
-
-#[derive(Deserialize, Debug)]
-pub struct AvatarRequest {
-    user_id: i64,
-}
-
-#[derive(Serialize)]
-pub struct AvatarResponse {
-    pub avatar_url: Option<String>,
-}
