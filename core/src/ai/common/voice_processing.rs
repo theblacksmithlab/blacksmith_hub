@@ -129,7 +129,7 @@ pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
 
     let output = Command::new("whisper-cli")
         .arg("-m")
-        .arg("/root/projects/whisper.cpp/models/ggml-base.bin")
+        .arg("/root/projects/whisper.cpp/models/ggml-medium.bin")
         .arg("-f")
         .arg(file_path)
         .arg("-l")
