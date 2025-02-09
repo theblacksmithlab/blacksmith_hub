@@ -135,8 +135,6 @@ pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
         .arg("-l")
         .arg("ru")
         .arg("--no-timestamps")
-        .arg("--best_of")
-        .arg("5")
         .output();
 
     match output {
