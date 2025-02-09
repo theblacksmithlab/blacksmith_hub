@@ -119,11 +119,14 @@ pub async fn session_file_creation(
     api_hash: String,
     nickname: String,
 ) -> Json<TheViperRoomServerResponse> {
-    let session_file_path = env::current_dir()
+    let session_dir = env::current_dir()
         .expect("Failed to get current directory")
         .join("common_res")
-        .join("the_viper_room_auth_tmp_data")
-        .join(format!("{}.session", user_id));
+        .join("the_viper_room_auth_tmp_data");
+
+    fs::create_dir_all(&session_dir).expect("Failed to create directory for sessions");
+
+    let session_file_path = session_dir.join(format!("{}.session", user_id));
 
     let is_awaiting_phone_number = {
         let user_states = the_viper_room_app_state.user_state.lock().await;
@@ -155,7 +158,7 @@ pub async fn session_file_creation(
             fs::create_dir_all(parent_dir).expect("Failed to create directory for sessions");
         }
 
-        let session = match Session::load_file_or_create(session_file_path) {
+        let session = match Session::load_file_or_create(&session_file_path) {
             Ok(session) => session,
             Err(e) => {
                 info!("Failed to create user's session: {}", e);
@@ -301,18 +304,6 @@ pub async fn session_file_creation(
 
             match client.sign_in(&token, &passcode).await {
                 Ok(_) => {
-                    // // Local copy of user's session (TURNED OFF!!!)
-                    // let session_file = env::current_dir()
-                    //     .expect("Failed to get current directory")
-                    //     .join("common_res")
-                    //     .join("the_viper_room_grammers_sessions")
-                    //     .join(format!("{}.session", user_id));
-                    //
-                    // client
-                    //     .session()
-                    //     .save_to_file(&session_file)
-                    //     .expect("Failed to save session file");
-
                     let session_data = client.session().save();
 
                     match save_user_id(user_id).await {
@@ -471,15 +462,9 @@ pub async fn session_file_creation(
                     .await;
 
                     // Local copy of user's session (TURNED OFF!!!)
-                    let session_file = env::current_dir()
-                        .expect("Failed to get current directory")
-                        .join("common_res")
-                        .join("the_viper_room_grammers_sessions")
-                        .join(format!("{}.session", user_id));
-                    
                     client
                         .session()
-                        .save_to_file(&session_file)
+                        .save_to_file(&session_file_path)
                         .expect("Failed to save session file");
 
                     if !client
