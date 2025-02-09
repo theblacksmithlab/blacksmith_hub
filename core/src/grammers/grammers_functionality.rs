@@ -125,6 +125,11 @@ pub async fn session_file_creation(
         .join("the_viper_room_auth_tmp_data")
         .join(format!("{}.session", user_id));
 
+    if !session_file_path.exists() {
+        fs::create_dir_all(&session_file_path)
+            .expect("Failed to create session directory");
+    }
+
     let is_awaiting_phone_number = {
         let user_states = the_viper_room_app_state.user_state.lock().await;
         user_states
@@ -471,15 +476,9 @@ pub async fn session_file_creation(
                     .await;
 
                     // Local copy of user's session (TURNED OFF!!!)
-                    let session_file = env::current_dir()
-                        .expect("Failed to get current directory")
-                        .join("common_res")
-                        .join("the_viper_room_grammers_sessions")
-                        .join(format!("{}.session", user_id));
-                    
                     client
                         .session()
-                        .save_to_file(&session_file)
+                        .save_to_file(&session_file_path)
                         .expect("Failed to save session file");
 
                     if !client
@@ -492,11 +491,11 @@ pub async fn session_file_creation(
                         info!("Client is ok!");
                     }
 
-                    if let Err(e) = fs::remove_file(&session_file_path) {
-                        info!("Failed to remove session file: {}", e);
-                    } else {
-                        info!("Successfully removed session file for user: {}", user_id);
-                    }
+                    // if let Err(e) = fs::remove_file(&session_file_path) {
+                    //     info!("Failed to remove session file: {}", e);
+                    // } else {
+                    //     info!("Successfully removed session file for user: {}", user_id);
+                    // }
 
                     return Json(TheViperRoomServerResponse {
                         message: format!(
