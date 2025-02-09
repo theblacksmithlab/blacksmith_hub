@@ -53,7 +53,6 @@ pub fn convert_video_to_audio(input_video: &Path, output_audio: &Path) -> Result
 pub fn ensure_directories() -> Result<(), String> {
     let input_path = Path::new("./tmp/input_videos");
     let output_path = Path::new("./tmp/output_audio");
-    let output_texts_dir = Path::new("./tmp/output_text");
 
     if !input_path.exists() {
         fs::create_dir_all(input_path).map_err(|e| format!("Failed to create input directory: {}", e))?;
@@ -61,8 +60,6 @@ pub fn ensure_directories() -> Result<(), String> {
     if !output_path.exists() {
         fs::create_dir_all(output_path).map_err(|e| format!("Failed to create output directory: {}", e))?;
     }
-    if !output_texts_dir.exists() {
-        fs::create_dir_all(output_texts_dir).map_err(|e| format!("Failed to create output directory: {}", e))?;
-    }
+    
     Ok(())
 }
