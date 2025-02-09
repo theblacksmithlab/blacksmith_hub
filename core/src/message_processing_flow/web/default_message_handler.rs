@@ -14,9 +14,8 @@ pub async fn default_message_handler(
     user_id: &str,
     app_name: AppName,
 ) -> String {
-    info!("Got message: '{}' from user: {}", action_text, user_id);
     info!(
-        "Message received from user: {} is text message. Let's process it...",
+        "Message received from user: {} is a text message. Let's process it...",
         user_id
     );
 
@@ -60,7 +59,7 @@ pub async fn default_message_handler(
 
             add_llm_response_to_cache(app_state.clone(), user_id, &full_response).await;
 
-            info!("Successfully processed action text from: {}", user_id);
+            info!("Successfully processed text message from user: {}", user_id);
 
             htmled_full_response
         }

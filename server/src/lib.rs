@@ -60,7 +60,7 @@ pub async fn start_server(
             post(handle_the_viper_room_user_request).options(|| async { StatusCode::OK }),
         )
         .route(
-            "/the_viper_room_avatar_request", 
+            "/the_viper_room_avatar_request",
             get(get_user_avatar).options(|| async { StatusCode::OK }),
         )
         .with_state(the_viper_room_app_state);

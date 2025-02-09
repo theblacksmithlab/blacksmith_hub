@@ -1,12 +1,14 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use grammers_client::Config as g_Config;
 use grammers_client::{Client as g_Client, SignInError};
 
+use crate::models::common::app_name::AppName;
 use crate::models::the_viper_room::the_viper_room::AuthStage::AuthError;
 use crate::models::the_viper_room::the_viper_room::{AuthStage, TheViperRoomServerResponse};
 use crate::state::the_viper_room::app_state::TheViperRoomAppState;
 use crate::state::the_viper_room::app_state_operation::reset_user_state_with_message;
 use crate::utils::common::update_the_viper_room_user_state;
+use crate::utils::tg_bot::groot_bot::build_resource_file_path;
 use axum::Json;
 use grammers_session::Session;
 use grammers_tl_types as tl;
@@ -468,17 +470,17 @@ pub async fn session_file_creation(
                     )
                     .await;
 
-                    // // Local copy of user's session (TURNED OFF!!!)
-                    // let session_file = env::current_dir()
-                    //     .expect("Failed to get current directory")
-                    //     .join("common_res")
-                    //     .join("the_viper_room_grammers_sessions")
-                    //     .join(format!("{}.session", user_id));
-                    //
-                    // client
-                    //     .session()
-                    //     .save_to_file(&session_file)
-                    //     .expect("Failed to save session file");
+                    // Local copy of user's session (TURNED OFF!!!)
+                    let session_file = env::current_dir()
+                        .expect("Failed to get current directory")
+                        .join("common_res")
+                        .join("the_viper_room_grammers_sessions")
+                        .join(format!("{}.session", user_id));
+                    
+                    client
+                        .session()
+                        .save_to_file(&session_file)
+                        .expect("Failed to save session file");
 
                     if !client
                         .is_authorized()
@@ -560,4 +562,21 @@ pub(crate) async fn save_user_id(user_id: u64) -> Result<()> {
         .expect("Failed to write user_id to file");
 
     Ok(())
+}
+
+pub fn load_grammers_session_data_from_file(
+    app_name: &AppName,
+    session_file_name: &str,
+) -> Result<Vec<u8>> {
+    let session_path = build_resource_file_path(app_name, session_file_name);
+
+    if !session_path.exists() {
+        return Err(anyhow::anyhow!(
+            "Session file not found: {}. Ensure the session file exists.",
+            session_path.display()
+        ));
+    }
+
+    fs::read(&session_path)
+        .with_context(|| format!("Failed to read session file: {}", session_path.display()))
 }

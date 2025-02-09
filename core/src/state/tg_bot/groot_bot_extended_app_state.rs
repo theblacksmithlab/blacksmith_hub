@@ -1,8 +1,8 @@
+use crate::models::tg_bot::groot_bot::groot_bot::ResourcesDialogState;
+use crate::state::tg_bot::app_state::BotAppState;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::models::tg_bot::groot_bot::groot_bot::ResourcesDialogState;
-use crate::state::tg_bot::app_state::BotAppState;
 
 pub struct GrootBotAppState {
     pub base_bot_app_state: Arc<BotAppState>,

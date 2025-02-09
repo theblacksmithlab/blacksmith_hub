@@ -4,6 +4,7 @@ pub enum AppsSystemRoles {
     W3A(W3ARoleType),
     RequestApp(RequestAppSystemRoleType),
     TheViperRoom(TheViperRoomRoleType),
+    Groot(GrootRoleType),
 }
 
 impl AppsSystemRoles {
@@ -13,11 +14,31 @@ impl AppsSystemRoles {
             AppsSystemRoles::W3A(role) => role.as_str(),
             AppsSystemRoles::RequestApp(role) => role.as_str(),
             AppsSystemRoles::TheViperRoom(role) => role.as_str(),
+            AppsSystemRoles::Groot(role) => role.as_str(),
         }
     }
 }
 
 impl AsRef<str> for AppsSystemRoles {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GrootRoleType {
+    MessageCheck,
+}
+
+impl GrootRoleType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            GrootRoleType::MessageCheck => "message_check",
+        }
+    }
+}
+
+impl AsRef<str> for GrootRoleType {
     fn as_ref(&self) -> &str {
         self.as_str()
     }

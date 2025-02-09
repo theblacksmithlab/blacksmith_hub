@@ -16,6 +16,19 @@ pub enum GrootBotMessages {
     PrivateCmdUsedInPublicChat,
     NoRightsForUseCmd,
     StartCmdInPrivateChat,
+    About,
+    Ask,
+    AlertForViolatorChannels,
+    AlertForBlackListed,
+    DemoBotSystemMessage,
+    DefaultScamAlert,
+    AnonymousUserAlert,
+    ScamDomainAlert,
+    MediaRestrictionAlert,
+    LLMCheckAlert,
+    NoUsernameForChatAlert,
+    ManualMessage,
+    ResultsTempMessage,
 }
 
 impl GrootBotMessages {
@@ -25,6 +38,19 @@ impl GrootBotMessages {
             GrootBotMessages::PrivateCmdUsedInPublicChat => "private_cmd_used_in_public_chat",
             GrootBotMessages::NoRightsForUseCmd => "no_rights_for_use_cmd",
             GrootBotMessages::StartCmdInPrivateChat => "start_cmd_in_private_chat",
+            GrootBotMessages::About => "about",
+            GrootBotMessages::Ask => "ask",
+            GrootBotMessages::AlertForViolatorChannels => "alert_for_violator_channels",
+            GrootBotMessages::AlertForBlackListed => "alert_for_black_listed",
+            GrootBotMessages::DemoBotSystemMessage => "demo_bot_system_message",
+            GrootBotMessages::DefaultScamAlert => "default_scam_alert",
+            GrootBotMessages::AnonymousUserAlert => "anonymous_user_alert",
+            GrootBotMessages::ScamDomainAlert => "scam_domain_alert",
+            GrootBotMessages::MediaRestrictionAlert => "media_restriction_alert",
+            GrootBotMessages::LLMCheckAlert => "llm_check_alert",
+            GrootBotMessages::NoUsernameForChatAlert => "no_username_for_chat_alert",
+            GrootBotMessages::ManualMessage => "manual_message",
+            GrootBotMessages::ResultsTempMessage => "results_temp_message",
         }
     }
 }

@@ -82,11 +82,17 @@ async fn main() -> Result<()> {
 
     let llm_client = LLM_Client::new();
 
-    let app_state = Arc::new(BotAppState::new(
-        llm_client,
-        qdrant_client,
-        app_name.clone(),
-    ));
+    let app_state = if app_name == AppName::GrootBot {
+        Arc::new(
+            BotAppState::with_groot_bot_options(llm_client, qdrant_client, app_name.clone()).await,
+        )
+    } else {
+        Arc::new(BotAppState::new(
+            llm_client,
+            qdrant_client,
+            app_name.clone(),
+        ))
+    };
 
     let handlers = match get_handlers(&app_name) {
         Ok(handlers) => handlers,
@@ -97,11 +103,7 @@ async fn main() -> Result<()> {
     };
 
     if let Err(err) = start_bot_with_handlers(app_state, handlers).await {
-        error!(
-            "Failed to start bot for app {}: {}",
-            app_name.as_str(),
-            err
-        );
+        error!("Failed to start bot for app {}: {}", app_name.as_str(), err);
     }
 
     Ok(())

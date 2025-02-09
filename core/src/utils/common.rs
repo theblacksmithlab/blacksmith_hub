@@ -1,7 +1,7 @@
 use crate::ai::common::voice_processing::speech_to_text;
 use crate::models::common::app_name::AppName;
-use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::avatar_request_response::{AvatarRequest, AvatarResponse};
+use crate::models::common::system_messages::AppsSystemMessages;
 use crate::state::request_app::app_state::{RequestAppState, UserProfile, UserStates};
 use crate::state::the_viper_room::app_state::{AuthStages, TheViperRoomAppState, UserData};
 use crate::vector_db::vector_db::restore_request_from_qdrant;
