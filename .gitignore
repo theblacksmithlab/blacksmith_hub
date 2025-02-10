@@ -24,3 +24,11 @@ common_res/the_viper_room/background_music.mp3
 DEV_NOTE.md
 *.log
 tools/tmp
+
+#Groot res
+common_res/groot_bot/black_listed_users.json
+common_res/groot_bot/chats_list.json
+common_res/groot_bot/message_counts.json
+common_res/groot_bot/penalty_points.json
+common_res/groot_bot/restricted_words.json
+common_res/groot_bot/white_listed_users.json
