@@ -246,11 +246,11 @@ pub async fn groot_bot_command_handler(
                     ),
                     (
                         build_resource_file_path(app_name, "chats_list.json"),
-                        "chat_ids_list.json",
+                        "chats_list.json",
                     ),
                     (
                         build_resource_file_path(app_name, "penalty_points.json"),
-                        "penalty_ids_list.json",
+                        "penalty_points.json",
                     )
                 ];
 
