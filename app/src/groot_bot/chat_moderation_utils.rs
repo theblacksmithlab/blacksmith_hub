@@ -28,7 +28,6 @@ pub async fn check_sender(
     app_name: &AppName,
     username: &str,
 ) -> Result<Option<()>> {
-    info!("TEMP log: Entering sender checking fn");
     if let Some(sender_chat) = &msg.sender_chat {
         let sender_chat_id = sender_chat.id.0;
         if white_listed_users.contains(&sender_chat_id) {
@@ -119,8 +118,7 @@ pub async fn check_sender(
     } else {
         warn!("Received a message with NO sender_chat id and NO user id!");
     }
-
-    info!("TEMP log: check_sender passed");
+    
     Ok(None)
 }
 
@@ -133,7 +131,6 @@ pub async fn via_bot_message_check(
     username: &str,
     user_id: u64,
 ) -> Result<Option<()>> {
-    info!("TEMP log: Entering via bot_message_check_fn");
     if msg.via_bot.is_some() {
         if is_paid_chat {
             let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
@@ -163,7 +160,7 @@ pub async fn via_bot_message_check(
             return Ok(Some(()));
         }
     }
-    info!("TEMP log: Via bot check passed");
+    
     Ok(None)
 }
 
@@ -176,7 +173,6 @@ pub async fn scam_stories_check(
     username: &str,
     user_id: u64,
 ) -> Result<Option<()>> {
-    info!("TEMP log: Entering scam_stories_check_fn");
     if let MessageKind::Common(common) = &msg.kind {
         if let MediaKind::Story(_) = common.media_kind {
             if is_paid_chat {
@@ -208,7 +204,7 @@ pub async fn scam_stories_check(
             }
         }
     }
-    info!("TEMP log: Scam stories check passed");
+    
     Ok(None)
 }
 
@@ -287,7 +283,6 @@ pub async fn scam_emojis_check(
     username: &str,
     user_id: u64,
 ) -> Result<Option<()>> {
-    info!("TEMP log: Entering scam emojis check fn");
     let emoji_count = count_emojis(message_to_check);
 
     if emoji_count > 5 {
@@ -316,7 +311,7 @@ pub async fn scam_emojis_check(
             return Ok(Some(()));
         }
     }
-    info!("TEMP log: Scam emojis check passed");
+    
     Ok(None)
 }
 
@@ -330,7 +325,6 @@ pub async fn restricted_words_check(
     username: &str,
     user_id: u64,
 ) -> Result<Option<()>> {
-    info!("TEMP log: Entering restricted words check fn");
     if parsing_restricted_words(app_name, message_to_check) {
         if is_paid_chat {
             let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
@@ -359,7 +353,7 @@ pub async fn restricted_words_check(
             return Ok(Some(()));
         }
     }
-    info!("TEMP log: Restricted words check passed");
+    
     Ok(None)
 }
 
@@ -373,7 +367,6 @@ pub async fn message_with_web_url_check(
     username: &str,
     user_id: u64,
 ) -> Result<Option<()>> {
-    info!("TEMP log: Entering web url link check fn");
     let url_pattern = Regex::new(r"(?i)\b((?:https?://|www\.)?[\w.-]+\.\w{2,})(?:\S+)?")?;
 
     if url_pattern.is_match(&message_to_check) {
@@ -422,7 +415,7 @@ pub async fn message_with_web_url_check(
             }
         }
     }
-    info!("TEMP log: Web url link check passed");
+    
     Ok(None)
 }
 
@@ -435,7 +428,6 @@ pub async fn message_caption_check(
     username: &str,
     user_id: u64,
 ) -> Result<Option<()>> {
-    info!("TEMP log: Entering caption check fn");
     if let Some(caption_entities) = msg.caption_entities() {
         for caption in caption_entities {
             match &caption.kind {
@@ -472,7 +464,7 @@ pub async fn message_caption_check(
             }
         }
     }
-    info!("TEMP log: Caption check passed");
+    
     Ok(None)
 }
 
@@ -485,8 +477,6 @@ pub async fn message_entities_check(
     username: &str,
     user_id: u64,
 ) -> Result<Option<()>> {
-    info!("TEMP log: Entering entities check fn");
-
     if let Some(entities) = msg.entities() {
         for entity in entities {
             match &entity.kind {
@@ -523,7 +513,7 @@ pub async fn message_entities_check(
             }
         }
     }
-    info!("TEMP log: Entities check passed");
+    
     Ok(None)
 }
 
@@ -536,7 +526,6 @@ pub async fn media_restriction_check(
     user_id: u64,
     app_name: &AppName,
 ) -> Result<Option<()>> {
-    info!("TEMP log: Entering media restriction check fn");
     if msg.photo().is_some() || msg.video().is_some() {
         if is_paid_chat {
             let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
@@ -566,7 +555,7 @@ pub async fn media_restriction_check(
             return Ok(Some(()));
         }
     }
-    info!("TEMP log: Media restriction check passed");
+    
     Ok(None)
 }
 
@@ -581,7 +570,6 @@ pub async fn ai_check(
     user_id: u64,
     app_state: Arc<BotAppState>,
 ) -> Result<Option<()>> {
-    info!("TEMP log: Entering ai-check fn");
     let system_role =
         get_system_role_or_fallback(&AppName::GrootBot, GrootRoleType::MessageCheck, None);
 
@@ -640,7 +628,9 @@ pub async fn ai_check(
             return Ok(Some(()));
         }
     }
-    info!("TEMP log: Ai check passed");
+    
+    info!("[Scam detection ai-system] Result for message {} from user: {} with id: {} is: {}", message_to_check, username, user_id, is_scam);
+    
     Ok(None)
 }
 
