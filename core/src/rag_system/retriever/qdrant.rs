@@ -1,4 +1,4 @@
-use crate::rag_system::types::{Document, DocumentMetadata, PointId};
+use crate::rag_system::types::{Document, PointId};
 use crate::rag_system::Retriever;
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use anyhow::Result;
@@ -67,15 +67,8 @@ impl<T: QdrantClientInit + Send + Sync> Retriever for QdrantRetriever<T> {
                             .map(String::from)
                             .unwrap_or_else(|| String::new());
 
-                        let source = point
-                            .payload
-                            .get("source")
-                            .and_then(|v| v.as_str())
-                            .map(String::from)
-                            .unwrap_or_else(|| collection_name.clone());
-
-                        let timestamp = point.payload.get("timestamp").and_then(|v| v.as_integer());
-
+                        let score = point.score;
+                        
                         let vector = match &point.vectors {
                             Some(vectors_output) => match &vectors_output.vectors_options {
                                 Some(vectors_output::VectorsOptions::Vector(single_vector)) => {
@@ -97,8 +90,7 @@ impl<T: QdrantClientInit + Send + Sync> Retriever for QdrantRetriever<T> {
                         Document {
                             point_id,
                             content,
-                            score: Some(point.score),
-                            metadata: Some(DocumentMetadata { source, timestamp }),
+                            score,
                             vector,
                         }
                     });

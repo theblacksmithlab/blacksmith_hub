@@ -8,15 +8,8 @@ pub enum PointId {
 pub struct Document {
     pub point_id: PointId,
     pub content: String,
-    pub score: Option<f32>,
-    pub metadata: Option<DocumentMetadata>,
+    pub score: f32,
     pub vector: Option<Vec<f32>>,
-}
-
-#[derive(Clone, Debug)]
-pub struct DocumentMetadata {
-    pub source: String,
-    pub timestamp: Option<i64>,
 }
 
 pub enum RAGConfig {

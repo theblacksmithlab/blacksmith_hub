@@ -58,21 +58,22 @@ where
     }
 
     pub async fn process(&self, query: &str) -> Result<RetrievedContext> {
+        let vector = self.vectorizer.vectorize(query).await?;
+        
         match &self.config {
             RAGConfig::Default {
                 max_documents,
                 similarity_threshold,
             } => {
-                let vector = self.vectorizer.vectorize(query).await?;
                 let base_results = self
                     .retriever
                     .search(vector.clone(), *max_documents, *similarity_threshold)
                     .await?;
                 let context = self.context_builder.build_context(base_results.clone())?;
-                return Ok(RetrievedContext {
+                Ok(RetrievedContext {
                     context,
                     documents: base_results,
-                });
+                })
             }
             RAGConfig::Advanced {
                 base_max_documents,
@@ -80,8 +81,6 @@ where
                 related_max_documents,
                 related_similarity_threshold,
             } => {
-                info!("TEMP LOG: Advanced RAG system started");
-                let vector = self.vectorizer.vectorize(query).await?;
                 let base_results = self
                     .retriever
                     .search(
@@ -132,21 +131,21 @@ where
                     }
                 }
 
-                all_results.sort_by(|a, b| {
-                    b.score
-                        .partial_cmp(&a.score)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                });
+                // all_results.sort_by(|a, b| {
+                //     b.score
+                //         .partial_cmp(&a.score)
+                //         .unwrap_or(std::cmp::Ordering::Equal)
+                // });
                 info!(
                     "TEMP LOG: Documents quantity in the end of the search: {}",
                     all_results.len()
                 );
 
                 let context = self.context_builder.build_context(all_results.clone())?;
-                return Ok(RetrievedContext {
+                Ok(RetrievedContext {
                     context,
                     documents: all_results,
-                });
+                })
             }
         }
     }
@@ -164,7 +163,7 @@ pub fn get_advanced_rag_config() -> RAGConfig {
     RAGConfig::Advanced {
         base_max_documents: 5,
         base_similarity_threshold: 0.4,
-        related_max_documents: 5,
+        related_max_documents: 4,
         related_similarity_threshold: 0.4,
     }
 }
