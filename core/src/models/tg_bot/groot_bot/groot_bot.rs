@@ -2,7 +2,9 @@ use crate::grammers::grammers_functionality::{
     initialize_grammers_client, load_grammers_session_data_from_file,
 };
 use crate::models::common::app_name::AppName;
-use crate::utils::tg_bot::groot_bot::{add_chat_to_file, build_resource_file_path, load_chats_objects_from_file};
+use crate::utils::tg_bot::groot_bot::{
+    add_chat_to_file, build_resource_file_path, load_chats_objects_from_file,
+};
 use anyhow::{Context, Result};
 use grammers_client::Client;
 use serde::{Deserialize, Serialize};
@@ -175,7 +177,12 @@ impl ChatMessageStats {
         Ok(())
     }
 
-    pub async fn fetch_chat_history_for_new_chat(&mut self, app_name: &AppName, msg: Message, chat_username:&str) -> Result<()> {
+    pub async fn fetch_chat_history_for_new_chat(
+        &mut self,
+        app_name: &AppName,
+        msg: Message,
+        chat_username: &str,
+    ) -> Result<()> {
         info!("Fetching chat history for a new chat...");
         // TODO: Implement non-hard-coded session file name determination
         let session_data = load_grammers_session_data_from_file(app_name, "current.session")?;
@@ -192,14 +199,17 @@ impl ChatMessageStats {
             username: chat_username.to_string(),
         };
 
-        let messages = self.fetch_chat_history_for_single_chat(&chat_object, &g_client).await?;
+        let messages = self
+            .fetch_chat_history_for_single_chat(&chat_object, &g_client)
+            .await?;
 
         let mut user_message_count = HashMap::new();
         for msg in messages {
             *user_message_count.entry(msg.user_id).or_insert(0) += 1;
         }
 
-        self.fetching_message_counts.insert(chat_object.chat_id, user_message_count);
+        self.fetching_message_counts
+            .insert(chat_object.chat_id, user_message_count);
 
         info!(
             "Chat history successfully fetched for chat: {} with id: {}. Users quantity in fetched messages: {}",
@@ -209,7 +219,7 @@ impl ChatMessageStats {
         );
 
         add_chat_to_file(app_name, chat_object.clone())?;
-        
+
         Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use crate::state::llm_client_init_trait::LlmProcessing;
+use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::state::request_app::app_state::RequestAppState;
 use crate::state::request_app::app_state::UserProfile;
 use crate::vector_db::vector_db::qdrant_upsert;
@@ -20,7 +20,7 @@ use teloxide::prelude::ChatId;
 use tiktoken_rs::cl100k_base;
 use tracing::info;
 
-pub async fn raw_llm_processing_json<T: LlmProcessing + Send + Sync>(
+pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
     system_role: &str,
     request: &str,
     app_state: Arc<T>,
@@ -59,7 +59,7 @@ pub async fn raw_llm_processing_json<T: LlmProcessing + Send + Sync>(
     }
 }
 
-pub async fn raw_llm_processing<T: LlmProcessing + Send + Sync>(
+pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
     system_role: &str,
     request: &str,
     app_state: Arc<T>,
@@ -188,26 +188,27 @@ pub async fn vectorize(data: String, app_state: Arc<RequestAppState>) -> Result<
     Ok(embedding)
 }
 
-pub async fn tokenize_and_truncate(data: &str) -> Result<String> {
+pub async fn tokenize_and_truncate(data: &str, max_tokens: usize) -> Result<(String, usize)> {
     let bpe = cl100k_base()?;
-
     let tokens = bpe.encode_ordinary(&*data);
-    info!(
-        "Tokenize_and_truncate fn | Input tokens: {:?}",
-        tokens.len()
-    );
+    let token_count = tokens.len();
 
-    if tokens.len() > 10000 {
-        let truncated_tokens = tokens[..10000].to_vec();
+    info!("Tokenize_and_truncate fn | Input tokens: {:?}", token_count);
 
+    if token_count > max_tokens {
+        let truncated_tokens = tokens[..max_tokens].to_vec();
         let truncated_data = bpe.decode(truncated_tokens)?;
-
         let truncated_text_tokens = bpe.encode_ordinary(&*truncated_data);
-        info!("Truncated input tokens: {:?}", truncated_text_tokens.len());
+        let truncated_count = truncated_text_tokens.len();
 
-        Ok(truncated_data)
+        info!("Truncated input tokens: {:?}", truncated_count);
+
+        Ok((truncated_data, truncated_count))
     } else {
-        info!("Input tokens < 10000, no need to truncate");
-        Ok(data.to_string())
+        info!(
+            "Input tokens {} < max_tokens, no need to truncate",
+            token_count
+        );
+        Ok((data.to_string(), token_count))
     }
 }

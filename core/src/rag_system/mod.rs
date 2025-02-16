@@ -1,4 +1,4 @@
-use crate::rag_system::types::{Document, RAGConfig, RetrievedContext};
+use crate::rag_system::types::{Document, DocumentType, RAGConfig, RetrievedContext, W3ADocument};
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashSet;
@@ -26,32 +26,57 @@ pub trait Retriever {
 }
 
 #[async_trait]
-pub trait ContextBuilder {
-    fn build_context(&self, documents: Vec<Document>) -> Result<String>;
+pub trait PayloadKeyBasedRetriever {
+    async fn search(
+        &self,
+        query_vector: Vec<f32>,
+        limit: usize,
+        similarity_threshold: f32,
+    ) -> Result<Vec<W3ADocument>>;
+    async fn search_by_payload_key(
+        &self,
+        payload_key: &str,
+        payload_value: &str,
+    ) -> Result<Vec<W3ADocument>>;
 }
 
-pub struct RAGSystem<V, R, C>
+#[async_trait]
+pub trait ContextBuilder {
+    fn build_context(&self, documents: Vec<DocumentType>) -> Result<String>;
+}
+
+pub struct RAGSystem<V, R, K, C>
 where
     V: Vectorizer,
     R: Retriever,
+    K: PayloadKeyBasedRetriever,
     C: ContextBuilder,
 {
     vectorizer: V,
     retriever: R,
+    payload_key_based_retriever: K,
     context_builder: C,
     config: RAGConfig,
 }
 
-impl<V, R, C> RAGSystem<V, R, C>
+impl<V, R, L, C> RAGSystem<V, R, L, C>
 where
     V: Vectorizer,
     R: Retriever,
+    L: PayloadKeyBasedRetriever,
     C: ContextBuilder,
 {
-    pub fn new(vectorizer: V, retriever: R, context_builder: C, config: RAGConfig) -> Self {
+    pub fn new(
+        vectorizer: V,
+        retriever: R,
+        payload_key_based_retriever: L,
+        context_builder: C,
+        config: RAGConfig,
+    ) -> Self {
         Self {
             vectorizer,
             retriever,
+            payload_key_based_retriever,
             context_builder,
             config,
         }
@@ -59,21 +84,17 @@ where
 
     pub async fn process(&self, query: &str) -> Result<RetrievedContext> {
         let vector = self.vectorizer.vectorize(query).await?;
-        
-        match &self.config {
+
+        let results: Vec<DocumentType> = match &self.config {
             RAGConfig::Default {
                 max_documents,
                 similarity_threshold,
             } => {
-                let base_results = self
+                let results = self
                     .retriever
                     .search(vector.clone(), *max_documents, *similarity_threshold)
                     .await?;
-                let context = self.context_builder.build_context(base_results.clone())?;
-                Ok(RetrievedContext {
-                    context,
-                    documents: base_results,
-                })
+                results.into_iter().map(DocumentType::Default).collect()
             }
             RAGConfig::Advanced {
                 base_max_documents,
@@ -95,18 +116,19 @@ where
                 );
 
                 let mut all_results = base_results.clone();
+
                 let mut seen_ids = base_results
                     .iter()
                     .map(|doc| doc.point_id.clone())
                     .collect::<HashSet<_>>();
 
-                for base_result in &base_results {
-                    let base_vector = match &base_result.vector {
+                for result in &base_results {
+                    let base_vector = match &result.vector {
                         Some(vector) => {
-                            info!("TEMP LOG: Vector used from Document");
+                            info!("TEMP LOG: Vector used from Document performing search with Advanced RAGConfig...Ok");
                             vector.clone()
                         }
-                        None => self.vectorizer.vectorize(&base_result.content).await?,
+                        None => self.vectorizer.vectorize(&result.text).await?,
                     };
 
                     let related_results = self
@@ -119,7 +141,7 @@ where
                         .await?;
 
                     info!(
-                        "TEMP LOG: Documents quantity in related in ITERATION: {}",
+                        "TEMP LOG: Documents quantity in related per one iteration: {}",
                         related_results.len()
                     );
 
@@ -127,31 +149,58 @@ where
                         if seen_ids.insert(related_result.point_id.clone()) {
                             info!("TEMP LOG: Related point is unique. All's good");
                             all_results.push(related_result);
+                        } else {
+                            info!("TEMP LOG: Related point is a duplicate. No need to push");
                         }
                     }
                 }
 
-                // all_results.sort_by(|a, b| {
-                //     b.score
-                //         .partial_cmp(&a.score)
-                //         .unwrap_or(std::cmp::Ordering::Equal)
-                // });
                 info!(
                     "TEMP LOG: Documents quantity in the end of the search: {}",
                     all_results.len()
                 );
 
-                let context = self.context_builder.build_context(all_results.clone())?;
-                Ok(RetrievedContext {
-                    context,
-                    documents: all_results,
-                })
+                all_results.into_iter().map(DocumentType::Default).collect()
             }
-        }
+            RAGConfig::PayloadKeyBased {
+                max_documents,
+                similarity_threshold,
+            } => {
+                let payload_key = "lesson_title".to_string();
+                
+                let initial_results = self
+                    .payload_key_based_retriever
+                    .search(vector.clone(), *max_documents, *similarity_threshold)
+                    .await?;
+
+                let mut all_documents_by_payload_key = Vec::new();
+
+                if let Some(first_doc) = initial_results.first() {
+                    let lesson_title = &first_doc.lesson_title;
+                    let all_results_by_payload_key = self
+                        .payload_key_based_retriever
+                        .search_by_payload_key(&payload_key, lesson_title)
+                        .await?;
+
+                    all_documents_by_payload_key.extend(all_results_by_payload_key);
+                }
+
+                all_documents_by_payload_key
+                    .into_iter()
+                    .map(DocumentType::W3A)
+                    .collect()
+            }
+        };
+
+        let context = self.context_builder.build_context(results.clone())?;
+
+        Ok(RetrievedContext {
+            context,
+            documents: results,
+        })
     }
 }
 
-// Todo: Organize dynamic getting rag config depending on AppName
 pub fn get_default_rag_config() -> RAGConfig {
     RAGConfig::Default {
         max_documents: 12,
@@ -165,5 +214,12 @@ pub fn get_advanced_rag_config() -> RAGConfig {
         base_similarity_threshold: 0.4,
         related_max_documents: 4,
         related_similarity_threshold: 0.4,
+    }
+}
+
+pub fn get_payload_key_based_rag_config() -> RAGConfig {
+    RAGConfig::PayloadKeyBased {
+        max_documents: 1,
+        similarity_threshold: 0.5,  
     }
 }

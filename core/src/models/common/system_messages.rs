@@ -1,12 +1,13 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppsSystemMessages {
-    Probiot(ProbiotBotMessages),
+    ProbiotBot(ProbiotBotMessages),
     TheViperRoom(TheViperRoomMessages),
     TheViperRoomBot(TheViperRoomBotMessages),
     RequestApp(RequestAppMessages),
     RequestAppBot(RequestAppBotMessages),
     Common(CommonMessages),
     W3ABot(W3ABotMessages),
+    W3A(W3AMessages),
     GrootBot(GrootBotMessages),
 }
 
@@ -116,6 +117,19 @@ impl W3ABotMessages {
             W3ABotMessages::StartMessage => "start_message",
             W3ABotMessages::PrivateChatInvitation => "private_chat_invitation",
             W3ABotMessages::ResponseFooter => "response_footer",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum W3AMessages {
+    W3AStudyStructure,
+}
+
+impl W3AMessages {
+    pub fn as_str(&self) -> &str {
+        match self {
+            W3AMessages::W3AStudyStructure => "w3a_learning_structure",
         }
     }
 }

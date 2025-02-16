@@ -628,9 +628,12 @@ pub async fn ai_check(
             return Ok(Some(()));
         }
     }
-    
-    info!("[Scam detection ai-system] Result for message {} from user: {} with id: {} is: {}", message_to_check, username, user_id, is_scam);
-    
+
+    info!(
+        "[Scam detection ai-system] Result for message {} from user: {} with id: {} is: {}",
+        message_to_check, username, user_id, is_scam
+    );
+
     Ok(None)
 }
 

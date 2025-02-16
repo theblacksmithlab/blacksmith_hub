@@ -50,15 +50,21 @@ pub fn add_chat_to_file(app_name: &AppName, chat_object: ChatObject) -> Result<(
     }
 
     chats.push(chat_object.clone());
-    
+
     let new_data = serde_json::to_string_pretty(&chats)
         .with_context(|| "Failed to serialize updated chat list")?;
-    fs::write(&chats_path, new_data)
-        .with_context(|| format!("Failed to write updated chat list to file: {}", chats_path.display()))?;
+    fs::write(&chats_path, new_data).with_context(|| {
+        format!(
+            "Failed to write updated chat list to file: {}",
+            chats_path.display()
+        )
+    })?;
 
     info!(
         "New chat: {} with id: {} added to chats list file {}.",
-        chat_object.username, chat_object.chat_id, chats_path.display()
+        chat_object.username,
+        chat_object.chat_id,
+        chats_path.display()
     );
 
     Ok(())

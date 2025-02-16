@@ -1,4 +1,5 @@
-use crate::rag_system::{ContextBuilder, Document};
+use crate::rag_system::types::DocumentType;
+use crate::rag_system::ContextBuilder;
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -21,16 +22,15 @@ impl DefaultContextBuilder {
 
 #[async_trait]
 impl ContextBuilder for DefaultContextBuilder {
-    fn build_context(&self, documents: Vec<Document>) -> Result<String> {
-        if documents.is_empty() {
-            return Ok(String::new());
-        }
-
+    fn build_context(&self, documents: Vec<DocumentType>) -> Result<String> {
         let context = documents
             .iter()
-            .map(|doc| doc.content.clone())
+            .map(|doc| match doc {
+                DocumentType::Default(d) => d.text.clone(),
+                DocumentType::W3A(d) => d.text.clone(),
+            })
             .collect::<Vec<String>>()
-            .join(&self.separator);
+            .join("\n\n");
 
         Ok(context)
     }

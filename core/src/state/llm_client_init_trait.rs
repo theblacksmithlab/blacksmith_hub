@@ -5,29 +5,29 @@ use crate::state::the_viper_room::app_state::TheViperRoomAppState;
 use async_openai::config::OpenAIConfig;
 use async_openai::Client as LLM_Client;
 
-pub trait LlmProcessing {
+pub trait OpenAIClientInit {
     fn get_llm_client(&self) -> &LLM_Client<OpenAIConfig>;
 }
 
-impl LlmProcessing for RequestAppState {
+impl OpenAIClientInit for RequestAppState {
     fn get_llm_client(&self) -> &LLM_Client<OpenAIConfig> {
         &self.llm_client
     }
 }
 
-impl LlmProcessing for TheViperRoomAppState {
+impl OpenAIClientInit for TheViperRoomAppState {
     fn get_llm_client(&self) -> &LLM_Client<OpenAIConfig> {
         &self.llm_client
     }
 }
 
-impl LlmProcessing for BotAppState {
+impl OpenAIClientInit for BotAppState {
     fn get_llm_client(&self) -> &LLM_Client<OpenAIConfig> {
         &self.llm_client
     }
 }
 
-impl LlmProcessing for BlacksmithWebAppState {
+impl OpenAIClientInit for BlacksmithWebAppState {
     fn get_llm_client(&self) -> &LLM_Client<OpenAIConfig> {
         &self.llm_client
     }

@@ -77,7 +77,7 @@ pub enum LlmModel {
 }
 
 impl LlmModel {
-    pub(crate) fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             LlmModel::Light => "gpt-4o-mini",
             LlmModel::Complex => "gpt-4o",
@@ -219,7 +219,7 @@ pub async fn get_message(message_enum: AppsSystemMessages) -> Result<String> {
             Path::new("common_res/messages/common").to_path_buf(),
             msg.as_str().to_string(),
         ),
-        AppsSystemMessages::Probiot(msg) => (
+        AppsSystemMessages::ProbiotBot(msg) => (
             Path::new("common_res/messages/probiot_bot").to_path_buf(),
             msg.as_str().to_string(),
         ),
@@ -245,6 +245,10 @@ pub async fn get_message(message_enum: AppsSystemMessages) -> Result<String> {
         ),
         AppsSystemMessages::GrootBot(msg) => (
             Path::new("common_res/messages/groot_bot").to_path_buf(),
+            msg.as_str().to_string(),
+        ),
+        AppsSystemMessages::W3A(msg) => (
+            Path::new("common_res/w3a").to_path_buf(),
             msg.as_str().to_string(),
         ),
     };

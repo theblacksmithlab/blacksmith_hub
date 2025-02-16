@@ -1,4 +1,4 @@
-use crate::state::llm_client_init_trait::LlmProcessing;
+use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::split_text_into_chunks;
 use anyhow::anyhow;
 use async_openai::types::{CreateSpeechRequestArgs, CreateSpeechResponse, SpeechModel, Voice};
@@ -9,7 +9,7 @@ use std::process::Command;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
-pub async fn podcast_tts<T: LlmProcessing + Send + Sync>(
+pub async fn podcast_tts<T: OpenAIClientInit + Send + Sync>(
     text: String,
     user_tmp_dir: String,
     app_state: Arc<T>,
@@ -101,7 +101,7 @@ pub async fn podcast_tts<T: LlmProcessing + Send + Sync>(
     Ok(PathBuf::from(final_path))
 }
 
-pub async fn simple_tts<T: LlmProcessing + Send + Sync>(
+pub async fn simple_tts<T: OpenAIClientInit + Send + Sync>(
     text: &str,
     app_state: Arc<T>,
 ) -> anyhow::Result<CreateSpeechResponse> {

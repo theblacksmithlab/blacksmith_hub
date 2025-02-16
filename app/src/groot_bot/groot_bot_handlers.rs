@@ -1,5 +1,3 @@
-use std::env;
-use std::path::Path;
 use crate::groot_bot::chat_moderation::chat_moderation;
 use crate::groot_bot::groot_bot_utils::load_super_admins;
 use anyhow::Result;
@@ -8,13 +6,15 @@ use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState,
 use core::models::tg_bot::groot_bot::groot_bot_commands::GrootBotCommands;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
+use core::utils::tg_bot::groot_bot::build_resource_file_path;
+use std::env;
+use std::path::Path;
 use std::sync::Arc;
+use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Requester, Update};
 use teloxide::types::{InputFile, KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
-use teloxide::payloads::SendMessageSetters;
 use tracing::{error, info};
-use core::utils::tg_bot::groot_bot::build_resource_file_path;
 
 pub async fn groot_bot_command_handler(
     bot: Bot,
@@ -91,7 +91,7 @@ pub async fn groot_bot_command_handler(
         bot.send_message(msg.chat.id, bot_msg).await?;
         return Ok(());
     }
-    
+
     if cmd == GrootBotCommands::Ask {
         if !msg.chat.is_private() {
             info!(
@@ -148,32 +148,44 @@ pub async fn groot_bot_command_handler(
         let bot_msg = get_message(AppsSystemMessages::GrootBot(
             GrootBotMessages::PrivateCmdUsedInPublicChat,
         ))
-            .await?;
+        .await?;
         bot.send_message(msg.chat.id, bot_msg).await?;
         return Ok(());
     }
-    
+
     match cmd {
         GrootBotCommands::Start => {
             let bot_msg =
                 get_message(AppsSystemMessages::GrootBot(GrootBotMessages::StartMessage)).await?;
             bot.send_message(msg.chat.id, bot_msg).await?;
-            
+
             if let Some(chat_username) = msg.chat.username() {
                 info!(
-                "Chat: {} with id: {} has username set. Fetching chat history...",
-                chat_username, msg.chat.id
-            );
-                
+                    "Chat: {} with id: {} has username set. Fetching chat history...",
+                    chat_username, msg.chat.id
+                );
+
                 let mut chat_stats = app_state.chat_message_stats.as_ref().unwrap().lock().await;
-                if let Err(err) = chat_stats.fetch_chat_history_for_new_chat(&app_state.app_name, msg.clone(), chat_username).await {
-                    error!("Error fetching chat history for a new chat: {} with id: {}: {}", chat_username, msg.chat.id, err);
+                if let Err(err) = chat_stats
+                    .fetch_chat_history_for_new_chat(
+                        &app_state.app_name,
+                        msg.clone(),
+                        chat_username,
+                    )
+                    .await
+                {
+                    error!(
+                        "Error fetching chat history for a new chat: {} with id: {}: {}",
+                        chat_username, msg.chat.id, err
+                    );
                 }
             } else {
-                let bot_msg =
-                    get_message(AppsSystemMessages::GrootBot(GrootBotMessages::NoUsernameForChatAlert)).await?;
+                let bot_msg = get_message(AppsSystemMessages::GrootBot(
+                    GrootBotMessages::NoUsernameForChatAlert,
+                ))
+                .await?;
                 bot.send_message(msg.chat.id, bot_msg).await?;
-                return Ok(())
+                return Ok(());
             }
         }
         GrootBotCommands::About => {
@@ -211,8 +223,10 @@ pub async fn groot_bot_command_handler(
             }
         }
         GrootBotCommands::Manual => {
-            let bot_msg =
-                get_message(AppsSystemMessages::GrootBot(GrootBotMessages::ManualMessage)).await?;
+            let bot_msg = get_message(AppsSystemMessages::GrootBot(
+                GrootBotMessages::ManualMessage,
+            ))
+            .await?;
             bot.send_message(msg.chat.id, bot_msg).await?;
         }
         GrootBotCommands::Ask => {
@@ -225,7 +239,7 @@ pub async fn groot_bot_command_handler(
                     msg.chat.id,
                     "Извините, у вас нет прав для использования этой команды. 🤷",
                 )
-                    .await?;
+                .await?;
             } else {
                 let files_to_send = [
                     (
@@ -242,7 +256,7 @@ pub async fn groot_bot_command_handler(
                     ),
                     (
                         build_resource_file_path(app_name, "restricted_words.json"),
-                        "restricted_words.json"
+                        "restricted_words.json",
                     ),
                     (
                         build_resource_file_path(app_name, "chats_list.json"),
@@ -251,7 +265,7 @@ pub async fn groot_bot_command_handler(
                     (
                         build_resource_file_path(app_name, "penalty_points.json"),
                         "penalty_points.json",
-                    )
+                    ),
                 ];
 
                 for (file_path, file_name) in files_to_send.iter() {
@@ -262,7 +276,7 @@ pub async fn groot_bot_command_handler(
                             msg.chat.id,
                             InputFile::file(path).file_name(file_name.to_string()),
                         )
-                            .await?;
+                        .await?;
                     } else {
                         bot.send_message(msg.chat.id, format!("Файл {} не найден", file_name))
                             .await?;
@@ -271,8 +285,10 @@ pub async fn groot_bot_command_handler(
             }
         }
         GrootBotCommands::Results => {
-            let bot_msg =
-                get_message(AppsSystemMessages::GrootBot(GrootBotMessages::ResultsTempMessage)).await?;
+            let bot_msg = get_message(AppsSystemMessages::GrootBot(
+                GrootBotMessages::ResultsTempMessage,
+            ))
+            .await?;
             bot.send_message(msg.chat.id, bot_msg).await?;
         }
         _ => {

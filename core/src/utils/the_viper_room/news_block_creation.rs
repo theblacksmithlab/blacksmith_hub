@@ -4,7 +4,7 @@ use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::TheViperRoomBotMessages;
 use crate::models::common::system_roles::TheViperRoomRoleType;
-use crate::state::llm_client_init_trait::LlmProcessing;
+use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::get_system_role_or_fallback;
 use crate::utils::common::{get_message, LlmModel};
 use crate::utils::the_viper_room::news_block_creation_utils::{
@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, info};
 
-pub async fn news_block_creation<T: LlmProcessing + Send + Sync>(
+pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
     client: &g_Client,
     user_id: &str,
     app_state: Arc<T>,
