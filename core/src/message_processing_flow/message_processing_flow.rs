@@ -3,6 +3,7 @@ use crate::ai::common::common::{raw_llm_processing, raw_llm_processing_json};
 use crate::message_processing_flow::check_request_for_crap_content::check_request_for_crap_content;
 use crate::message_processing_flow::clarify_request::clarify_request;
 use crate::models::common::app_name::AppName;
+use crate::models::common::qdrant_collection_manager::AppsCollections;
 use crate::models::common::system_messages::{AppsSystemMessages, W3AMessages};
 use crate::models::common::system_roles::ProbiotRoleType;
 use crate::models::common::system_roles::{AppsSystemRoles, W3ARoleType};
@@ -10,7 +11,10 @@ use crate::rag_system::context_builder::DefaultContextBuilder;
 use crate::rag_system::get_results_via_rag_system::get_results_via_rag_system::get_results_via_rag_system;
 use crate::rag_system::retriever::QdrantRetriever;
 use crate::rag_system::types::DocumentType;
-use crate::rag_system::{get_advanced_rag_config, get_payload_key_based_rag_config, ContextBuilder, PayloadKeyBasedRetriever};
+use crate::rag_system::{
+    get_advanced_rag_config, get_payload_key_based_rag_config, ContextBuilder,
+    PayloadKeyBasedRetriever,
+};
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
@@ -21,7 +25,6 @@ use anyhow::Result;
 use serde_json::Value;
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use crate::models::common::qdrant_collection_manager::AppsCollections;
 
 pub async fn process_user_raw_request<
     T: OpenAIClientInit + QdrantClientInit + TempCacheInit + Send + Sync,
@@ -111,8 +114,8 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
 
     let search_result_content = rag_system_search_result.context;
 
-    let max_tokens = 10000;
-    let min_tokens = 7500;
+    let max_tokens = 8192;
+    let min_tokens = 4096;
 
     let (post_processed_initial_search_result_content, token_count) =
         tokenize_and_truncate(&search_result_content, max_tokens)
@@ -131,7 +134,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
                 }
             })
             .unwrap_or_default();
-        
+
         let initial_search_result_titled_content = format!(
             "Lesson title: {}.\nLesson content:\n{}",
             initial_search_result_lesson_learned, post_processed_initial_search_result_content
@@ -155,7 +158,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
             min_tokens,
             vec![initial_search_result_lesson_learned],
             5,
-            0
+            0,
         )
         .await?
     } else {
@@ -163,9 +166,8 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
     };
 
     let llm_message = format!(
-        "User's current query: {}\nUser's refined query: {}\nChat history: {}\nRelevant information from the database: {}",
+        "User's current query: {}\nChat history: {}\nRelevant information from the database: {}",
         user_raw_request,
-        clarified_request,
         current_cache,
         if matches!(app_name, AppName::W3AWeb | AppName::W3ABot) {
             additional_context
@@ -248,7 +250,7 @@ pub async fn get_llm_recommendation<T: OpenAIClientInit + QdrantClientInit + Sen
     let w3a_academy_study_struct =
         get_message(AppsSystemMessages::W3A(W3AMessages::W3AStudyStructure)).await?;
 
-    let system_role = get_system_role_or_fallback(&app_name, W3ARoleType::LessonAdvice, None);
+    let system_role = get_system_role_or_fallback(&app_name, W3ARoleType::Recommendation, None);
 
     let llm_message = format!("User's current query: {}\nUser's refined query: {}\nChat history: {}\nWeb3 Academy learning structure:{}\nCompleted lessons:{:?}\n", user_raw_request, clarified_request, current_cache, w3a_academy_study_struct, lesson_learned);
 
@@ -360,9 +362,12 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
         );
         return Ok(actual_context.to_string());
     }
-    
-    info!("TEMP log: Recursive search attempts counter: {}", attempt_counter);
-    
+
+    info!(
+        "TEMP log: Recursive search attempts counter: {}",
+        attempt_counter
+    );
+
     if attempt_counter >= max_attempts {
         warn!(
             "Reached max attempts ({}) of recursive search, stopping additional context search.",

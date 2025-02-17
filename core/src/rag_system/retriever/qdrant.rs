@@ -259,11 +259,14 @@ impl<T: QdrantClientInit + Send + Sync> PayloadKeyBasedRetriever for QdrantRetri
             }]);
 
             let mut all_results = Vec::new();
-            
+
             let mut next_page_offset = None;
 
             loop {
-                info!("Entering the loop of searching results by payload_key. Next page offset: {:?}", next_page_offset);
+                info!(
+                    "Entering the loop of searching results by payload_key. Next page offset: {:?}",
+                    next_page_offset
+                );
                 let mut scroll_request = ScrollPointsBuilder::new(collection_name.clone())
                     .filter(filter.clone())
                     .with_payload(true)
@@ -287,12 +290,15 @@ impl<T: QdrantClientInit + Send + Sync> PayloadKeyBasedRetriever for QdrantRetri
                     info!("Next page offset is None, breaking loop.");
                     break;
                 }
-                
+
                 next_page_offset = response.next_page_offset.clone();
             }
 
-            info!("TEMP log: results by payload key quantity: {} ", all_results.len());
-            
+            info!(
+                "TEMP log: results by payload key quantity: {} ",
+                all_results.len()
+            );
+
             let documents: Vec<W3ADocument> = all_results
                 .into_iter()
                 .map(|point| {
@@ -332,7 +338,7 @@ impl<T: QdrantClientInit + Send + Sync> PayloadKeyBasedRetriever for QdrantRetri
                         .and_then(|v| v.as_str())
                         .map(String::from)
                         .unwrap_or_else(|| String::new());
-                    
+
                     let segment_id = point
                         .payload
                         .get("segment_id")

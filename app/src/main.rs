@@ -73,7 +73,7 @@ async fn main() -> Result<()> {
     if let Err(e) = reset_tmp_dir() {
         error!("Failed to reset tmp directory: {}", e);
     }
-    
+
     let qdrant_client = Arc::new(
         Qdrant::from_url(&env::var("QDRANT_URL")?)
             .api_key(env::var("QDRANT_API_KEY")?)
@@ -103,7 +103,11 @@ async fn main() -> Result<()> {
     };
 
     if let Err(err) = start_bot_with_handlers(app_state, handlers).await {
-        error!("Failed to start bot for app {}: {}", app_name.as_str(), err);
+        error!(
+            "Failed to start bot with app_name '{}': {}",
+            app_name.as_str(),
+            err
+        );
     }
 
     Ok(())

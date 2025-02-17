@@ -7,12 +7,12 @@ use tracing::{error, info, warn};
 use unicode_normalization::UnicodeNormalization;
 use walkdir::WalkDir;
 
-/// The function validates the data of incoming json files by comparing the values for the keys 
+/// The function validates the data of incoming json files by comparing the values for the keys
 /// of  reference json structure and the json structures of incoming json files.
-/// 
+///
 /// * normalize_structure_file() fn normalize data in the reference json structure
-/// 
-/// * apply_normalization flag is used to enable and disable the need for data normalization 
+///
+/// * apply_normalization flag is used to enable and disable the need for data normalization
 /// before validation
 ///
 pub async fn validate_input_data() -> Result<()> {
@@ -75,7 +75,7 @@ pub async fn validate_input_data() -> Result<()> {
         &valid_module_titles,
         &valid_block_titles,
         &valid_lesson_titles,
-        true
+        true,
     )
     .await
     {
@@ -165,10 +165,22 @@ pub async fn normalize_and_validate_input_jsons(
             fs::write(path, formatted_json).map_err(|e| e.to_string())?;
         }
 
-        let check_module = if apply_normalization { &normalized_module } else { &module };
-        let check_block = if apply_normalization { &normalized_block_title } else { &block_title };
-        let check_lesson = if apply_normalization { &normalized_lesson_title } else { &lesson_title };
-        
+        let check_module = if apply_normalization {
+            &normalized_module
+        } else {
+            &module
+        };
+        let check_block = if apply_normalization {
+            &normalized_block_title
+        } else {
+            &block_title
+        };
+        let check_lesson = if apply_normalization {
+            &normalized_lesson_title
+        } else {
+            &lesson_title
+        };
+
         if !module_titles.contains(check_module) {
             return Err(format!(
                 "Error: module | '{}' | in file {:?} doesn't match any option in reference file",
@@ -197,12 +209,9 @@ pub async fn normalize_and_validate_input_jsons(
             "Missing lessons! The following lessons were not found in input JSON files: {:?}",
             missing_lessons
         );
-        return Err(format!(
-            "Missing lessons: {:?}",
-            missing_lessons
-        ));
+        return Err(format!("Missing lessons: {:?}", missing_lessons));
     }
-    
+
     info!("Completed!");
     info!("Total files processed: {}", files_processed);
     info!("Modified files: {}", files_modified);
@@ -210,12 +219,20 @@ pub async fn normalize_and_validate_input_jsons(
     Ok(())
 }
 
-fn normalize_titles(module: &str, block_title: &str, lesson_title: &str) -> (String, String, String) {
+fn normalize_titles(
+    module: &str,
+    block_title: &str,
+    lesson_title: &str,
+) -> (String, String, String) {
     let normalized_module = module.nfc().collect::<String>();
     let normalized_block_title = block_title.nfc().collect::<String>();
     let normalized_lesson_title = lesson_title.nfc().collect::<String>();
 
-    (normalized_module, normalized_block_title, normalized_lesson_title)
+    (
+        normalized_module,
+        normalized_block_title,
+        normalized_lesson_title,
+    )
 }
 
 fn normalize_structure_file() -> Result<(), String> {
@@ -233,7 +250,7 @@ fn normalize_structure_file() -> Result<(), String> {
         .map_err(|e| format!("JSON serialization error: {}", e))?;
 
     fs::write(file_path, normalized_content).map_err(|e| format!("Error writing file: {}", e))?;
-    
+
     Ok(())
 }
 

@@ -1,12 +1,14 @@
-use std::collections::HashMap;
 use anyhow::Result;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::{CreateEmbeddingRequestArgs, CreateEmbeddingResponse};
 use async_openai::Client as LLM_Client;
 use core::utils::common::LlmModel;
-use qdrant_client::qdrant::{CreateCollectionBuilder, Distance, PointStruct, UpsertPointsBuilder, VectorParamsBuilder};
+use qdrant_client::qdrant::{
+    CreateCollectionBuilder, Distance, PointStruct, UpsertPointsBuilder, VectorParamsBuilder,
+};
 use qdrant_client::Qdrant;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -30,12 +32,11 @@ pub async fn upsert_data_to_qdrant(
                     .vectors_config(VectorParamsBuilder::new(3072, Distance::Cosine)),
             )
             .await?;
-
     }
 
     let mut index = load_index()?;
     let mut uploaded_count = 0;
-    
+
     for entry in WalkDir::new(input_dir)
         .follow_links(true)
         .into_iter()
@@ -82,20 +83,23 @@ pub async fn upsert_data_to_qdrant(
             .await?;
 
         index.insert(point_id, path.to_string_lossy().to_string());
-        
+
         uploaded_count += 1;
-        
-        info!("File {} uploaded successfully. Files processed: {}", path.to_string_lossy(), uploaded_count);
-        
+
+        info!(
+            "File {} uploaded successfully. Files processed: {}",
+            path.to_string_lossy(),
+            uploaded_count
+        );
     }
 
     save_index(&index)?;
-    
+
     info!(
         "All JSON files have been successfully uploaded to Qdrant db! Total files uploaded: {}",
         uploaded_count
     );
-    
+
     Ok(())
 }
 

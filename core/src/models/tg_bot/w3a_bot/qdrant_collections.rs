@@ -9,7 +9,7 @@ use strum_macros::EnumIter;
 //     Base5,
 //     Base6,
 // }
-// 
+//
 // impl W3ACollections {
 //     pub fn as_str(&self) -> &str {
 //         match self {

@@ -167,7 +167,7 @@ where
                 similarity_threshold,
             } => {
                 let payload_key = "lesson_title".to_string();
-                
+
                 let initial_results = self
                     .payload_key_based_retriever
                     .search(vector.clone(), *max_documents, *similarity_threshold)
@@ -220,6 +220,6 @@ pub fn get_advanced_rag_config() -> RAGConfig {
 pub fn get_payload_key_based_rag_config() -> RAGConfig {
     RAGConfig::PayloadKeyBased {
         max_documents: 1,
-        similarity_threshold: 0.5,  
+        similarity_threshold: 0.5,
     }
 }

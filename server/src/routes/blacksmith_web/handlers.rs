@@ -2,6 +2,7 @@ use anyhow::Result;
 use axum::extract::{Query, State};
 use axum::Json;
 use base64::{engine::general_purpose::STANDARD, Engine};
+use core::ai::common::common::raw_llm_processing;
 use core::ai::common::voice_processing::simple_tts;
 use core::local_db::local_db::fetch_chat_history_from_db;
 use core::message_processing_flow::web::default_message_handler::default_message_handler;
@@ -11,7 +12,10 @@ use core::models::blacksmith_web::blacksmith_web::{
     BlacksmithWebUserRequest,
 };
 use core::models::common::app_name::AppName;
+use core::models::common::system_roles::{AppsSystemRoles, W3ARoleType};
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
+use core::utils::common::get_system_role_or_fallback;
+use core::utils::common::LlmModel;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
@@ -38,10 +42,13 @@ pub(crate) async fn handle_blacksmith_web_user_request(
     let user_id = request.user_id;
     let request_text = request.text;
 
-    info!("Got text message from user: {} : {}", user_id, request_text);
+    info!(
+        "Source: {} | Got text message from user: {}: {}",
+        app_name, user_id, request_text
+    );
 
     let response =
-        default_message_handler(&request_text, blacksmith_web_app_state, &user_id, app_name).await;
+        default_message_handler(&request_text, blacksmith_web_app_state, &user_id, &app_name).await;
 
     Json(BlacksmithWebServerResponse { text: response })
 }
@@ -50,11 +57,6 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Json<Vec<ChatMessage>> {
-    let user_id = match params.get("user_id") {
-        Some(id) => id.clone(),
-        None => return Json(vec![]),
-    };
-
     let app_name = match params.get("app_name") {
         Some(name) => match AppName::from_str(name) {
             Ok(app) => app,
@@ -63,9 +65,14 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
         None => return Json(vec![]),
     };
 
+    let user_id = match params.get("user_id") {
+        Some(id) => id.clone(),
+        None => return Json(vec![]),
+    };
+
     info!(
-        "Fetching chat history for user: {} with AppName: {}",
-        user_id, app_name
+        "Source: {} | Fetching chat history for user: {}",
+        app_name, user_id
     );
     match fetch_chat_history_from_db(
         &blacksmith_web_app_state.local_db_pool,
@@ -83,11 +90,6 @@ pub(crate) async fn handle_blacksmith_web_tts_request(
     State(blacksmith_web_app_state): State<Arc<BlacksmithWebAppState>>,
     Json(request): Json<BlacksmithWebTTSRequest>,
 ) -> Json<BlacksmithWebTTSResponse> {
-    let user_id = request.user_id;
-    let request_text = request.text;
-
-    // TODO: prepare action_text for TTS
-
     let app_name = match AppName::from_str(&request.app_name) {
         Ok(app) => app,
         Err(_) => {
@@ -96,14 +98,31 @@ pub(crate) async fn handle_blacksmith_web_tts_request(
         }
     };
 
+    let user_id = request.user_id;
+    let request_text = request.text;
+
     let temp_dir = app_name.temp_dir();
 
     info!(
-        "Got TTS request from user: {} for text: {}",
-        user_id, request_text
+        "Source: {} | Got TTS request from user: {} for text: {}",
+        app_name, user_id, request_text
     );
 
-    match simple_tts(&request_text, blacksmith_web_app_state.clone()).await {
+    let processed_text =
+        match prepare_text_for_tts_fn(&app_name, blacksmith_web_app_state.clone(), &request_text)
+            .await
+        {
+            Ok(clean_text) => clean_text,
+            Err(err) => {
+                warn!(
+                    "Failed to pre-process text for TTS: {}. Using original text.",
+                    err
+                );
+                request_text.clone()
+            }
+        };
+
+    match simple_tts(&processed_text, blacksmith_web_app_state.clone()).await {
         Ok(audio_response) => {
             let temp_file_id = Uuid::new_v4().to_string();
             let audio_file_path = temp_dir.join(format!("{}.mp3", temp_file_id));
@@ -118,15 +137,18 @@ pub(crate) async fn handle_blacksmith_web_tts_request(
             match read_audio_file_as_base64(&audio_file_path) {
                 Ok(audio_data) => {
                     if let Err(e) = fs::remove_file(&audio_file_path) {
-                        error!("Failed to delete temp file {:?}: {}", audio_file_path, e);
+                        error!(
+                            "Failed to delete TTS temp file {:?}: {}",
+                            audio_file_path, e
+                        );
                     }
 
-                    info!("TTS request text transcribed successfully");
+                    info!("TTS request processed successfully!");
 
                     Json(BlacksmithWebTTSResponse { audio_data })
                 }
                 Err(e) => {
-                    error!("Failed to read audio file: {}", e);
+                    error!("Failed to read audio file with TTS result: {}", e);
                     Json(BlacksmithWebTTSResponse {
                         audio_data: String::new(),
                     })
@@ -147,4 +169,39 @@ fn read_audio_file_as_base64(path: &Path) -> Result<String> {
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer)?;
     Ok(STANDARD.encode(&buffer))
+}
+
+async fn prepare_text_for_tts_fn(
+    app_name: &AppName,
+    blacksmith_web_app_state: Arc<BlacksmithWebAppState>,
+    text_to_process: &str,
+) -> Result<String> {
+    let system_role = match app_name {
+        AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::TTSPreProcessing)),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::TTSPreProcessing)),
+        _ => None,
+    };
+
+    let system_role = match system_role {
+        Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
+        None => {
+            error!(
+                "TTSPreProcessing role is not defined for app '{}'. Using fallback.",
+                app_name.as_str()
+            );
+            "You are a helpful assistant".to_string()
+        }
+    };
+
+    let llm_message = format!("Text to process: {}", text_to_process);
+
+    let processed_text = raw_llm_processing(
+        &system_role,
+        &llm_message,
+        blacksmith_web_app_state,
+        LlmModel::Complex,
+    )
+    .await?;
+
+    Ok(processed_text)
 }

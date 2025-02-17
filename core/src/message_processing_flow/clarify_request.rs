@@ -35,7 +35,7 @@ pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
         }
     };
 
-    match raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Complex).await {
+    match raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Light).await {
         Ok(clarified_request) => {
             info!("User's raw request clarified successfully");
             Ok(clarified_request)

@@ -12,7 +12,7 @@ pub async fn default_message_handler(
     action_text: &str,
     app_state: Arc<BlacksmithWebAppState>,
     user_id: &str,
-    app_name: AppName,
+    app_name: &AppName,
 ) -> String {
     info!(
         "Message received from user: {} is a text message. Let's process it...",
