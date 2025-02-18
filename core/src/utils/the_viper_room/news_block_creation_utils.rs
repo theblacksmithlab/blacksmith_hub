@@ -1,7 +1,7 @@
 use crate::ai::common::common::raw_llm_processing;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::TheViperRoomRoleType;
-use crate::state::llm_client_init_trait::LlmProcessing;
+use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::get_system_role_or_fallback;
 use crate::utils::common::LlmModel;
 use chrono::Duration as ChronoDuration;
@@ -59,7 +59,7 @@ pub(crate) async fn get_dialogs(client: &g_Client) -> Result<Vec<types::Dialog>,
     Ok(channels)
 }
 
-pub(crate) async fn processing_dialogs<T: LlmProcessing + Send + Sync>(
+pub(crate) async fn processing_dialogs<T: OpenAIClientInit + Send + Sync>(
     client: &g_Client,
     channels: Vec<types::Dialog>,
     app_state: Arc<T>,
@@ -107,7 +107,7 @@ pub(crate) async fn processing_dialogs<T: LlmProcessing + Send + Sync>(
     Ok(())
 }
 
-pub(crate) async fn updates_file_creation<T: LlmProcessing + Send + Sync>(
+pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
 ) -> Result<(), anyhow::Error> {
@@ -165,7 +165,7 @@ pub(crate) async fn updates_file_creation<T: LlmProcessing + Send + Sync>(
     Ok(())
 }
 
-pub(crate) async fn summarize_updates<T: LlmProcessing + Send + Sync>(
+pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
     nickname: String,
@@ -208,7 +208,7 @@ pub(crate) async fn summarize_updates<T: LlmProcessing + Send + Sync>(
     Ok(updates_summarized)
 }
 
-pub(crate) async fn get_latest_messages<T: LlmProcessing + Send + Sync>(
+pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
     client: &g_Client,
     dialog: types::Dialog,
     chat_name: &str,

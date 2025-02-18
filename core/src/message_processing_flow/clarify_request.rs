@@ -1,12 +1,12 @@
 use crate::ai::common::common::raw_llm_processing;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::{AppsSystemRoles, ProbiotRoleType, W3ARoleType};
-use crate::state::llm_client_init_trait::LlmProcessing;
+use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::{get_system_role_or_fallback, LlmModel};
 use std::sync::Arc;
 use tracing::{error, info};
 
-pub async fn clarify_request<T: LlmProcessing + Send + Sync>(
+pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
     user_raw_request: &str,
     current_cache: &str,
     app_state: Arc<T>,
@@ -35,7 +35,7 @@ pub async fn clarify_request<T: LlmProcessing + Send + Sync>(
         }
     };
 
-    match raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Complex).await {
+    match raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Light).await {
         Ok(clarified_request) => {
             info!("User's raw request clarified successfully");
             Ok(clarified_request)

@@ -1,17 +1,19 @@
+use crate::groot_bot::groot_bot_utils::{
+    load_black_listed_users, load_restricted_words, load_white_listed_users,
+};
+use core::models::tg_bot::groot_bot::groot_bot::ResourcesDialogState;
+use core::models::tg_bot::groot_bot::groot_bot::{EditType, ShowType};
+use core::state::tg_bot::app_state::BotAppState;
+use core::utils::tg_bot::groot_bot::build_resource_file_path;
+use serde_json::Value;
 use std::fs;
 use std::fs::File;
 use std::sync::Arc;
-use serde_json::Value;
-use teloxide::Bot;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Requester};
 use teloxide::types::{KeyboardButton, KeyboardMarkup, ReplyMarkup};
+use teloxide::Bot;
 use tracing::{error, info};
-use core::models::tg_bot::groot_bot::groot_bot::ResourcesDialogState;
-use core::models::tg_bot::groot_bot::groot_bot::{ShowType, EditType};
-use crate::groot_bot::groot_bot_utils::{load_black_listed_users, load_restricted_words, load_white_listed_users};
-use core::state::tg_bot::app_state::BotAppState;
-use core::utils::tg_bot::groot_bot::build_resource_file_path;
 
 pub async fn resources_cmd_handler(
     bot: Bot,
@@ -65,7 +67,7 @@ pub async fn resources_cmd_handler(
                 state.awaiting_show_type = false;
                 state.show_type = ShowType::UsersFromWhiteList;
                 let white_listed_users_ids = load_white_listed_users(&app_state.app_name);
-                
+
                 let data = if white_listed_users_ids.is_empty() {
                     "No data available".to_string()
                 } else {
@@ -85,8 +87,8 @@ pub async fn resources_cmd_handler(
                         msg.chat.id,
                         format!("Текущий 'белый список' пользователей:\n\n{}", data),
                     )
-                        .reply_markup(ReplyMarkup::kb_remove())
-                        .await?;
+                    .reply_markup(ReplyMarkup::kb_remove())
+                    .await?;
                 }
 
                 state.show_type = ShowType::None;
@@ -96,15 +98,15 @@ pub async fn resources_cmd_handler(
                 state.show_type = ShowType::UsersFromBlackList;
 
                 let black_listed_users_ids = load_black_listed_users(&app_state.app_name);
-                
+
                 let data = if black_listed_users_ids.is_empty() {
                     "No data available".to_string()
                 } else {
                     black_listed_users_ids
-                    .iter()
-                    .map(|id| id.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\n")
+                        .iter()
+                        .map(|id| id.to_string())
+                        .collect::<Vec<String>>()
+                        .join("\n")
                 };
 
                 if data.len() > 4095 {
@@ -116,8 +118,8 @@ pub async fn resources_cmd_handler(
                         msg.chat.id,
                         format!("Текущий 'чёрный список' пользователей:\n\n{}", data),
                     )
-                        .reply_markup(ReplyMarkup::kb_remove())
-                        .await?;
+                    .reply_markup(ReplyMarkup::kb_remove())
+                    .await?;
                 }
 
                 state.show_type = ShowType::None;
@@ -125,7 +127,7 @@ pub async fn resources_cmd_handler(
             "Запрещённые слова/фразы" => {
                 state.awaiting_show_type = false;
                 state.show_type = ShowType::Words;
-                
+
                 let restricted_words = load_restricted_words(&app_state.app_name);
 
                 let data = if restricted_words.is_empty() {
@@ -143,8 +145,8 @@ pub async fn resources_cmd_handler(
                         msg.chat.id,
                         format!("Текущий список запрещённых слов/фраз:\n\n{}", data),
                     )
-                        .reply_markup(ReplyMarkup::kb_remove())
-                        .await?;
+                    .reply_markup(ReplyMarkup::kb_remove())
+                    .await?;
                 }
 
                 state.show_type = ShowType::None;
@@ -185,8 +187,8 @@ pub async fn resources_cmd_handler(
                     "Пожалуйста, предоставьте id пользователя для добавления в 'чёрный список'\n\n\
                 ВНИМАНИЕ! id пользователя можно получить с помощью бота: @username_to_id_bot",
                 )
-                    .reply_markup(keyboard)
-                    .await?;
+                .reply_markup(keyboard)
+                .await?;
 
                 state.awaiting_edit_type = false;
                 state.awaiting_data_entry = true;
@@ -198,8 +200,8 @@ pub async fn resources_cmd_handler(
                     msg.chat.id,
                     "Пожалуйста предоставьте слово/фразу для добавления в список спам-триггеров",
                 )
-                    .reply_markup(keyboard)
-                    .await?;
+                .reply_markup(keyboard)
+                .await?;
 
                 state.awaiting_edit_type = false;
                 state.awaiting_data_entry = true;
@@ -237,10 +239,12 @@ pub async fn resources_cmd_handler(
                     EditType::UsersToBlackList => {
                         build_resource_file_path(&app_state.app_name, "black_listed_users.json")
                     }
-                    EditType::Words => build_resource_file_path(&app_state.app_name, "restricted_words.json"),
+                    EditType::Words => {
+                        build_resource_file_path(&app_state.app_name, "restricted_words.json")
+                    }
                     _ => return Ok(()),
                 };
-                
+
                 let mut data: Vec<Value> = match fs::read_to_string(&file_path) {
                     Ok(content) => serde_json::from_str::<Vec<Value>>(&content).unwrap_or_default(),
                     Err(_) => Vec::new(),
@@ -249,7 +253,7 @@ pub async fn resources_cmd_handler(
                 let data_to_store: Value;
 
                 let input_text = msg.text().unwrap_or("Empty text").to_string();
-                
+
                 match state.edit_type {
                     EditType::UsersToWhiteList | EditType::UsersToBlackList => {
                         let cleaned_id = input_text.trim();
@@ -264,9 +268,12 @@ pub async fn resources_cmd_handler(
                                 return Ok(());
                             }
                         } else {
-                            bot.send_message(msg.chat.id, "Неверный формат ID. Используйте ID, НЕ username.")
-                                .reply_markup(ReplyMarkup::kb_remove())
-                                .await?;
+                            bot.send_message(
+                                msg.chat.id,
+                                "Неверный формат ID. Используйте ID, НЕ username.",
+                            )
+                            .reply_markup(ReplyMarkup::kb_remove())
+                            .await?;
                             return Ok(());
                         }
                     }
@@ -284,29 +291,30 @@ pub async fn resources_cmd_handler(
                     }
                     _ => return Ok(()),
                 }
-                
+
                 if let Ok(mut file) = File::create(&file_path) {
                     if let Err(err) = serde_json::to_writer(&mut file, &data) {
-                        error!("Error recording data to file: {}: {}", file_path.display(), err);
+                        error!(
+                            "Error recording data to file: {}: {}",
+                            file_path.display(),
+                            err
+                        );
                         return Err(anyhow::anyhow!("Error saving data."));
                     }
                 } else {
                     error!("Error opening file: {}", file_path.display());
                     return Err(anyhow::anyhow!("Ошибка при открытии файла."));
                 }
-                
+
                 info!(
                 "New restriction: | \'{}\' | added to file: | \'{}\' | by user: | \'{}\' | with id: | \'{}\' |",
                 input_text, file_path.display(), username, user_id
             );
 
-                bot.send_message(
-                    msg.chat.id,
-                    "Данные успешно сохранены!",
-                )
+                bot.send_message(msg.chat.id, "Данные успешно сохранены!")
                     .reply_markup(ReplyMarkup::kb_remove())
                     .await?;
-                
+
                 state.edit_type = EditType::None;
                 Ok(())
             }

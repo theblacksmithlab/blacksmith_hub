@@ -26,7 +26,7 @@ pub(crate) async fn probiot_command_handler(
 
     match cmd {
         ProbiotBotCommands::Start => {
-            let bot_msg = get_message(AppsSystemMessages::Probiot(
+            let bot_msg = get_message(AppsSystemMessages::ProbiotBot(
                 ProbiotBotMessages::StartMessage,
             ))
             .await?;

@@ -7,16 +7,27 @@ pub enum PointId {
 #[derive(Clone, Debug)]
 pub struct Document {
     pub point_id: PointId,
-    pub content: String,
-    pub score: Option<f32>,
-    pub metadata: Option<DocumentMetadata>,
+    pub text: String,
+    pub score: f32,
     pub vector: Option<Vec<f32>>,
 }
 
 #[derive(Clone, Debug)]
-pub struct DocumentMetadata {
-    pub source: String,
-    pub timestamp: Option<i64>,
+pub struct W3ADocument {
+    pub point_id: PointId,
+    pub text: String,
+    pub score: Option<f32>,
+    pub vector: Option<Vec<f32>>,
+    pub module: String,
+    pub block_title: String,
+    pub lesson_title: String,
+    pub segment_id: i64,
+}
+
+#[derive(Clone, Debug)]
+pub enum DocumentType {
+    Default(Document),
+    W3A(W3ADocument),
 }
 
 pub enum RAGConfig {
@@ -30,9 +41,13 @@ pub enum RAGConfig {
         related_max_documents: usize,
         related_similarity_threshold: f32,
     },
+    PayloadKeyBased {
+        max_documents: usize,
+        similarity_threshold: f32,
+    },
 }
 
 pub struct RetrievedContext {
     pub context: String,
-    pub documents: Vec<Document>,
+    pub documents: Vec<DocumentType>,
 }

@@ -75,6 +75,8 @@ pub enum W3ARoleType {
     ClarifyRequest,
     MainProcessing,
     CrapRequestProcessing,
+    Recommendation,
+    TTSPreProcessing,
 }
 
 impl W3ARoleType {
@@ -84,6 +86,8 @@ impl W3ARoleType {
             W3ARoleType::ClarifyRequest => "clarify_request",
             W3ARoleType::MainProcessing => "main_processing",
             W3ARoleType::CrapRequestProcessing => "crap_request_processing",
+            W3ARoleType::Recommendation => "recommendation",
+            W3ARoleType::TTSPreProcessing => "tts_pre_processing",
         }
     }
 }

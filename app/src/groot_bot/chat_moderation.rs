@@ -7,13 +7,13 @@ use crate::groot_bot::chat_moderation_utils::{
 use crate::groot_bot::groot_bot_utils::{
     load_black_listed_users, load_paid_chats, load_white_listed_users,
 };
+use crate::groot_bot::resources_cmd_handler::resources_cmd_handler;
 use anyhow::Result;
 use core::state::tg_bot::app_state::BotAppState;
 use std::sync::Arc;
 use teloxide::prelude::Message;
 use teloxide::Bot;
 use tracing::info;
-use crate::groot_bot::resources_cmd_handler::resources_cmd_handler;
 
 pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>) -> Result<()> {
     let user_id = msg.clone().from.unwrap().id.0;
@@ -35,17 +35,25 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
             }
         })
         .unwrap_or_else(|| "Anonymous User".to_string());
-    
+
     if let Some(dialog_states_mutex) = &app_state.dialog_states {
         let mut dialog_states = dialog_states_mutex.lock().await;
-    
+
         if let Some(state) = dialog_states.get_mut(&user_id) {
             if state.awaiting_option_choice
                 || state.awaiting_show_type
                 || state.awaiting_edit_type
                 || state.awaiting_data_entry
             {
-                return resources_cmd_handler(bot, msg, state, app_state.clone(), &username, user_id).await;
+                return resources_cmd_handler(
+                    bot,
+                    msg,
+                    state,
+                    app_state.clone(),
+                    &username,
+                    user_id,
+                )
+                .await;
             }
             // if state.awaiting_ask_message {
             //     return handle_ask(bot, msg, state, app_state.clone()).await;

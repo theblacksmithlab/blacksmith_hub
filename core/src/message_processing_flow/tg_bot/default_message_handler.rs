@@ -239,7 +239,7 @@ pub async fn default_message_handler(
             );
 
             if let Some(message_enum) = match app_name {
-                AppName::ProbiotBot => Some(AppsSystemMessages::Probiot(
+                AppName::ProbiotBot => Some(AppsSystemMessages::ProbiotBot(
                     ProbiotBotMessages::PrivateChatInvitation,
                 )),
                 AppName::W3ABot => Some(AppsSystemMessages::W3ABot(

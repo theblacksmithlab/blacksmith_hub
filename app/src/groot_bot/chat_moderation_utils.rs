@@ -118,7 +118,7 @@ pub async fn check_sender(
     } else {
         warn!("Received a message with NO sender_chat id and NO user id!");
     }
-    
+
     Ok(None)
 }
 
@@ -160,7 +160,7 @@ pub async fn via_bot_message_check(
             return Ok(Some(()));
         }
     }
-    
+
     Ok(None)
 }
 
@@ -204,7 +204,7 @@ pub async fn scam_stories_check(
             }
         }
     }
-    
+
     Ok(None)
 }
 
@@ -311,7 +311,7 @@ pub async fn scam_emojis_check(
             return Ok(Some(()));
         }
     }
-    
+
     Ok(None)
 }
 
@@ -353,7 +353,7 @@ pub async fn restricted_words_check(
             return Ok(Some(()));
         }
     }
-    
+
     Ok(None)
 }
 
@@ -415,7 +415,7 @@ pub async fn message_with_web_url_check(
             }
         }
     }
-    
+
     Ok(None)
 }
 
@@ -464,7 +464,7 @@ pub async fn message_caption_check(
             }
         }
     }
-    
+
     Ok(None)
 }
 
@@ -513,7 +513,7 @@ pub async fn message_entities_check(
             }
         }
     }
-    
+
     Ok(None)
 }
 
@@ -555,7 +555,7 @@ pub async fn media_restriction_check(
             return Ok(Some(()));
         }
     }
-    
+
     Ok(None)
 }
 
@@ -628,9 +628,12 @@ pub async fn ai_check(
             return Ok(Some(()));
         }
     }
-    
-    info!("[Scam detection ai-system] Result for message {} from user: {} with id: {} is: {}", message_to_check, username, user_id, is_scam);
-    
+
+    info!(
+        "[Scam detection ai-system] Result for message {} from user: {} with id: {} is: {}",
+        message_to_check, username, user_id, is_scam
+    );
+
     Ok(None)
 }
 
