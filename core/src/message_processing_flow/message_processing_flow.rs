@@ -255,7 +255,7 @@ pub async fn get_llm_recommendation<T: OpenAIClientInit + QdrantClientInit + Sen
     let llm_message = format!("User's current query: {}\nUser's refined query: {}\nChat history: {}\nWeb3 Academy learning structure:{}\nCompleted lessons:{:?}\n", user_raw_request, clarified_request, current_cache, w3a_academy_study_struct, lesson_learned);
 
     let result =
-        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Complex).await?;
+        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light).await?;
 
     info!("LLM lesson recommendation: {}", result);
 
