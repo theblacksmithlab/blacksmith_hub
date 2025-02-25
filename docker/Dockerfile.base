@@ -58,7 +58,7 @@ RUN chown -R app_user:app_user /app/whisper.cpp && \
     chmod -R 755 /app/whisper.cpp
 
 # Создание симлинка для whisper-cli
-RUN ln -s /app/whisper.cpp/main /usr/local/bin/whisper-cli
+RUN ln -s /app/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
 
 # Настройка временной папки
 RUN mkdir -p /app/tmp/input_videos /app/tmp/output_audio && \
