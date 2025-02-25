@@ -6,5 +6,4 @@ if [ -z "$APP_NAME" ]; then
     exit 1
 fi
 
-echo "Starting $APP_NAME..."
 exec /app/app
