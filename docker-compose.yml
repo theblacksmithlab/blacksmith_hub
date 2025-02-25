@@ -5,8 +5,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.probiot_bot
-    depends_on:
-      - runtime-base
     env_file:
       - .env
     volumes:
