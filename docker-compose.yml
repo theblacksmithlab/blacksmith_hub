@@ -18,4 +18,9 @@ services:
       - ./common_res/messages/probiot_bot:/app/common_res/messages/probiot_bot
       - ./common_res/system_roles/probiot:/app/common_res/system_roles/probiot
       - /root/projects/whisper.cpp/models:/app/models
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
     restart: unless-stopped
