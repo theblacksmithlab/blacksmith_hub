@@ -7,15 +7,12 @@ RUN apt-get update && apt-get install -y \
     cmake \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /usr/src/app
-COPY . .
-
 # Сборка whisper.cpp
 WORKDIR /root/projects
+
 RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
-    make && \
-    make install
+    make
 
 # Загрузка модели в нужную директорию
 RUN mkdir -p /root/projects/whisper.cpp/models && \
@@ -24,6 +21,7 @@ RUN mkdir -p /root/projects/whisper.cpp/models && \
 
 # Сборка Rust-приложения
 WORKDIR /usr/src/app
+COPY . .
 RUN cargo build -p app --release
 
 # --- RUNTIME ---
@@ -44,6 +42,8 @@ COPY --from=builder /usr/src/app/target/release/app .
 
 # Копируем whisper.cpp и модели
 COPY --from=builder /root/projects/whisper.cpp /root/projects/whisper.cpp
+
+RUN chmod +x /root/projects/whisper.cpp/build/bin/main
 
 # Настройка папки tmp
 RUN mkdir /app/tmp && \
