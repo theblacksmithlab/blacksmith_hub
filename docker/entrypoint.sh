@@ -6,6 +6,4 @@ if [ -z "$APP_NAME" ]; then
     exit 1
 fi
 
-ln -sfn /app/models /root/projects/whisper.cpp/models
-
-exec ./app
+exec /app/app
