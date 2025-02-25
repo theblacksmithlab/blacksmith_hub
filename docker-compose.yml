@@ -17,7 +17,7 @@ services:
       - ./common_res/messages/common:/app/common_res/messages/common
       - ./common_res/messages/probiot_bot:/app/common_res/messages/probiot_bot
       - ./common_res/system_roles/probiot:/app/common_res/system_roles/probiot
-      - /root/projects/whisper.cpp/models:/app/models
+      - /root/projects/whisper.cpp/models:/app/whisper.cpp/models
     deploy:
       resources:
         limits:

@@ -14,11 +14,6 @@ RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
     make
 
-# Загрузка модели whisper
-RUN mkdir -p /app/whisper.cpp/models && \
-    curl -L -o /app/whisper.cpp/models/ggml-medium.bin \
-    https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin
-
 # Подготовка к сборке Rust-приложения
 WORKDIR /usr/src/app
 COPY Cargo.toml Cargo.lock ./
@@ -60,10 +55,9 @@ RUN chown -R app_user:app_user /app/whisper.cpp && \
 # Создание симлинка для whisper-cli
 RUN ln -s /app/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
 
-# Настройка временной папки
-RUN mkdir -p /app/tmp/input_videos /app/tmp/output_audio && \
-    chown -R app_user:app_user /app/tmp && \
-    chmod -R 700 /app/tmp && \
+RUN mkdir -p /app/tmp && \
+    chown app_user:app_user /app/tmp && \
+    chmod 700 /app/tmp && \
     chown app_user:app_user /app && \
     chmod 755 /app
 
