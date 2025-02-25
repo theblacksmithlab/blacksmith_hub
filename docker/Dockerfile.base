@@ -14,13 +14,6 @@ RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
 
 WORKDIR /usr/src/app
 COPY Cargo.toml Cargo.lock ./
-
-RUN mkdir -p core/src server/src ai_forge/src app/src tools/src && \
-    touch core/src/lib.rs server/src/lib.rs ai_forge/src/main.rs \
-    app/src/main.rs tools/src/main.rs
-
-RUN cargo build -p app --release
-
 COPY core core/
 COPY server server/
 COPY ai_forge ai_forge/
@@ -45,7 +38,6 @@ WORKDIR /app
 COPY --from=builder /usr/src/app/target/release/app .
 
 COPY --from=builder /app/whisper.cpp /app/whisper.cpp
-RUN mkdir -p /app/whisper.cpp/models
 
 RUN chown -R app_user:app_user /app/whisper.cpp && \
     chmod -R 755 /app/whisper.cpp
@@ -60,3 +52,7 @@ RUN mkdir -p /app/tmp && \
 
 COPY docker/entrypoint.sh .
 RUN chmod +x entrypoint.sh
+
+USER app_user
+
+ENTRYPOINT ["./entrypoint.sh"]
