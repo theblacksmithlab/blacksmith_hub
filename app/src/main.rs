@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
         _ => return Err(anyhow::anyhow!("Unknown APP_NAME: {}", app_name_str)),
     };
 
-    if let Err(e) = reset_tmp_dir() {
+    if let Err(e) = reset_tmp_dir(&app_name) {
         error!("Failed to reset tmp directory: {}", e);
     }
 
