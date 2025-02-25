@@ -130,9 +130,12 @@ pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
         ));
     }
 
+    let model_path = std::env::var("WHISPER_MODEL_PATH")
+        .unwrap_or_else(|_| "/root/projects/whisper.cpp/models/ggml-base.bin".to_string());
+    
     let output = Command::new("whisper-cli")
         .arg("-m")
-        .arg("/app/whisper.cpp/models/ggml-base.bin")
+        .arg(model_path)
         .arg("-f")
         .arg(file_path)
         .arg("-l")

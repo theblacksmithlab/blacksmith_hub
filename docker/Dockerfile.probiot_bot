@@ -1,7 +1,5 @@
 FROM runtime-base
 
-USER root
-
 COPY common_res/messages/common /app/common_res/messages/common
 COPY common_res/messages/probiot_bot /app/common_res/messages/probiot_bot
 COPY common_res/system_roles/probiot /app/common_res/system_roles/probiot
@@ -9,7 +7,17 @@ COPY common_res/system_roles/probiot /app/common_res/system_roles/probiot
 COPY docker/entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
+ENV APP_NAME="probiot_bot"
+ENV WHISPER_MODEL_PATH="/app/whisper.cpp/models/ggml-base.bin"
+
+RUN for dir in /app/common_res/messages/common /app/common_res/messages/probiot_bot /app/common_res/system_roles/probiot; do \
+    if [ ! -d "$dir" ]; then echo "Error: Directory $dir does not exist"; exit 1; fi; \
+    chown -R app_user:app_user "$dir"; \
+    chmod -R 755 "$dir"; \
+    done
+
 USER app_user
 
-ENV APP_NAME="probiot_bot"
+RUN which whisper-cli || (echo "Error: whisper-cli not found" && exit 1)
+
 ENTRYPOINT ["./entrypoint.sh"]
