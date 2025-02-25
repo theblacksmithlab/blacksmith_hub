@@ -20,6 +20,8 @@ services:
       - ./common_res/messages/probiot_bot:/app/common_res/messages/probiot_bot
       - ./common_res/system_roles/probiot:/app/common_res/system_roles/probiot
       - /root/projects/whisper.cpp/models:/app/whisper.cpp/models
+    tmpfs:
+      - /app/tmp:exec,mode=0700,uid=1000,gid=1000
     deploy:
       resources:
         limits:
