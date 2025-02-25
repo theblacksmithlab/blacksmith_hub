@@ -1,12 +1,6 @@
 version: '3.8'
 
 services:
-  runtime-base:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.base
-    image: runtime-base
-
   probiot_bot:
     build:
       context: .
