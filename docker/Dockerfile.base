@@ -44,10 +44,7 @@ RUN chown -R app_user:app_user /app/whisper.cpp && \
 
 RUN ln -s /app/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
 
-RUN mkdir -p /app/tmp && \
-    chown app_user:app_user /app/tmp && \
-    chmod 700 /app/tmp && \
-    chown app_user:app_user /app && \
+RUN chown app_user:app_user /app && \
     chmod 755 /app
 
 COPY docker/entrypoint.sh .
