@@ -1,31 +1,40 @@
 FROM rust:latest AS builder
 
+# Установка системных зависимостей
 RUN apt-get update && apt-get install -y \
     pkg-config \
-    libssl3 \
+    libssl-dev \
     ffmpeg \
     cmake \
     && rm -rf /var/lib/apt/lists/*
 
-# Сборка whisper.cpp в /app/
+# Сборка whisper.cpp
 WORKDIR /app
 RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
     make
 
-# Загрузка модели в /app/whisper.cpp/models
+# Загрузка модели whisper
 RUN mkdir -p /app/whisper.cpp/models && \
     curl -L -o /app/whisper.cpp/models/ggml-medium.bin \
     https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin
 
-# Сборка Rust-приложения
+# Подготовка к сборке Rust-приложения
 WORKDIR /usr/src/app
-COPY . .
+COPY Cargo.toml Cargo.lock ./
+COPY core core/
+COPY server server/
+COPY ai_forge ai_forge/
+COPY app app/
+COPY tools tools/
+
+# Сборка приложения
 RUN cargo build -p app --release
 
-# --- RUNTIME ---
+# Рантайм
 FROM debian:bookworm-slim AS runtime-base
 
+# Установка необходимых зависимостей для выполнения
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
@@ -33,31 +42,35 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
+# Создание пользователя
 RUN useradd -ms /bin/bash app_user
 
 WORKDIR /app
 
-# Копируем исполняемый файл
+# Копирование исполняемого файла
 COPY --from=builder /usr/src/app/target/release/app .
 
-# Копируем whisper.cpp и модели
+# Копирование whisper.cpp и моделей
 COPY --from=builder /app/whisper.cpp /app/whisper.cpp
 
-# Даём права app_user на whisper.cpp
+# Настройка прав доступа
 RUN chown -R app_user:app_user /app/whisper.cpp && \
     chmod -R 755 /app/whisper.cpp
 
-# Создаём симлинк на whisper-cli
+# Создание симлинка для whisper-cli
 RUN ln -s /app/whisper.cpp/main /usr/local/bin/whisper-cli
 
-# Настройка папки tmp
-RUN mkdir /app/tmp && \
+# Настройка временной папки
+RUN mkdir -p /app/tmp/input_videos /app/tmp/output_audio && \
     chown -R app_user:app_user /app/tmp && \
     chmod -R 700 /app/tmp && \
     chown app_user:app_user /app && \
     chmod 755 /app
 
-# Запуск под пользователем app_user
+# Копирование entrypoint скрипта
+COPY docker/entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
 USER app_user
 
-CMD ["/app/app"]
+ENTRYPOINT ["./entrypoint.sh"]
