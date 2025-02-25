@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::time::Instant;
 use tracing::{error, info, warn};
 
 pub async fn podcast_tts<T: OpenAIClientInit + Send + Sync>(
@@ -120,6 +121,8 @@ pub async fn simple_tts<T: OpenAIClientInit + Send + Sync>(
 }
 
 pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
+    let start = Instant::now();
+    
     if !file_path.exists() {
         return Err(anyhow!(
             "Voice message file not found: {}",
@@ -139,6 +142,8 @@ pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
 
     match output {
         Ok(output) if output.status.success() => {
+            info!("Transcription took: {:?}", start.elapsed());
+            
             let stdout = String::from_utf8(output.stdout)?;
 
             if stdout.trim().is_empty() {
@@ -157,6 +162,7 @@ pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
             Err(anyhow!("Failed to execute Whisper CLI: {}", err))
         }
     }
+    
 }
 
 // ElevenLabs TTS functionality
