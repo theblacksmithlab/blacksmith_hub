@@ -1,0 +1,21 @@
+services:
+  runtime-base:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.base
+    image: runtime-base
+
+  probiot_bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.probiot_bot
+    depends_on:
+      - runtime-base
+    env_file:
+      - .env
+    volumes:
+      - ./common_res/messages/common:/app/common_res/messages/common
+      - ./common_res/messages/probiot_bot:/app/common_res/messages/probiot_bot
+      - ./common_res/system_roles/probiot:/app/common_res/system_roles/probiot
+      - /root/projects/whisper.cpp/models:/app/models
+    restart: unless-stopped
