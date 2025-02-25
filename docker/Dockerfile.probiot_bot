@@ -1,5 +1,7 @@
 FROM runtime-base
 
+USER root
+
 COPY common_res/messages/common /app/common_res/messages/common
 COPY common_res/messages/probiot_bot /app/common_res/messages/probiot_bot
 COPY common_res/system_roles/probiot /app/common_res/system_roles/probiot
