@@ -46,6 +46,9 @@ RUN mkdir -p tmp && \
     chown app_user:app_user /app && \
     chmod 755 /app
 
-USER app_user
+RUN mkdir -p /etc/letsencrypt/live/api.blacksmith-lab.com/ && \
+    chmod 755 /etc/letsencrypt/live/api.blacksmith-lab.com/
+
+USER root
 
 CMD ["/app/ai_forge"]
