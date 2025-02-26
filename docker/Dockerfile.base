@@ -1,6 +1,5 @@
 FROM rust:latest AS builder
 
-# Установка системных зависимостей
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl3 \
@@ -8,28 +7,24 @@ RUN apt-get update && apt-get install -y \
     cmake \
     && rm -rf /var/lib/apt/lists/*
 
-# Сборка whisper.cpp
 WORKDIR /app
 RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
     make
 
-# Подготовка к сборке Rust-приложения
 WORKDIR /usr/src/app
+
 COPY Cargo.toml Cargo.lock ./
+
 COPY core core/
 COPY server server/
 COPY ai_forge ai_forge/
 COPY app app/
-COPY tools tools/
 
-# Сборка приложения
-RUN cargo build -p app --release
+RUN cargo build -p app --release -j 4
 
-# Рантайм
 FROM debian:bookworm-slim AS runtime-base
 
-# Установка необходимых зависимостей для выполнения
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
@@ -37,22 +32,17 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Создание пользователя
 RUN useradd -ms /bin/bash app_user
 
 WORKDIR /app
 
-# Копирование исполняемого файла
 COPY --from=builder /usr/src/app/target/release/app .
 
-# Копирование whisper.cpp и моделей
 COPY --from=builder /app/whisper.cpp /app/whisper.cpp
 
-# Настройка прав доступа
 RUN chown -R app_user:app_user /app/whisper.cpp && \
     chmod -R 755 /app/whisper.cpp
 
-# Создание симлинка для whisper-cli
 RUN ln -s /app/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
 
 RUN mkdir -p tmp && \
@@ -61,7 +51,6 @@ RUN mkdir -p tmp && \
     chown app_user:app_user /app && \
     chmod 755 /app
 
-# Копирование entrypoint скрипта
 COPY docker/entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
