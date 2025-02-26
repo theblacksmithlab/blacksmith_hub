@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd -ms /bin/bash app_user
+RUN useradd -ms /bin/bash -u 1001 -g 1001 app_user
 
 WORKDIR /app
 
