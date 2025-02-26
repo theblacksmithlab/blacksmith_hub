@@ -28,7 +28,8 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd -ms /bin/bash -u 1001 -g 1001 app_user
+RUN groupadd -g 1001 common_res_group && \
+    useradd -ms /bin/bash -u 1001 -g common_res_group app_user
 
 WORKDIR /app
 
