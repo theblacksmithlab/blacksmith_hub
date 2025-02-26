@@ -24,6 +24,7 @@ common_res/w3a/w3a_qdrant_index.json
 DEV_NOTE.md
 *.log
 tools/tmp
+certs/
 
 #Groot res
 common_res/groot_bot/black_listed_users.json
