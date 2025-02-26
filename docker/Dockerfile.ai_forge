@@ -38,8 +38,8 @@ COPY config.yaml .
 
 RUN mkdir -p /etc/letsencrypt/live/api.blacksmith-lab.com/
 
-COPY /etc/letsencrypt/archive/api.blacksmith-lab.com/fullchain1.pem /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
-COPY /etc/letsencrypt/archive/api.blacksmith-lab.com/privkey1.pem /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem
+COPY ./certs/fullchain.pem /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
+COPY ./certs/privkey.pem /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem
 
 RUN chown app_user:app_user /app/ai_forge && \
     chmod +x /app/ai_forge && \
