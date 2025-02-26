@@ -28,8 +28,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -g 1001 common_res_group && \
-    useradd -ms /bin/bash -u 1001 -g common_res_group app_user
+RUN groupadd -g 1001 app_user && useradd -m -u 1001 -g 1001 app_user
 
 WORKDIR /app
 
@@ -42,18 +41,18 @@ RUN mkdir -p /etc/letsencrypt/live/api.blacksmith-lab.com/
 COPY ./certs/fullchain.pem /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
 COPY ./certs/privkey.pem /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem
 
-RUN chown app_user:app_user /app/ai_forge && \
+RUN chown 1001:1001 /app/ai_forge && \
     chmod +x /app/ai_forge && \
-    chown app_user:app_user /app/config.yaml
+    chown 1001:1001 /app/config.yaml
 
-RUN chown -R app_user:app_user /etc/letsencrypt/live && \
+RUN chown -R 1001:1001 /etc/letsencrypt/live && \
     chmod 600 /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem && \
     chmod 644 /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
 
-RUN mkdir -p tmp && \
-    chown app_user:app_user tmp && \
-    chmod 700 tmp && \
-    chown app_user:app_user /app && \
+RUN mkdir -p /tmp && \
+    chown 1001:1001 /tmp && \
+    chmod 700 /tmp && \
+    chown 1001:1001 /app && \
     chmod 755 /app
 
 USER app_user
