@@ -199,7 +199,7 @@ pub(crate) async fn handle_the_viper_room_user_request(
                 .unwrap_or(false)
         };
         info!(
-            "needs_session_file_creation: {}",
+            "Needs_session_file_creation: {}",
             needs_session_file_creation
         );
 

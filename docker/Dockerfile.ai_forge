@@ -1,0 +1,48 @@
+FROM rust:latest AS builder
+
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl3 \
+    libsqlite3-dev \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/app
+
+COPY Cargo.toml Cargo.lock ./
+COPY core core/
+COPY server server/
+COPY ai_forge ai_forge/
+
+RUN cargo build -p ai_forge --release -j 4
+
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    libsqlite3-0 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -ms /bin/bash app_user
+
+WORKDIR /app
+
+COPY --from=builder /usr/src/app/target/release/ai_forge .
+
+COPY config.yaml .
+
+RUN chown app_user:app_user /app/ai_forge && \
+    chmod +x /app/ai_forge && \
+    chown app_user:app_user /app/config.yaml
+
+RUN mkdir -p tmp && \
+    chown app_user:app_user tmp && \
+    chmod 700 tmp && \
+    chown app_user:app_user /app && \
+    chmod 755 /app
+
+USER app_user
+
+CMD ["/app/ai_forge"]

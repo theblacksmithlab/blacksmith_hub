@@ -21,3 +21,23 @@ services:
           cpus: '4'
           memory: 4G
     restart: unless-stopped
+
+  ai_forge:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ai_forge
+    volumes:
+      - ./blacksmith_lab.db:/app/blacksmith_lab.db
+      - ./request_app.db:/app/request_app.db
+      - ./common_res:/app/common_res
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+    restart: unless-stopped
