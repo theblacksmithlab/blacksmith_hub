@@ -36,9 +36,18 @@ COPY --from=builder /usr/src/app/target/release/ai_forge .
 
 COPY config.yaml .
 
+RUN mkdir -p /etc/letsencrypt/live/api.blacksmith-lab.com/
+
+COPY /etc/letsencrypt/archive/api.blacksmith-lab.com/fullchain1.pem /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
+COPY /etc/letsencrypt/archive/api.blacksmith-lab.com/privkey1.pem /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem
+
 RUN chown app_user:app_user /app/ai_forge && \
     chmod +x /app/ai_forge && \
     chown app_user:app_user /app/config.yaml
+
+RUN chown -R app_user:app_user /etc/letsencrypt/live && \
+    chmod 600 /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem && \
+    chmod 644 /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
 
 RUN mkdir -p tmp && \
     chown app_user:app_user tmp && \
@@ -46,9 +55,6 @@ RUN mkdir -p tmp && \
     chown app_user:app_user /app && \
     chmod 755 /app
 
-RUN mkdir -p /etc/letsencrypt/live/api.blacksmith-lab.com/ && \
-    chmod 755 /etc/letsencrypt/live/api.blacksmith-lab.com/
-
-USER root
+USER app_user
 
 CMD ["/app/ai_forge"]

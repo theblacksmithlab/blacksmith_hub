@@ -30,7 +30,6 @@ services:
       - ./blacksmith_lab.db:/app/blacksmith_lab.db
       - ./request_app.db:/app/request_app.db
       - ./common_res:/app/common_res
-      - /etc/letsencrypt:/etc/letsencrypt:ro
     env_file:
       - .env
     ports:
