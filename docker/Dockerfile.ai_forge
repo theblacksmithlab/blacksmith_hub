@@ -10,9 +10,12 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /usr/src/app
 
 COPY Cargo.toml Cargo.lock ./
+
 COPY core core/
 COPY server server/
 COPY ai_forge ai_forge/
+COPY app app/
+COPY tools tools/
 
 RUN cargo build -p ai_forge --release -j 4
 
