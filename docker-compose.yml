@@ -4,13 +4,12 @@ services:
       context: .
       dockerfile: docker/Dockerfile.base
     image: runtime-base
+    profiles: ["never-start"]
 
   probiot_bot:
     build:
       context: .
       dockerfile: docker/Dockerfile.probiot_bot
-    depends_on:
-      - runtime-base
     env_file:
       - .env
     volumes:
