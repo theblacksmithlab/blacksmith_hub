@@ -17,8 +17,25 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
+          cpus: '2'
           memory: 4G
+    restart: unless-stopped
+
+  groot_bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.groot_bot
+    env_file:
+      - .env
+    volumes:
+      - /root/projects/whisper.cpp/models:/app/whisper.cpp/models
+      - ./common_res/groot_bot:/app/common_res/groot_bot
+    user: "1001:1000"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
     restart: unless-stopped
 
   ai_forge:

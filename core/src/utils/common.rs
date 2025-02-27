@@ -29,12 +29,11 @@ pub fn get_mapped_from_app_name_role_directory(app_name: &AppName) -> &str {
     }
 }
 
-pub fn get_system_role_path(app_name: &AppName, role_type: &str) -> String {
-    format!(
-        "common_res/system_roles/{}/{}.txt",
-        get_mapped_from_app_name_role_directory(app_name),
-        role_type
-    )
+pub fn get_system_role_path(app_name: &AppName, role_type: &str) -> PathBuf {
+    PathBuf::from("common_res")
+        .join("system_roles")
+        .join(get_mapped_from_app_name_role_directory(app_name))
+        .join(format!("{}.txt", role_type))
 }
 
 pub fn get_system_role_or_fallback<T>(
@@ -54,7 +53,7 @@ where
         Err(err) => {
             error!(
                 "Failed to load system role '{}': {}. Using fallback.",
-                file_path, err
+                file_path.display(), err
             );
 
             error!(

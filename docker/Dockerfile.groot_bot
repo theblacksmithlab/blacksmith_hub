@@ -1,0 +1,16 @@
+FROM runtime-base
+
+USER root
+
+COPY common_res/messages/common /app/common_res/messages/common
+COPY common_res/messages/groot_bot /app/common_res/messages/groot_bot
+COPY common_res/system_roles/groot_bot /app/common_res/system_roles/groot_bot
+
+COPY docker/entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+USER app_user
+
+ENV APP_NAME="groot_bot"
+ENV WHISPER_MODEL_PATH="/app/whisper.cpp/models/ggml-base.bin"
+ENTRYPOINT ["./entrypoint.sh"]
