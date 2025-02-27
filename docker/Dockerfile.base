@@ -33,28 +33,26 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd -ms /bin/bash app_user
-
 WORKDIR /app
 
 COPY --from=builder /usr/src/app/target/release/app .
 
 COPY --from=builder /app/whisper.cpp /app/whisper.cpp
 
-RUN chown -R app_user:app_user /app/whisper.cpp && \
+RUN chown -R 1001:1000 /app/whisper.cpp && \
     chmod -R 755 /app/whisper.cpp
 
 RUN ln -s /app/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
 
 RUN mkdir -p tmp && \
-    chown app_user:app_user tmp && \
+    chown 1001:1000 tmp && \
     chmod 700 tmp && \
-    chown app_user:app_user /app && \
+    chown 1001:1000 /app && \
     chmod 755 /app
 
 COPY docker/entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-USER app_user
+USER 1001:1000
 
 ENTRYPOINT ["./entrypoint.sh"]

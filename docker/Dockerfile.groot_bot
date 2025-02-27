@@ -9,7 +9,7 @@ COPY common_res/system_roles/groot_bot /app/common_res/system_roles/groot_bot
 COPY docker/entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-USER app_user
+USER 1001:1000
 
 ENV APP_NAME="groot_bot"
 ENV WHISPER_MODEL_PATH="/app/whisper.cpp/models/ggml-base.bin"

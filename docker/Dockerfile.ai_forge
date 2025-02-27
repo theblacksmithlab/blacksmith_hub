@@ -28,8 +28,6 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd -ms /bin/bash app_user
-
 WORKDIR /app
 
 COPY --from=builder /usr/src/app/target/release/ai_forge .
@@ -41,20 +39,20 @@ RUN mkdir -p /etc/letsencrypt/live/api.blacksmith-lab.com/
 COPY ./certs/fullchain.pem /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
 COPY ./certs/privkey.pem /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem
 
-RUN chown 1001:1001 /app/ai_forge && \
+RUN chown 1001:1000 /app/ai_forge && \
     chmod +x /app/ai_forge && \
-    chown 1001:1001 /app/config.yaml
+    chown 1001:1000 /app/config.yaml
 
-RUN chown -R 1001:1001 /etc/letsencrypt/live && \
+RUN chown -R 1001:1000 /etc/letsencrypt/live && \
     chmod 600 /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem && \
     chmod 644 /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
 
 RUN mkdir -p /tmp && \
-    chown 1001:1001 /tmp && \
+    chown 1001:1000 /tmp && \
     chmod 700 /tmp && \
-    chown 1001:1001 /app && \
+    chown 1001:1000 /app && \
     chmod 755 /app
 
-USER app_user
+USER 1001:1000
 
 CMD ["/app/ai_forge"]

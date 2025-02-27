@@ -9,7 +9,7 @@ COPY common_res/system_roles/probiot /app/common_res/system_roles/probiot
 COPY docker/entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-USER app_user
+USER 1001:1000
 
 ENV APP_NAME="probiot_bot"
 ENV WHISPER_MODEL_PATH="/app/whisper.cpp/models/ggml-base.bin"
