@@ -205,7 +205,7 @@ pub async fn get_and_remove_tts_payload(
     }
 }
 
-pub fn reset_tmp_dir() -> std::io::Result<()> {
+pub fn reset_tmp_dir(app_name: &AppName) -> std::io::Result<()> {
     let base_tmp = PathBuf::from("tmp");
 
     if base_tmp.exists() {
@@ -213,5 +213,9 @@ pub fn reset_tmp_dir() -> std::io::Result<()> {
     }
 
     fs::create_dir_all(&base_tmp)?;
+
+    let app_tmp_dir = app_name.temp_dir();
+    fs::create_dir_all(&app_tmp_dir)?;
+    
     Ok(())
 }

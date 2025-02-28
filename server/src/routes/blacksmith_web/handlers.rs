@@ -43,7 +43,7 @@ pub(crate) async fn handle_blacksmith_web_user_request(
     let request_text = request.text;
 
     info!(
-        "Source: {} | Got text message from user: {}: {}",
+        "App-Source: {} | Got text message from user: {}: {}",
         app_name, user_id, request_text
     );
 
@@ -71,7 +71,7 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
     };
 
     info!(
-        "Source: {} | Fetching chat history for user: {}",
+        "App-Source: {} | Fetching chat history for user: {}",
         app_name, user_id
     );
     match fetch_chat_history_from_db(
@@ -104,7 +104,7 @@ pub(crate) async fn handle_blacksmith_web_tts_request(
     let temp_dir = app_name.temp_dir();
 
     info!(
-        "Source: {} | Got TTS request from user: {} for text: {}",
+        "App-Source: {} | Got TTS request from user: {} for text: {}",
         app_name, user_id, request_text
     );
 

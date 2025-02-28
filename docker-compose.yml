@@ -1,0 +1,57 @@
+services:
+  runtime-base:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.base
+    image: runtime-base
+    profiles: ["never-start"]
+
+  probiot_bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.probiot_bot
+    env_file:
+      - .env
+    volumes:
+      - /root/projects/whisper.cpp/models:/app/whisper.cpp/models
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+    restart: unless-stopped
+
+  groot_bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.groot_bot
+    env_file:
+      - .env
+    volumes:
+      - /root/projects/whisper.cpp/models:/app/whisper.cpp/models
+      - ./common_res/groot_bot:/app/common_res/groot_bot
+    user: "1001:1000"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    restart: unless-stopped
+
+  ai_forge:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ai_forge
+    volumes:
+      - ./common_res:/app/common_res
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    user: "1001:1000"
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+    restart: unless-stopped

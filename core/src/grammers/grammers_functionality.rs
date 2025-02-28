@@ -121,8 +121,8 @@ pub async fn session_file_creation(
 ) -> Json<TheViperRoomServerResponse> {
     let session_dir = env::current_dir()
         .expect("Failed to get current directory")
-        .join("common_res")
-        .join("the_viper_room_auth_tmp_data");
+        .join("tmp")
+        .join("the_viper_room");
 
     fs::create_dir_all(&session_dir).expect("Failed to create directory for sessions");
 

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 pub async fn default_message_handler(
-    action_text: &str,
+    request_text: &str,
     app_state: Arc<BlacksmithWebAppState>,
     user_id: &str,
     app_name: &AppName,
@@ -23,7 +23,7 @@ pub async fn default_message_handler(
         app_state.get_db_pool(),
         user_id,
         "user",
-        action_text,
+        request_text,
         &app_name.as_str(),
     )
     .await
@@ -31,7 +31,7 @@ pub async fn default_message_handler(
         error!("Failed to save user message to DB: {}", e);
     }
 
-    match process_user_raw_request(user_id, action_text, app_state.clone(), app_name.clone()).await
+    match process_user_raw_request(user_id, request_text, app_state.clone(), app_name.clone()).await
     {
         Ok(llm_response) => {
             let full_response = append_footer_if_needed(

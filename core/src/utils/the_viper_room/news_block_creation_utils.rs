@@ -217,7 +217,7 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
 ) -> anyhow::Result<()> {
     let mut messages = client.iter_messages(dialog.chat());
     let now = Utc::now();
-    let period = now - chrono::Duration::hours(9); // TODO: Реализовать настройку временного периода
+    let period = now - chrono::Duration::hours(9); // TODO: Implement news parsing period setting from UI
 
     let user_tmp_file = format!(
         "{}/{}.txt",
@@ -278,7 +278,7 @@ async fn remove_empty_txt_files(dir: String) -> anyhow::Result<()> {
 
             if metadata.len() == 0 {
                 remove_file(&path)?;
-                println!("Deleted empty file: {:?}", path);
+                info!("Deleted empty file: {:?}", path);
             }
         }
     }
@@ -340,7 +340,7 @@ pub(crate) async fn mix_podcast_with_music(
         fade_start
     );
 
-    info!("Starting FFmpeg mixing process...");
+    info!("Starting ffmpeg mixing process...");
     let output = Command::new("ffmpeg")
         .args([
             "-i",
@@ -361,7 +361,7 @@ pub(crate) async fn mix_podcast_with_music(
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("FFmpeg error: {}", error));
+        return Err(anyhow::anyhow!("ffmpeg error: {}", error));
     }
 
     info!("Mixing completed successfully");
@@ -388,7 +388,7 @@ pub async fn generate_waveform(audio_path: &Path) -> anyhow::Result<Vec<u8>> {
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("FFmpeg error: {}", error));
+        return Err(anyhow::anyhow!("ffmpeg error: {}", error));
     }
 
     let samples: Vec<i16> = output

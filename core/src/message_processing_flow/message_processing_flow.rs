@@ -247,12 +247,12 @@ pub async fn get_llm_recommendation<T: OpenAIClientInit + QdrantClientInit + Sen
     app_name: &AppName,
     lesson_learned: &Vec<String>,
 ) -> Result<String> {
-    let w3a_academy_study_struct =
+    let w3a_academy_learning_structure =
         get_message(AppsSystemMessages::W3A(W3AMessages::W3AStudyStructure)).await?;
 
     let system_role = get_system_role_or_fallback(&app_name, W3ARoleType::Recommendation, None);
 
-    let llm_message = format!("User's current query: {}\nUser's refined query: {}\nChat history: {}\nWeb3 Academy learning structure:{}\nCompleted lessons:{:?}\n", user_raw_request, clarified_request, current_cache, w3a_academy_study_struct, lesson_learned);
+    let llm_message = format!("User's current query: {}\nUser's refined query: {}\nChat history: {}\nWeb3 Academy learning structure:{}\nCompleted lessons:{:?}\n", user_raw_request, clarified_request, current_cache, w3a_academy_learning_structure, lesson_learned);
 
     let result =
         raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light).await?;
@@ -273,7 +273,7 @@ pub async fn get_llm_recommendation<T: OpenAIClientInit + QdrantClientInit + Sen
     info!("Extracted recommendation: {}", llm_lesson_recommendation);
 
     if !llm_lesson_recommendation.is_empty()
-        && !lesson_exists_in_structure(&llm_lesson_recommendation, &w3a_academy_study_struct)
+        && !lesson_exists_in_structure(&llm_lesson_recommendation, &w3a_academy_learning_structure)
     {
         warn!(
             "Recommended lesson '{}' not found in W3A structure, returning empty string",

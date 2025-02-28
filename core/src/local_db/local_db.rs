@@ -15,9 +15,15 @@ pub async fn setup_blacksmith_lab_db() -> anyhow::Result<SqlitePool> {
     let blacksmith_lab_database_url = env::var("BLACKSMITH_LAB_DATABASE_URL")
         .context("Error: BLACKSMITH_LAB_DATABASE_URL must be set")?;
 
-    let db_path = "blacksmith_lab.db";
+    let db_path = "common_res/local_db/blacksmith_lab.db";
 
     if !Path::new(db_path).exists() {
+        if let Some(parent) = Path::new(db_path).parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent).context("Error creating directory for Blacksmith Lab DB")?;
+            }
+        }
+
         fs::File::create(db_path).context("Error creating local db file for Blacksmith Lab")?;
         warn!("Blacksmith Lab local_db file {} created.", db_path);
     }
@@ -45,11 +51,17 @@ pub async fn setup_request_app_db() -> anyhow::Result<SqlitePool> {
     let request_app_database_url = env::var("REQUEST_APP_DATABASE_URL")
         .context("Error: REQUEST_APP_DATABASE_URL must be set")?;
 
-    let db_path = "request_app.db";
+    let db_path = "common_res/local_db/request_app.db";
 
     if !Path::new(db_path).exists() {
-        fs::File::create(db_path).context("Error creating local db file for Request App")?;
-        warn!("Request App local_db file {} created.", db_path);
+        if let Some(parent) = Path::new(db_path).parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent).context("Error creating directory for Request APP DB")?;
+            }
+        }
+
+        fs::File::create(db_path).context("Error creating local db file for Request APP")?;
+        warn!("Request APP local_db file {} created.", db_path);
     }
 
     let pool = SqlitePool::connect_with(

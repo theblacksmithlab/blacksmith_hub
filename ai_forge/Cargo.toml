@@ -1,5 +1,5 @@
 [package]
-name = "forge"
+name = "ai_forge"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,8 +11,7 @@ dotenv.workspace = true
 qdrant-client.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-tokio.workspace = true  
-sqlx.workspace = true
+tokio.workspace = true
 
 core = { path = "../core" }
 server = { path = "../server" }
