@@ -34,7 +34,7 @@ pub(crate) async fn handle_blacksmith_web_user_request(
     let app_name = match AppName::from_str(&request.app_name) {
         Ok(app) => app,
         Err(_) => {
-            warn!("Unsupported app type: {}", request.app_name);
+            warn!("Unsupported app_name received from frontend: {}. Processing request as Blacksmith Web", request.app_name);
             AppName::BlacksmithWeb
         }
     };

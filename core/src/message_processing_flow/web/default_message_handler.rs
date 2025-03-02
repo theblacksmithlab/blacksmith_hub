@@ -15,7 +15,7 @@ pub async fn default_message_handler(
     app_name: &AppName,
 ) -> String {
     info!(
-        "Message received from user: {} is a text message. Let's process it...",
+        "Message received from user: {} is a text message. Processing it...",
         user_id
     );
 
@@ -28,7 +28,7 @@ pub async fn default_message_handler(
     )
     .await
     {
-        error!("Failed to save user message to DB: {}", e);
+        error!("Failed to save user message to local db: {}", e);
     }
 
     match process_user_raw_request(user_id, request_text, app_state.clone(), app_name.clone()).await
@@ -54,7 +54,7 @@ pub async fn default_message_handler(
             )
             .await
             {
-                error!("Failed to save llm_response message to DB: {}", e);
+                error!("Failed to save llm_response message to local db: {}", e);
             }
 
             add_llm_response_to_cache(app_state.clone(), user_id, &full_response).await;
@@ -64,7 +64,7 @@ pub async fn default_message_handler(
             htmled_full_response
         }
         Err(err) => {
-            error!("Error processing action text from user: {}", err);
+            error!("Error processing text request from user: {}", err);
             err.to_string()
         }
     }

@@ -34,7 +34,6 @@ pub async fn process_user_raw_request<
     app_state: Arc<T>,
     app_name: AppName,
 ) -> Result<String> {
-    info!("Start processing user raw request...");
     add_user_message_to_cache(app_state.clone(), user_id, user_raw_request).await;
 
     let current_cache = get_cache_as_string(app_state.clone(), user_id).await;
