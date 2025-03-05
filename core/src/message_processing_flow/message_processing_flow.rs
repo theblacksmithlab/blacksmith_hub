@@ -5,7 +5,7 @@ use crate::message_processing_flow::clarify_request::clarify_request;
 use crate::models::common::app_name::AppName;
 use crate::models::common::qdrant_collection_manager::AppsCollections;
 use crate::models::common::system_messages::{AppsSystemMessages, W3AMessages};
-use crate::models::common::system_roles::ProbiotRoleType;
+use crate::models::common::system_roles::{BlacksmithLabRoleType, ProbiotRoleType};
 use crate::models::common::system_roles::{AppsSystemRoles, W3ARoleType};
 use crate::rag_system::context_builder::DefaultContextBuilder;
 use crate::rag_system::get_results_via_rag_system::get_results_via_rag_system::get_results_via_rag_system;
@@ -95,6 +95,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
 
     let rag_config = match app_name {
         AppName::W3AWeb | AppName::W3ABot => get_payload_key_based_rag_config(),
+        AppName::BlacksmithWeb => get_advanced_rag_config(),
         _ => get_advanced_rag_config(),
     };
 
@@ -165,8 +166,9 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
     };
 
     let llm_message = format!(
-        "User's current query: {}\nChat history: {}\nRelevant information from the database: {}",
+        "User's current query: {}\nUser's refined query: {}\nChat history: {}\nRelevant information from the database: {}",
         user_raw_request,
+        clarified_request,
         current_cache,
         if matches!(app_name, AppName::W3AWeb | AppName::W3ABot) {
             additional_context
@@ -218,6 +220,7 @@ pub async fn handle_crap_request<T: OpenAIClientInit + Send + Sync>(
         )),
         AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::CrapRequestProcessing)),
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::CrapRequestProcessing)),
+        AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(BlacksmithLabRoleType::CrapRequestProcessing)),
         _ => None,
     };
 

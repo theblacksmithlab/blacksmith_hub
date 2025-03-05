@@ -1,14 +1,14 @@
 use strum_macros::EnumIter;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, EnumIter)]
-pub enum W3ACollections {
-    W3AMain,
+pub enum BlacksmithLabCollections {
+    Test,
 }
 
-impl W3ACollections {
+impl BlacksmithLabCollections {
     pub fn as_str(&self) -> &str {
         match self {
-            W3ACollections::W3AMain => "w3a_main",
+            BlacksmithLabCollections::Test => "test",
         }
     }
 }

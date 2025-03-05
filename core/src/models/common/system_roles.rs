@@ -5,6 +5,7 @@ pub enum AppsSystemRoles {
     RequestApp(RequestAppSystemRoleType),
     TheViperRoom(TheViperRoomRoleType),
     Groot(GrootRoleType),
+    BlacksmithLab(BlacksmithLabRoleType),
 }
 
 impl AppsSystemRoles {
@@ -15,6 +16,7 @@ impl AppsSystemRoles {
             AppsSystemRoles::RequestApp(role) => role.as_str(),
             AppsSystemRoles::TheViperRoom(role) => role.as_str(),
             AppsSystemRoles::Groot(role) => role.as_str(),
+            AppsSystemRoles::BlacksmithLab(role) => role.as_str(),
         }
     }
 }
@@ -143,6 +145,31 @@ impl TheViperRoomRoleType {
 }
 
 impl AsRef<str> for TheViperRoomRoleType {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlacksmithLabRoleType {
+    ClarifyRequest,
+    CrapDetection,
+    CrapRequestProcessing,
+    TTSPreProcessing,
+}
+
+impl BlacksmithLabRoleType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            BlacksmithLabRoleType::ClarifyRequest => "clarify_request",
+            BlacksmithLabRoleType::CrapDetection => "crap_detection",
+            BlacksmithLabRoleType::CrapRequestProcessing => "crap_request_processing",
+            BlacksmithLabRoleType::TTSPreProcessing => "tts_pre_processing",
+        }
+    }
+}
+
+impl AsRef<str> for BlacksmithLabRoleType {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
