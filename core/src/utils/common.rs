@@ -25,6 +25,7 @@ pub fn get_mapped_from_app_name_role_directory(app_name: &AppName) -> &str {
         AppName::W3AWeb => "w3a",
         AppName::RequestAppBot => "request_app",
         AppName::TheViperRoomBot => "the_viper_room",
+        AppName::BlacksmithWeb => "blacksmith_lab",
         _ => app_name.as_str(),
     }
 }
