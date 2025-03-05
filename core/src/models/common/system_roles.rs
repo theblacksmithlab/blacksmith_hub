@@ -156,6 +156,7 @@ pub enum BlacksmithLabRoleType {
     CrapDetection,
     CrapRequestProcessing,
     TTSPreProcessing,
+    MainProcessing,
 }
 
 impl BlacksmithLabRoleType {
@@ -165,6 +166,7 @@ impl BlacksmithLabRoleType {
             BlacksmithLabRoleType::CrapDetection => "crap_detection",
             BlacksmithLabRoleType::CrapRequestProcessing => "crap_request_processing",
             BlacksmithLabRoleType::TTSPreProcessing => "tts_pre_processing",
+            BlacksmithLabRoleType::MainProcessing => "main_processing",
         }
     }
 }

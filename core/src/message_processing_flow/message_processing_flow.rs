@@ -183,6 +183,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::MainProcessing)),
         AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::MainProcessing)),
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::MainProcessing)),
+        AppName::BlacksmithWeb =>Some(AppsSystemRoles::BlacksmithLab(BlacksmithLabRoleType::MainProcessing)),
         _ => None,
     };
 
