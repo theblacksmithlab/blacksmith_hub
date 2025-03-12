@@ -12,7 +12,7 @@ use core::models::blacksmith_web::blacksmith_web::{
     BlacksmithWebUserRequest,
 };
 use core::models::common::app_name::AppName;
-use core::models::common::system_roles::{AppsSystemRoles, W3ARoleType};
+use core::models::common::system_roles::{AppsSystemRoles, W3ARoleType, BlacksmithLabRoleType};
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use core::utils::common::get_system_role_or_fallback;
 use core::utils::common::LlmModel;
@@ -34,7 +34,7 @@ pub(crate) async fn handle_blacksmith_web_user_request(
     let app_name = match AppName::from_str(&request.app_name) {
         Ok(app) => app,
         Err(_) => {
-            warn!("Unsupported app type: {}", request.app_name);
+            warn!("Unsupported app_name received from frontend: {}. Processing request as Blacksmith Web", request.app_name);
             AppName::BlacksmithWeb
         }
     };
@@ -179,6 +179,7 @@ async fn prepare_text_for_tts_fn(
     let system_role = match app_name {
         AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::TTSPreProcessing)),
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::TTSPreProcessing)),
+        AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(BlacksmithLabRoleType::TTSPreProcessing)),
         _ => None,
     };
 

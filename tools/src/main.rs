@@ -1,9 +1,9 @@
 mod qdrant_data_pre_processing;
-mod qdrant_data_processing;
+mod w3a_qdrant_data_processing;
 mod video_to_audio_converter;
 
 use crate::qdrant_data_pre_processing::validate_input_data;
-use crate::qdrant_data_processing::upsert_data_to_qdrant;
+use crate::w3a_qdrant_data_processing::{upsert_data_to_qdrant, upsert_w3a_data_to_qdrant};
 use crate::video_to_audio_converter::convert_videos_to_wav;
 use async_openai::Client as LLM_Client;
 use clap::Parser;
@@ -27,6 +27,7 @@ struct Cli {
 enum Commands {
     ConvertVideosToWav,
     ValidateInputDataForQdrant,
+    UpsertW3ADataToQdrant,
     UpsertDataToQdrant,
 }
 
@@ -41,6 +42,15 @@ async fn main() {
     let cli = Cli::parse();
     info!("Blacksmith tools launched with command: {:?}", cli.command);
 
+    let qdrant_client = Arc::new(
+        Qdrant::from_url(&env::var("QDRANT_URL").expect("QDRANT_URL not set"))
+            .api_key(env::var("QDRANT_API_KEY").expect("QDRANT_API_KEY not set"))
+            .build()
+            .unwrap(),
+    );
+
+    let llm_client = LLM_Client::new();
+    
     match cli.command {
         Commands::ConvertVideosToWav => {
             if let Err(e) = convert_videos_to_wav() {
@@ -54,25 +64,26 @@ async fn main() {
                 std::process::exit(1);
             }
         }
-        Commands::UpsertDataToQdrant => {
-            let qdrant_client = Arc::new(
-                Qdrant::from_url(&env::var("QDRANT_URL").expect("QDRANT_URL not set"))
-                    .api_key(env::var("QDRANT_API_KEY").expect("QDRANT_API_KEY not set"))
-                    .build()
-                    .unwrap(),
-            );
-
-            let llm_client = LLM_Client::new();
-
-            match upsert_data_to_qdrant(qdrant_client, llm_client).await {
+        Commands::UpsertW3ADataToQdrant => {
+            match upsert_w3a_data_to_qdrant(qdrant_client, llm_client).await {
                 Ok(_) => {
-                    info!("Data successfully uploaded to QDRANT.");
+                    info!("Data successfully uploaded to Qdrant.");
                 }
                 Err(e) => {
                     error!("Error during upsert data: {}", e);
                 }
             }
             std::process::exit(1);
+        }
+        Commands::UpsertDataToQdrant => {
+            match upsert_data_to_qdrant(qdrant_client, llm_client).await {
+                Ok(_) => {
+                    info!("Data successfully uploaded to Qdrant.");
+                }
+                Err(e) => {
+                    error!("Error during upsert data: {}", e);
+                }
+            }
         }
     }
 }
