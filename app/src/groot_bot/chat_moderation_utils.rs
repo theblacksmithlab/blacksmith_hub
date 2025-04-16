@@ -16,6 +16,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use teloxide::types::{MediaKind, Message, MessageKind};
 use teloxide::Bot;
+use teloxide::prelude::Requester;
 use tracing::{error, info, warn};
 
 pub async fn check_sender(
@@ -88,27 +89,30 @@ pub async fn check_sender(
 
         if black_listed_users.contains(&user_id) {
             if is_paid_chat {
-                let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
-                    GrootBotMessages::AlertForBlackListed,
-                ))
-                .await?;
-                let formatted_bot_system_message_text =
-                    bot_system_message_text.replace("{}", &username);
+                // // Temporary turned-off ot ignore scammers' invasion
+                // let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
+                //     GrootBotMessages::AlertForBlackListed,
+                // ))
+                // .await?;
+                // let formatted_bot_system_message_text =
+                //     bot_system_message_text.replace("{}", &username);
+                // 
+                // paid_chat_spam_warning(
+                //     bot.clone(),
+                //     &msg,
+                //     msg.thread_id,
+                //     formatted_bot_system_message_text,
+                //     format!(
+                //         "Got message from black-listed user: {} with id: {} ... message DELETED",
+                //         username, user_id
+                //     ),
+                //     app_name,
+                //     chat_title,
+                //     username,
+                // )
+                // .await?;
 
-                paid_chat_spam_warning(
-                    bot.clone(),
-                    &msg,
-                    msg.thread_id,
-                    formatted_bot_system_message_text,
-                    format!(
-                        "Got message from black-listed user: {} with id: {} ... message DELETED",
-                        username, user_id
-                    ),
-                    app_name,
-                    chat_title,
-                    username,
-                )
-                .await?;
+                bot.delete_message(msg.chat.id, msg.id).await?;
                 return Ok(Some(()));
             } else {
                 unpaid_chat_spam_warning(bot.clone(), &msg, msg.thread_id, chat_title).await?;
