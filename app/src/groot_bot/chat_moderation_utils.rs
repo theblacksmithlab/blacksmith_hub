@@ -111,7 +111,7 @@ pub async fn check_sender(
                 //     username,
                 // )
                 // .await?;
-
+                info!("Got message from Black-listed user: {} with id: {} ... message DELETED", username, user_id);
                 bot.delete_message(msg.chat.id, msg.id).await?;
                 return Ok(Some(()));
             } else {
