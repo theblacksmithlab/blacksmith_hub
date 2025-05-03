@@ -156,7 +156,9 @@ pub async fn append_footer_if_needed<T: TempCacheInit + Send + Sync>(
                 get_message(AppsSystemMessages::W3ABot(W3ABotMessages::ResponseFooter)).await?
             }
             AppName::W3AWeb => {
-                get_message(AppsSystemMessages::W3ABot(W3ABotMessages::ResponseFooter)).await?
+                "".to_string()
+                // // Uncomment to use ResponseFooter for W3AWeb App    
+                // get_message(AppsSystemMessages::W3ABot(W3ABotMessages::ResponseFooter)).await?
             }
             _ => "".to_string(),
         };

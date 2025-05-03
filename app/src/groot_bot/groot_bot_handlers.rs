@@ -11,7 +11,7 @@ use std::env;
 use std::path::Path;
 use std::sync::Arc;
 use teloxide::payloads::SendMessageSetters;
-use teloxide::prelude::{Message, Requester, Update};
+use teloxide::prelude::{Message, Request, Requester, Update};
 use teloxide::types::{InputFile, KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
 use tracing::{error, info};
@@ -32,6 +32,10 @@ pub async fn groot_bot_command_handler(
         .username
         .unwrap_or("Anonymous User".to_string());
 
+    let admins = bot.get_chat_administrators(msg.chat.id).send().await?;
+    let is_admin = msg.clone().from.map(|user| admins.iter().any(|admin| admin.user.id == user.id))
+        .unwrap_or(false);
+    
     let lord_admin_id = match env::var("LORD_ADMIN_ID") {
         Ok(val) => match val.parse::<u64>() {
             Ok(id) => id,
@@ -135,6 +139,20 @@ pub async fn groot_bot_command_handler(
             GrootBotMessages::StartCmdInPrivateChat,
         ))
         .await?;
+        bot.send_message(msg.chat.id, bot_msg).await?;
+        return Ok(());
+    }
+
+    if cmd == GrootBotCommands::Start && !is_admin && user_id != lord_admin_id {
+        info!(
+            "User | {} | with id: {} tried to use /{:?} command in public chat: ",
+            username, user_id, cmd
+        );
+
+        let bot_msg = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::StartCmdReaction,
+        ))
+            .await?;
         bot.send_message(msg.chat.id, bot_msg).await?;
         return Ok(());
     }
