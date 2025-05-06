@@ -1,10 +1,10 @@
+use core::models::common::ai::LlmModel;
 use anyhow::Result;
 use core::ai::common::common::{raw_llm_processing_json, vectorize};
 use core::models::common::app_name::AppName;
 use core::models::common::system_roles::RequestAppSystemRoleType;
 use core::state::request_app::app_state::RequestAppState;
 use core::utils::common::get_system_role_or_fallback;
-use core::utils::common::LlmModel;
 use core::vector_db::vector_db::{
     get_llm_order_from_response, prepare_search_results_for_llm, qdrant_search,
     store_search_results, update_search_results_order, ExecutionMode, QdrantSearchResult,

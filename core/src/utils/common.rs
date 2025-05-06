@@ -18,6 +18,13 @@ use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tracing::{error, info};
 
+
+pub fn build_resource_file_path(app_name: &AppName, file_name: &str) -> PathBuf {
+    PathBuf::from("common_res")
+        .join(get_mapped_from_app_name_role_directory(app_name))
+        .join(file_name)
+}
+
 pub fn get_mapped_from_app_name_role_directory(app_name: &AppName) -> &str {
     match app_name {
         AppName::ProbiotBot => "probiot",
@@ -26,6 +33,7 @@ pub fn get_mapped_from_app_name_role_directory(app_name: &AppName) -> &str {
         AppName::RequestAppBot => "request_app",
         AppName::TheViperRoomBot => "the_viper_room",
         AppName::BlacksmithWeb => "blacksmith_lab",
+        AppName::GrootBot => "groot_bot",
         _ => app_name.as_str(),
     }
 }
@@ -66,22 +74,6 @@ where
             fallback
                 .unwrap_or("You are a helpful assistant")
                 .to_string()
-        }
-    }
-}
-
-pub enum LlmModel {
-    Light,               // OpenAI gpt-4o-mini
-    Complex,             // OpenAI gpt-4o
-    TextEmbedding3Large, // OpenAI embedding generative model
-}
-
-impl LlmModel {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            LlmModel::Light => "gpt-4o-mini",
-            LlmModel::Complex => "gpt-4o",
-            LlmModel::TextEmbedding3Large => "text-embedding-3-large",
         }
     }
 }

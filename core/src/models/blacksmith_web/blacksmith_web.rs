@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug, Clone)]
@@ -17,6 +18,8 @@ pub struct BlacksmithWebTTSRequest {
 #[derive(Serialize)]
 pub struct BlacksmithWebServerResponse {
     pub text: String,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub extra_data_parsed: HashMap<String, String>,
 }
 
 #[derive(Serialize)]

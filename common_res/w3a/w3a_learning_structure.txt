@@ -93,8 +93,6 @@
       "Liquidity Providing",
       "Что такое AMM",
       "Практика на Uniswap V2",
-      "Impermanent Loss в CFMM-пулах",
-      "Отличия CLMM от CFMM-пулов",
       "Работа с симулятором CLMM",
       "Ticks в Uniswap V3",
       "Что влияет на доходность позиции (Часть 1)",

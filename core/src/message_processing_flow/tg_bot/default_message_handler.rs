@@ -79,7 +79,7 @@ pub async fn default_message_handler(
                     )
                     .await
                     {
-                        Ok(llm_response) => {
+                        Ok((llm_response, _extra_data)) => {
                             let full_response = append_footer_if_needed(
                                 &llm_response,
                                 app_state.clone(),
@@ -169,7 +169,7 @@ pub async fn default_message_handler(
             )
             .await
             {
-                Ok(llm_response) => {
+                Ok((llm_response, _extra_data)) => {
                     let full_response = append_footer_if_needed(
                         &llm_response,
                         app_state.clone(),

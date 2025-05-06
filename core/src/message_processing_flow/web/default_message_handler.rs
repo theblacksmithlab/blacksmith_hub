@@ -13,7 +13,7 @@ pub async fn default_message_handler(
     app_state: Arc<BlacksmithWebAppState>,
     user_id: &str,
     app_name: &AppName,
-) -> String {
+) -> (String, Vec<String>) {
     info!(
         "Message received from user: {} is a text message. Processing it...",
         user_id
@@ -33,7 +33,7 @@ pub async fn default_message_handler(
 
     match process_user_raw_request(user_id, request_text, app_state.clone(), app_name.clone()).await
     {
-        Ok(llm_response) => {
+        Ok((llm_response, extra_data)) => {
             let full_response = append_footer_if_needed(
                 &llm_response,
                 app_state.clone(),
@@ -61,11 +61,11 @@ pub async fn default_message_handler(
 
             info!("Successfully processed text message from user: {}", user_id);
 
-            htmled_full_response
+            (htmled_full_response, extra_data)
         }
         Err(err) => {
             error!("Error processing text request from user: {}", err);
-            err.to_string()
+            (err.to_string(), Vec::new())
         }
     }
 }

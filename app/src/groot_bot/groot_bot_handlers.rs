@@ -16,6 +16,7 @@ use teloxide::types::{InputFile, KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
 use tracing::{error, info};
 
+
 pub async fn groot_bot_command_handler(
     bot: Bot,
     msg: Message,
@@ -32,8 +33,6 @@ pub async fn groot_bot_command_handler(
         .username
         .unwrap_or("Anonymous User".to_string());
 
-    // let admins = bot.get_chat_administrators(msg.chat.id).send().await?;
-
     let mut is_admin = false;
 
     if !msg.chat.is_private() {
@@ -46,7 +45,7 @@ pub async fn groot_bot_command_handler(
                     .unwrap_or(false);
             }
             Err(err) => {
-                error!("Error getting admins list in public chat: {:?}", err);
+                error!("Error getting admins list from public chat: {:?}", err);
             }
         }
     }
@@ -56,14 +55,14 @@ pub async fn groot_bot_command_handler(
             Ok(id) => id,
             Err(_) => {
                 error!("Error: LORD_ADMIN_ID .env has incorrect format!");
-                bot.send_message(msg.chat.id, "Ошибка получения LORD_ADMIN_ID.")
+                bot.send_message(msg.chat.id, "Error getting LORD_ADMIN_ID.")
                     .await?;
                 return Ok(());
             }
         },
         Err(_) => {
             error!("Error: LORD_ADMIN_ID must be set in .env!");
-            bot.send_message(msg.chat.id, "Ошибка получения LORD_ADMIN_ID.")
+            bot.send_message(msg.chat.id, "Error getting LORD_ADMIN_ID.")
                 .await?;
             return Ok(());
         }

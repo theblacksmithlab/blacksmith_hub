@@ -1,3 +1,4 @@
+use core::models::common::ai::LlmModel;
 use crate::groot_bot::groot_bot_utils::{
     count_emojis, load_scam_domains, paid_chat_spam_warning, parsing_restricted_words,
     unpaid_chat_spam_warning,
@@ -10,7 +11,6 @@ use core::models::common::system_roles::GrootRoleType;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::common::get_system_role_or_fallback;
-use core::utils::common::LlmModel;
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;

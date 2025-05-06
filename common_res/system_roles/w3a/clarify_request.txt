@@ -14,7 +14,7 @@ Format Rules:
 3. No prefixes or suffixes
 4. No quotes or delimiters around the query
 
-Examples:
+Example №1:
 
 Input:
 User's current query: "What's its max supply?"
@@ -22,6 +22,8 @@ User's previous message from chat history: "Tell me about Bitcoin and its curren
 
 Output:
 What is Bitcoin's maximum supply?
+
+Example №2:
 
 Input:
 User's current query: "How do I store them safely?"

@@ -6,7 +6,7 @@ use crate::models::common::system_messages::TheViperRoomBotMessages;
 use crate::models::common::system_roles::TheViperRoomRoleType;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::get_system_role_or_fallback;
-use crate::utils::common::{get_message, LlmModel};
+use crate::utils::common::get_message;
 use crate::utils::the_viper_room::news_block_creation_utils::{
     get_dialogs, mix_podcast_with_music, processing_dialogs, summarize_updates,
     updates_file_creation,
@@ -17,6 +17,7 @@ use std::fs::{create_dir_all, read_dir, remove_file, rename};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, info};
+use crate::models::common::ai::LlmModel;
 
 pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
     client: &g_Client,

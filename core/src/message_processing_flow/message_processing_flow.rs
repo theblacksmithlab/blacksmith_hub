@@ -18,13 +18,14 @@ use crate::rag_system::{
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
-use crate::utils::common::LlmModel;
 use crate::utils::common::{get_message, get_system_role_or_fallback};
 use crate::utils::tg_bot::tg_bot::{add_user_message_to_cache, get_cache_as_string};
 use anyhow::Result;
 use serde_json::Value;
 use std::sync::Arc;
 use tracing::{error, info, warn};
+use crate::models::common::ai::LlmModel;
+
 
 pub async fn process_user_raw_request<
     T: OpenAIClientInit + QdrantClientInit + TempCacheInit + Send + Sync,
@@ -33,7 +34,7 @@ pub async fn process_user_raw_request<
     user_raw_request: &str,
     app_state: Arc<T>,
     app_name: AppName,
-) -> Result<String> {
+) -> Result<(String, Vec<String>)> {
     add_user_message_to_cache(app_state.clone(), user_id, user_raw_request).await;
 
     let current_cache = get_cache_as_string(app_state.clone(), user_id).await;
@@ -65,10 +66,10 @@ pub async fn process_user_raw_request<
         )
         .await?;
 
-        Ok(response_for_crap_request)
+        Ok((response_for_crap_request, Vec::new()))
     } else {
         info!("Valid request detected, sending message to handle_valid_request fn");
-        let response_for_valid_request = handle_valid_request(
+        let (response_for_valid_request, extra_data) = handle_valid_request(
             user_raw_request,
             &clarified_request,
             app_state,
@@ -77,7 +78,7 @@ pub async fn process_user_raw_request<
         )
         .await?;
 
-        Ok(response_for_valid_request)
+        Ok((response_for_valid_request, extra_data))
     }
 }
 
@@ -87,7 +88,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
     app_state: Arc<T>,
     current_cache: &str,
     app_name: AppName,
-) -> Result<String> {
+) -> Result<(String, Vec<String>)> {
     let collection_names: Vec<String> = AppsCollections::all_collections_for_app(app_name.clone())
         .iter()
         .map(|collection| collection.as_str().to_string())
@@ -100,7 +101,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
     };
 
     info!(
-        "TEMP log: Collections names for RAG system: {:?}",
+        "Collections names for RAG system: {:?}",
         collection_names
     );
 
@@ -122,7 +123,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
             .await
             .unwrap_or_else(|_| (search_result_content.clone(), max_tokens));
 
-    let additional_context = if matches!(app_name, AppName::W3AWeb | AppName::W3ABot) {
+    let (additional_context, extra_data) = if matches!(app_name, AppName::W3AWeb | AppName::W3ABot) {
         let initial_search_result_lesson_learned = rag_system_search_result
             .documents
             .first()
@@ -141,7 +142,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
         );
 
         info!(
-            "TEMP log: Initial search result's lesson title: {}",
+            "Base search result's lesson title: {}",
             initial_search_result_lesson_learned
         );
 
@@ -162,7 +163,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
         )
         .await?
     } else {
-        String::new()
+        (String::new(), Vec::new())
     };
 
     let llm_message = format!(
@@ -177,7 +178,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
         }
     );
 
-    info!("TEMP log: LLM message: {}", llm_message);
+    info!("LLM message for user's request main processing: {}", llm_message);
 
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::MainProcessing)),
@@ -201,7 +202,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
     let llm_response =
         raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Complex).await?;
 
-    Ok(llm_response)
+    Ok((llm_response, extra_data))
 }
 
 pub async fn handle_crap_request<T: OpenAIClientInit + Send + Sync>(
@@ -357,17 +358,17 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
     lessons_learned: Vec<String>,
     max_attempts: usize,
     attempt_counter: usize,
-) -> Result<String> {
+) -> Result<(String, Vec<String>)> {
     if current_token_count >= min_tokens {
         info!(
             "Actual context token count: {} which is >= required minimum: {}, context is enough.",
             current_token_count, min_tokens
         );
-        return Ok(actual_context.to_string());
+        return Ok((actual_context.to_string(), lessons_learned));
     }
 
     info!(
-        "TEMP log: Recursive search attempts counter: {}",
+        "Recursive search attempts counter: {}",
         attempt_counter
     );
 
@@ -376,7 +377,7 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
             "Reached max attempts ({}) of recursive search, stopping additional context search.",
             max_attempts
         );
-        return Ok(actual_context.to_string());
+        return Ok((actual_context.to_string(), lessons_learned));
     }
 
     info!(
@@ -384,7 +385,7 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
         current_token_count, min_tokens, max_attempts
     );
 
-    info!("TEMP log: Actual learned lessons: {:?}", lessons_learned);
+    info!("Actual learned lessons: {:?} at the step #{} of attempts counter", lessons_learned, attempt_counter);
 
     let llm_recommendation = get_llm_recommendation(
         user_raw_request,
@@ -402,8 +403,9 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
     updated_lessons_learned.push(llm_recommendation.clone());
 
     info!(
-        "TEMP log: Actual learned lessons after update: {:?}",
-        updated_lessons_learned
+        "Actual learned lessons after update: {:?} at the step #{} of attempts counter",
+        updated_lessons_learned,
+        attempt_counter
     );
 
     let raw_additional_search_result_content = get_additional_context_by_llm_recommendation(
@@ -436,7 +438,7 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
     let updated_token_count = current_token_count + new_token_count;
     let updated_attempt_counter = attempt_counter + 1;
 
-    Box::pin(fetch_additional_context(
+    let (final_context, final_lessons) = Box::pin(fetch_additional_context(
         user_raw_request,
         clarified_request,
         app_state,
@@ -451,5 +453,7 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
         max_attempts,
         updated_attempt_counter,
     ))
-    .await
+    .await?;
+    
+    Ok((final_context, final_lessons))
 }

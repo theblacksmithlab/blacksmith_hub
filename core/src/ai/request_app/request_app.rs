@@ -3,13 +3,14 @@ use crate::local_db::local_db::save_user_profile;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::RequestAppSystemRoleType;
 use crate::state::request_app::app_state::{RequestAppState, UserProfile};
-use crate::utils::common::{get_system_role_or_fallback, LlmModel};
+use crate::utils::common::get_system_role_or_fallback;
 use crate::vector_db::vector_db::qdrant_upsert;
 use anyhow::Context;
 use std::fs;
 use std::sync::Arc;
 use teloxide::prelude::ChatId;
 use tracing::info;
+use crate::models::common::ai::LlmModel;
 
 pub async fn process_users_self_description(
     user_id: ChatId,
