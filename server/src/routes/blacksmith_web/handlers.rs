@@ -51,14 +51,14 @@ pub(crate) async fn handle_blacksmith_web_user_request(
 
     let (response, extra_data) =
         default_message_handler(&request_text, blacksmith_web_app_state, &user_id, &app_name).await;
-    
-    info!("==============================================================================\n\
-    User's request: {}\n\
-    ------------------------------\n
-    System's response: {}\n\
+
+    info!("\n==============================================================================\n\n\
+    User's request: {}\n\n\
+    ------------------------------\n\n\
+    System's response: {}\n\n\
     ==============================================================================\n",
     request_text, response);
-    
+
     let extra_data_map = if matches!(app_name, AppName::W3AWeb) && !extra_data.is_empty() {
         let all_lesson_urls = load_lesson_urls(&app_name).await;
 

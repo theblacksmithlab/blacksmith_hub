@@ -165,7 +165,7 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
     };
 
     let llm_message = format!(
-        "Текущий запрос пользователя: {}\nУточнение запроса: {}\nИстория чата: {}\nТекст релевантных уроков программы Web3 Academy: {}",
+        "Текущий запрос пользователя: {}\nУточнение запроса: {}\nИстория чата: {}\nИнформация из базы данных для формирования ответа: {}",
         user_raw_request,
         clarified_request,
         current_cache,
