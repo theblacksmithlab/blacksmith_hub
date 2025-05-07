@@ -3,3 +3,4 @@ pub mod clarify_request;
 pub mod message_processing_flow;
 pub mod tg_bot;
 pub mod web;
+mod llm_recommendation_system;

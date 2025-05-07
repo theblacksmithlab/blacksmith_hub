@@ -1,10 +1,9 @@
 use crate::ai::common::common::tokenize_and_truncate;
-use crate::ai::common::common::{raw_llm_processing, raw_llm_processing_json};
-use crate::message_processing_flow::check_request_for_crap_content::check_request_for_crap_content;
+use crate::ai::common::common::raw_llm_processing;
+use crate::message_processing_flow::check_request_for_crap_content::check_request_for_common_case;
 use crate::message_processing_flow::clarify_request::clarify_request;
 use crate::models::common::app_name::AppName;
 use crate::models::common::qdrant_collection_manager::AppsCollections;
-use crate::models::common::system_messages::{AppsSystemMessages, W3AMessages};
 use crate::models::common::system_roles::{BlacksmithLabRoleType, ProbiotRoleType};
 use crate::models::common::system_roles::{AppsSystemRoles, W3ARoleType};
 use crate::rag_system::context_builder::DefaultContextBuilder;
@@ -18,12 +17,12 @@ use crate::rag_system::{
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
-use crate::utils::common::{get_message, get_system_role_or_fallback};
+use crate::utils::common::get_system_role_or_fallback;
 use crate::utils::tg_bot::tg_bot::{add_user_message_to_cache, get_cache_as_string};
 use anyhow::Result;
-use serde_json::Value;
 use std::sync::Arc;
 use tracing::{error, info, warn};
+use crate::message_processing_flow::llm_recommendation_system::get_llm_recommendation;
 use crate::models::common::ai::LlmModel;
 
 
@@ -39,7 +38,7 @@ pub async fn process_user_raw_request<
 
     let current_cache = get_cache_as_string(app_state.clone(), user_id).await;
 
-    let clarified_request = clarify_request(
+    let is_common = check_request_for_common_case(
         user_raw_request,
         &current_cache,
         app_state.clone(),
@@ -47,29 +46,28 @@ pub async fn process_user_raw_request<
     )
     .await?;
 
-    let is_crap = check_request_for_crap_content(
-        user_raw_request,
-        &clarified_request,
-        &current_cache,
-        app_state.clone(),
-        app_name.clone(),
-    )
-    .await?;
-
-    if is_crap {
-        info!("Crap request detected, sending message to handle_crap_request fn");
-        let response_for_crap_request = handle_crap_request(
+    if is_common {
+        info!("Common case request detected, sending message handle_common_case_request fn");
+        let response_for_common_request = handle_common_case_request(
             user_raw_request,
             app_state.clone(),
-            &clarified_request,
+            &current_cache,
             app_name.clone(),
         )
         .await?;
 
-        Ok((response_for_crap_request, Vec::new()))
+        Ok((response_for_common_request, Vec::new()))
     } else {
-        info!("Valid request detected, sending message to handle_valid_request fn");
-        let (response_for_valid_request, extra_data) = handle_valid_request(
+        info!("Special case request detected, sending message to handle_special_case_request fn");
+        let clarified_request = clarify_request(
+            user_raw_request,
+            &current_cache,
+            app_state.clone(),
+            app_name.clone(),
+        )
+            .await?;
+        
+        let (response_for_special_case_request, extra_data) = handle_special_case_request(
             user_raw_request,
             &clarified_request,
             app_state,
@@ -78,11 +76,11 @@ pub async fn process_user_raw_request<
         )
         .await?;
 
-        Ok((response_for_valid_request, extra_data))
+        Ok((response_for_special_case_request, extra_data))
     }
 }
 
-pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send + Sync>(
+pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit + Send + Sync>(
     user_raw_request: &str,
     clarified_request: &str,
     app_state: Arc<T>,
@@ -137,7 +135,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
             .unwrap_or_default();
 
         let initial_search_result_titled_content = format!(
-            "Lesson title: {}.\nLesson content:\n{}",
+            "Название урока: {}.\nСостав урока:\n{}",
             initial_search_result_lesson_learned, post_processed_initial_search_result_content
         );
 
@@ -167,7 +165,7 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
     };
 
     let llm_message = format!(
-        "User's current query: {}\nUser's refined query: {}\nChat history: {}\nRelevant information from the database: {}",
+        "Текущий запрос пользователя: {}\nУточнение запроса: {}\nИстория чата: {}\nТекст релевантных уроков программы Web3 Academy: {}",
         user_raw_request,
         clarified_request,
         current_cache,
@@ -205,24 +203,24 @@ pub async fn handle_valid_request<T: OpenAIClientInit + QdrantClientInit + Send 
     Ok((llm_response, extra_data))
 }
 
-pub async fn handle_crap_request<T: OpenAIClientInit + Send + Sync>(
+pub async fn handle_common_case_request<T: OpenAIClientInit + Send + Sync>(
     user_raw_request: &str,
     app_state: Arc<T>,
     current_cache: &str,
     app_name: AppName,
 ) -> Result<String> {
     let llm_message = format!(
-        "User's current query: {}\nChat history: {}",
+        "Текущий запрос пользователя: {}\nИстория чата: {}",
         user_raw_request, current_cache
     );
 
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(
-            ProbiotRoleType::CrapRequestProcessing,
+            ProbiotRoleType::CommonCaseRequestProcessing,
         )),
-        AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::CrapRequestProcessing)),
-        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::CrapRequestProcessing)),
-        AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(BlacksmithLabRoleType::CrapRequestProcessing)),
+        AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::CommonCaseRequestProcessing)),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::CommonCaseRequestProcessing)),
+        AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(BlacksmithLabRoleType::CommonCaseRequestProcessing)),
         _ => None,
     };
 
@@ -230,7 +228,7 @@ pub async fn handle_crap_request<T: OpenAIClientInit + Send + Sync>(
         Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
         None => {
             error!(
-                "CrapRequestProcessing role is not defined for app '{}'. Using fallback.",
+                "CommonCaseRequestProcessing role is not defined for app '{}'. Using fallback.",
                 app_name.as_str()
             );
             "You are a helpful assistant".to_string()
@@ -243,74 +241,74 @@ pub async fn handle_crap_request<T: OpenAIClientInit + Send + Sync>(
     Ok(llm_response)
 }
 
-pub async fn get_llm_recommendation<T: OpenAIClientInit + QdrantClientInit + Send + Sync>(
-    user_raw_request: &str,
-    clarified_request: &str,
-    app_state: Arc<T>,
-    current_cache: &str,
-    app_name: &AppName,
-    lesson_learned: &Vec<String>,
-) -> Result<String> {
-    let w3a_academy_learning_structure =
-        get_message(AppsSystemMessages::W3A(W3AMessages::W3AStudyStructure)).await?;
+// pub async fn get_llm_recommendation<T: OpenAIClientInit + QdrantClientInit + Send + Sync>(
+//     user_raw_request: &str,
+//     clarified_request: &str,
+//     app_state: Arc<T>,
+//     current_cache: &str,
+//     app_name: &AppName,
+//     lesson_learned: &Vec<String>,
+// ) -> Result<String> {
+//     let w3a_academy_learning_structure =
+//         get_message(AppsSystemMessages::W3A(W3AMessages::W3AStudyStructure)).await?;
+// 
+//     let system_role = get_system_role_or_fallback(&app_name, W3ARoleType::Recommendation, None);
+// 
+//     let llm_message = format!("User's current query: {}\nUser's refined query: {}\nChat history: {}\nWeb3 Academy learning structure:{}\nCompleted lessons:{:?}\n", user_raw_request, clarified_request, current_cache, w3a_academy_learning_structure, lesson_learned);
+// 
+//     let result =
+//         raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Complex).await?;
+// 
+//     info!("LLM lesson recommendation: {}", result);
+// 
+//     let parsed_json: Value = serde_json::from_str(&result).map_err(|err| {
+//         error!("Failed to parse LLM response as JSON: {}", err);
+//         err
+//     })?;
+// 
+//     let llm_lesson_recommendation = parsed_json
+//         .get("Recommended lesson")
+//         .and_then(|v| v.as_str())
+//         .unwrap_or("")
+//         .to_lowercase();
+// 
+//     info!("Extracted recommendation: {}", llm_lesson_recommendation);
+// 
+//     if !llm_lesson_recommendation.is_empty()
+//         && !lesson_exists_in_structure(&llm_lesson_recommendation, &w3a_academy_learning_structure)
+//     {
+//         warn!(
+//             "Recommended lesson '{}' not found in W3A structure, returning empty string",
+//             llm_lesson_recommendation
+//         );
+//         return Ok(String::new());
+//     }
+// 
+//     Ok(llm_lesson_recommendation)
+// }
 
-    let system_role = get_system_role_or_fallback(&app_name, W3ARoleType::Recommendation, None);
-
-    let llm_message = format!("User's current query: {}\nUser's refined query: {}\nChat history: {}\nWeb3 Academy learning structure:{}\nCompleted lessons:{:?}\n", user_raw_request, clarified_request, current_cache, w3a_academy_learning_structure, lesson_learned);
-
-    let result =
-        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light).await?;
-
-    info!("LLM lesson recommendation: {}", result);
-
-    let parsed_json: Value = serde_json::from_str(&result).map_err(|err| {
-        error!("Failed to parse LLM response as JSON: {}", err);
-        err
-    })?;
-
-    let llm_lesson_recommendation = parsed_json
-        .get("Recommended lesson")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_lowercase();
-
-    info!("Extracted recommendation: {}", llm_lesson_recommendation);
-
-    if !llm_lesson_recommendation.is_empty()
-        && !lesson_exists_in_structure(&llm_lesson_recommendation, &w3a_academy_learning_structure)
-    {
-        warn!(
-            "Recommended lesson '{}' not found in W3A structure, returning empty string",
-            llm_lesson_recommendation
-        );
-        return Ok(String::new());
-    }
-
-    Ok(llm_lesson_recommendation)
-}
-
-fn lesson_exists_in_structure(lesson: &str, structure_json: &str) -> bool {
-    if let Ok(structure) = serde_json::from_str::<Value>(structure_json) {
-        if let Some(obj) = structure.as_object() {
-            for (_, module_value) in obj {
-                if let Some(module_obj) = module_value.as_object() {
-                    for (_, block_value) in module_obj {
-                        if let Some(lessons) = block_value.as_array() {
-                            for lesson_value in lessons {
-                                if let Some(lesson_str) = lesson_value.as_str() {
-                                    if lesson_str.to_lowercase() == lesson {
-                                        return true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    false
-}
+// fn lesson_exists_in_structure(lesson: &str, structure_json: &str) -> bool {
+//     if let Ok(structure) = serde_json::from_str::<Value>(structure_json) {
+//         if let Some(obj) = structure.as_object() {
+//             for (_, module_value) in obj {
+//                 if let Some(module_obj) = module_value.as_object() {
+//                     for (_, block_value) in module_obj {
+//                         if let Some(lessons) = block_value.as_array() {
+//                             for lesson_value in lessons {
+//                                 if let Some(lesson_str) = lesson_value.as_str() {
+//                                     if lesson_str.to_lowercase() == lesson {
+//                                         return true;
+//                                     }
+//                                 }
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+//     false
+// }
 
 pub async fn get_additional_context_by_llm_recommendation<
     T: OpenAIClientInit + QdrantClientInit + Send + Sync,
@@ -428,7 +426,7 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
             });
 
     let additional_search_result_titled_content = format!(
-        "Lesson title: {}.\nLesson content:\n{}",
+        "Название урока: {}.\nСостав урока:\n{}",
         llm_recommendation, post_processed_additional_search_result_content
     );
     let updated_context = format!(

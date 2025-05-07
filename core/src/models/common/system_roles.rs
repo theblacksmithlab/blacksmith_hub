@@ -48,19 +48,19 @@ impl AsRef<str> for GrootRoleType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProbiotRoleType {
-    CrapDetection,
+    CommonCaseDetection,
     ClarifyRequest,
     MainProcessing,
-    CrapRequestProcessing,
+    CommonCaseRequestProcessing,
 }
 
 impl ProbiotRoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            ProbiotRoleType::CrapDetection => "crap_detection",
+            ProbiotRoleType::CommonCaseDetection => "common_case_detection",
             ProbiotRoleType::ClarifyRequest => "clarify_request",
             ProbiotRoleType::MainProcessing => "main_processing",
-            ProbiotRoleType::CrapRequestProcessing => "crap_request_processing",
+            ProbiotRoleType::CommonCaseRequestProcessing => "common_case_request_processing",
         }
     }
 }
@@ -73,23 +73,29 @@ impl AsRef<str> for ProbiotRoleType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum W3ARoleType {
-    CrapDetection,
+    CommonCaseDetection,
     ClarifyRequest,
     MainProcessing,
-    CrapRequestProcessing,
+    CommonCaseRequestProcessing,
     Recommendation,
     TTSPreProcessing,
+    ModuleRecommendation,
+    BlockRecommendation,
+    LessonRecommendation,
 }
 
 impl W3ARoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            W3ARoleType::CrapDetection => "crap_detection",
+            W3ARoleType::CommonCaseDetection => "common_case_detection",
             W3ARoleType::ClarifyRequest => "clarify_request",
             W3ARoleType::MainProcessing => "main_processing",
-            W3ARoleType::CrapRequestProcessing => "crap_request_processing",
+            W3ARoleType::CommonCaseRequestProcessing => "common_case_request_processing",
             W3ARoleType::Recommendation => "recommendation",
             W3ARoleType::TTSPreProcessing => "tts_pre_processing",
+            W3ARoleType::ModuleRecommendation => "module_recommendation",
+            W3ARoleType::BlockRecommendation => "block_recommendation",
+            W3ARoleType::LessonRecommendation => "lesson_recommendation",
         }
     }
 }
@@ -153,8 +159,8 @@ impl AsRef<str> for TheViperRoomRoleType {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlacksmithLabRoleType {
     ClarifyRequest,
-    CrapDetection,
-    CrapRequestProcessing,
+    CommonCaseDetection,
+    CommonCaseRequestProcessing,
     TTSPreProcessing,
     MainProcessing,
 }
@@ -163,8 +169,8 @@ impl BlacksmithLabRoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
             BlacksmithLabRoleType::ClarifyRequest => "clarify_request",
-            BlacksmithLabRoleType::CrapDetection => "crap_detection",
-            BlacksmithLabRoleType::CrapRequestProcessing => "crap_request_processing",
+            BlacksmithLabRoleType::CommonCaseDetection => "common_case_detection",
+            BlacksmithLabRoleType::CommonCaseRequestProcessing => "common_case_request_processing",
             BlacksmithLabRoleType::TTSPreProcessing => "tts_pre_processing",
             BlacksmithLabRoleType::MainProcessing => "main_processing",
         }

@@ -14,7 +14,7 @@ pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
     app_name: AppName,
 ) -> anyhow::Result<String> {
     let llm_message = format!(
-        "User's current query: {}\nChat history: {}",
+        "Текущий запрос пользователя: {}\nИстория чата: {}",
         user_raw_request, current_cache
     );
 
