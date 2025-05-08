@@ -1,10 +1,10 @@
 use crate::rag_system::Vectorizer;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
-use crate::utils::common::LlmModel;
 use anyhow::Result;
 use async_openai::types::{CreateEmbeddingRequestArgs, CreateEmbeddingResponse};
 use async_trait::async_trait;
 use std::sync::Arc;
+use crate::models::common::ai::LlmModel;
 
 pub struct OpenAIVectorizer<T: OpenAIClientInit> {
     app_state: Arc<T>,

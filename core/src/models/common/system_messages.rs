@@ -30,6 +30,7 @@ pub enum GrootBotMessages {
     NoUsernameForChatAlert,
     ManualMessage,
     ResultsTempMessage,
+    StartCmdReaction,
 }
 
 impl GrootBotMessages {
@@ -52,6 +53,7 @@ impl GrootBotMessages {
             GrootBotMessages::NoUsernameForChatAlert => "no_username_for_chat_alert",
             GrootBotMessages::ManualMessage => "manual_message",
             GrootBotMessages::ResultsTempMessage => "results_temp_message",
+            GrootBotMessages::StartCmdReaction => "start_cmd_reaction",
         }
     }
 }

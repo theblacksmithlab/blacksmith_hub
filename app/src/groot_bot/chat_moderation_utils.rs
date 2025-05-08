@@ -1,3 +1,4 @@
+use core::models::common::ai::LlmModel;
 use crate::groot_bot::groot_bot_utils::{
     count_emojis, load_scam_domains, paid_chat_spam_warning, parsing_restricted_words,
     unpaid_chat_spam_warning,
@@ -10,12 +11,12 @@ use core::models::common::system_roles::GrootRoleType;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::common::get_system_role_or_fallback;
-use core::utils::common::LlmModel;
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;
 use teloxide::types::{MediaKind, Message, MessageKind};
 use teloxide::Bot;
+use teloxide::prelude::Requester;
 use tracing::{error, info, warn};
 
 pub async fn check_sender(
@@ -88,27 +89,30 @@ pub async fn check_sender(
 
         if black_listed_users.contains(&user_id) {
             if is_paid_chat {
-                let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
-                    GrootBotMessages::AlertForBlackListed,
-                ))
-                .await?;
-                let formatted_bot_system_message_text =
-                    bot_system_message_text.replace("{}", &username);
-
-                paid_chat_spam_warning(
-                    bot.clone(),
-                    &msg,
-                    msg.thread_id,
-                    formatted_bot_system_message_text,
-                    format!(
-                        "Got message from black-listed user: {} with id: {} ... message DELETED",
-                        username, user_id
-                    ),
-                    app_name,
-                    chat_title,
-                    username,
-                )
-                .await?;
+                // // Temporary turned-off ot ignore scammers' invasion
+                // let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
+                //     GrootBotMessages::AlertForBlackListed,
+                // ))
+                // .await?;
+                // let formatted_bot_system_message_text =
+                //     bot_system_message_text.replace("{}", &username);
+                // 
+                // paid_chat_spam_warning(
+                //     bot.clone(),
+                //     &msg,
+                //     msg.thread_id,
+                //     formatted_bot_system_message_text,
+                //     format!(
+                //         "Got message from black-listed user: {} with id: {} ... message DELETED",
+                //         username, user_id
+                //     ),
+                //     app_name,
+                //     chat_title,
+                //     username,
+                // )
+                // .await?;
+                info!("Got message from Black-listed user: {} with id: {} ... message DELETED", username, user_id);
+                bot.delete_message(msg.chat.id, msg.id).await?;
                 return Ok(Some(()));
             } else {
                 unpaid_chat_spam_warning(bot.clone(), &msg, msg.thread_id, chat_title).await?;

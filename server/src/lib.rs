@@ -85,7 +85,7 @@ pub async fn start_server(
         .merge(request_app_routes)
         .merge(the_viper_room_routes)
         .merge(blacksmith_web_router)
-        .route("/*path", options(|| async { StatusCode::OK }))
+        .route("/{*path}", options(|| async { StatusCode::OK }))
         .fallback(handler_404)
         .layer(cors);
 

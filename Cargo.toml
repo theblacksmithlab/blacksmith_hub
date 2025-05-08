@@ -13,15 +13,15 @@ resolver = "2"
 [workspace.dependencies]
 # Async Runtime & Web Framework
 tokio = { version = "1.38.0", features = ["full"] }
-axum = "0.7.9"
+axum = "0.8.1"
 tower = "0.5.1"
 tower-http = { version = "0.6.1", features = ["trace", "cors"] }
 http = "1.1.0"
 axum-server = { version = "0.7.1", features = ["tls-rustls-no-provider"] }
 
 # Telegram Client Libraries
-teloxide = { version = "0.13.0", features = ["macros"] }
-grammers = "0.1.0"
+teloxide = { version = "0.15.0", features = ["macros"] }
+teloxide-core = { version = "0.11.2", package = "teloxide-core" }
 grammers-client = "0.7.0"
 grammers-session = "0.7.0"
 grammers-tl-types = "0.7.0"
@@ -31,13 +31,13 @@ sqlx = { version = "0.8.2", features = ["sqlite", "runtime-tokio", "migrate"] }
 qdrant-client = "1.13.0"
 
 # AI Services
-async-openai = "0.26.0"
+async-openai = "0.28.0"
 tiktoken-rs = "0.6.0"
 
 # Serialization & Data Handling
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
-config = "0.14.1"
+config = "0.15.11"
 
 # HTTP Client
 reqwest = "0.12.5"
@@ -53,9 +53,9 @@ lazy_static = "1.5.0"
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1.85"
 uuid = "1.12.1"
-pulldown-cmark = "0.12.2"
-strum_macros = "0.26.4"
-strum = "0.26.3"
+pulldown-cmark = "0.13.0"
+strum_macros = "0.27.1"
+strum = "0.27.1"
 base64 = "0.22.1"
 unicode-segmentation = "1.12.0"
 emojis = "0.6.4"

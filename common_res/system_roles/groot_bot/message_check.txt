@@ -8,6 +8,7 @@ ANALYSIS CRITERIA:
    - connecting crypto wallets
    - moving communication to private messages
    - performing financial operations
+4. Any job offers
 
 IMPORTANT CLARIFICATIONS:
 - Discussion of fraud, scams, or deception in the context of sharing experience or warning others is acceptable

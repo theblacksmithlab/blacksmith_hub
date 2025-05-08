@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow.workspace = true
 teloxide.workspace = true
+teloxide-core.workspace = true
 tokio.workspace = true
 async-openai.workspace = true
 dotenv.workspace = true

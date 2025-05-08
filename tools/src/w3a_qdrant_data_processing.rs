@@ -1,8 +1,8 @@
+use core::models::common::ai::LlmModel;
 use anyhow::Result;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::{CreateEmbeddingRequestArgs, CreateEmbeddingResponse};
 use async_openai::Client as LLM_Client;
-use core::utils::common::LlmModel;
 use qdrant_client::qdrant::{
     CreateCollectionBuilder, Distance, PointStruct, UpsertPointsBuilder, VectorParamsBuilder,
 };

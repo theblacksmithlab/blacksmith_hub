@@ -2,9 +2,10 @@ use crate::ai::common::common::raw_llm_processing;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::{AppsSystemRoles, BlacksmithLabRoleType, ProbiotRoleType, W3ARoleType};
 use crate::state::llm_client_init_trait::OpenAIClientInit;
-use crate::utils::common::{get_system_role_or_fallback, LlmModel};
+use crate::utils::common::get_system_role_or_fallback;
 use std::sync::Arc;
 use tracing::{error, info};
+use crate::models::common::ai::LlmModel;
 
 pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
     user_raw_request: &str,
@@ -13,7 +14,7 @@ pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
     app_name: AppName,
 ) -> anyhow::Result<String> {
     let llm_message = format!(
-        "User's current query: {}\nChat history: {}",
+        "Текущий запрос пользователя: {}\nИстория чата: {}",
         user_raw_request, current_cache
     );
 

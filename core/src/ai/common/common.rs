@@ -6,10 +6,10 @@ use async_openai::types::{
     ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
     CreateChatCompletionRequestArgs, CreateEmbeddingRequestArgs, CreateEmbeddingResponse,
 };
-use crate::utils::common::LlmModel;
 use std::sync::Arc;
 use tiktoken_rs::cl100k_base;
 use tracing::info;
+use crate::models::common::ai::LlmModel;
 
 pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
     system_role: &str,

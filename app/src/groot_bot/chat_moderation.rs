@@ -146,7 +146,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         return Ok(());
     };
 
-    // anonymous_user_treatment(bot.clone(), msg.clone(), is_paid_chat, app_name, chat_title, &username, user_id ).await?;
+    // anonymous_user_treatment(bot.clone(), msg.clone(), is_paid_chat, app_name, chat_title, &username, user_id).await?;
 
     if scam_emojis_check(
         bot.clone(),
