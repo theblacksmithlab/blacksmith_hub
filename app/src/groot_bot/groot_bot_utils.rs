@@ -1,3 +1,4 @@
+use crate::BotAppState;
 use anyhow::{Context, Result};
 use core::models::common::app_name::AppName;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
@@ -9,6 +10,7 @@ use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{ChatId, Message, Requester};
@@ -19,6 +21,7 @@ use teloxide::Bot;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 use unicode_segmentation::UnicodeSegmentation;
+use crate::groot_bot::chat_moderation_utils::ai_check;
 
 pub fn load_super_admins(app_name: &AppName) -> HashSet<u64> {
     let path = build_resource_file_path(app_name, "super_admins_list.json");

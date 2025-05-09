@@ -1,9 +1,9 @@
 use crate::groot_bot::chat_moderation::chat_moderation;
-use crate::groot_bot::groot_bot_utils::load_super_admins;
+use crate::groot_bot::groot_bot_utils::{load_super_admins, load_white_listed_users};
 use anyhow::Result;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState, ShowType};
-use core::models::tg_bot::groot_bot::groot_bot_commands::GrootBotCommands;
+use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::build_resource_file_path;
@@ -15,6 +15,7 @@ use teloxide::prelude::{Message, Request, Requester, Update};
 use teloxide::types::{InputFile, KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
 use tracing::{error, info};
+use crate::groot_bot::chat_moderation_utils::ai_check;
 
 
 pub async fn groot_bot_command_handler(
@@ -32,7 +33,6 @@ pub async fn groot_bot_command_handler(
         .unwrap()
         .username
         .unwrap_or("Anonymous User".to_string());
-
     let mut is_admin = false;
 
     if !msg.chat.is_private() {
@@ -68,7 +68,7 @@ pub async fn groot_bot_command_handler(
         }
     };
 
-    if cmd != GrootBotCommands::Start && !msg.chat.is_private() {
+    if cmd != GrootBotCommands::Start && cmd != GrootBotCommands::Groot && !msg.chat.is_private() {
         info!(
             "User | {} | with id: {} tried to use {:?} command in public chat {}",
             username,
@@ -84,49 +84,20 @@ pub async fn groot_bot_command_handler(
         return Ok(());
     }
 
-    if cmd == GrootBotCommands::Resources && !super_admins.contains(&user_id) {
+    if (cmd == GrootBotCommands::Resources || cmd == GrootBotCommands::Logs) && !super_admins.contains(&user_id) {
         info!(
-            "Non-super-admin user | {} | with id: {} tried to use /{:?} command",
-            username, user_id, cmd,
-        );
+        "Non-super-admin user | {} | with id: {} tried to use /{:?} command",
+        username, user_id, cmd,
+    );
         let bot_msg = get_message(AppsSystemMessages::GrootBot(
             GrootBotMessages::NoRightsForUseCmd,
         ))
-        .await?;
-        bot.send_message(msg.chat.id, bot_msg).await?;
-        return Ok(());
-    }
-
-    if cmd == GrootBotCommands::Logs && !super_admins.contains(&user_id) {
-        info!(
-            "Non-super-admin user | {} | with id: {} tried to use /{:?} command",
-            username, user_id, cmd,
-        );
-        let bot_msg = get_message(AppsSystemMessages::GrootBot(
-            GrootBotMessages::NoRightsForUseCmd,
-        ))
-        .await?;
-        bot.send_message(msg.chat.id, bot_msg).await?;
-        return Ok(());
-    }
-
-    if cmd == GrootBotCommands::Ask {
-        if !msg.chat.is_private() {
-            info!(
-                "User | {} | with id: {} tried to use {:?} command in public chat {}",
-                username,
-                user_id,
-                cmd,
-                msg.chat.username().unwrap_or_default()
-            );
-            let bot_msg = get_message(AppsSystemMessages::GrootBot(
-                GrootBotMessages::PrivateCmdUsedInPublicChat,
-            ))
             .await?;
-            bot.send_message(msg.chat.id, bot_msg).await?;
-            return Ok(());
-        }
-
+        bot.send_message(msg.chat.id, bot_msg).await?;
+        return Ok(());
+    }
+    
+    if cmd == GrootBotCommands::Ask {
         if !super_admins.contains(&user_id) {
             info!(
                 "Non-super-admin | {} | with id: {} tried to use /{:?} command",
@@ -167,20 +138,6 @@ pub async fn groot_bot_command_handler(
             GrootBotMessages::StartCmdReaction,
         ))
             .await?;
-        bot.send_message(msg.chat.id, bot_msg).await?;
-        return Ok(());
-    }
-
-    if cmd == GrootBotCommands::Manual && !msg.chat.is_private() {
-        info!(
-            "User | {} | with id: {} tried to use /{:?} command in public chat",
-            username, user_id, cmd
-        );
-
-        let bot_msg = get_message(AppsSystemMessages::GrootBot(
-            GrootBotMessages::PrivateCmdUsedInPublicChat,
-        ))
-        .await?;
         bot.send_message(msg.chat.id, bot_msg).await?;
         return Ok(());
     }
@@ -323,6 +280,170 @@ pub async fn groot_bot_command_handler(
             .await?;
             bot.send_message(msg.chat.id, bot_msg).await?;
         }
+        GrootBotCommands::Groot => {
+            if let Some(replied_msg) = msg.reply_to_message() {
+                let is_lord_admin = user_id == lord_admin_id;
+
+                if is_lord_admin {
+                    info!(
+                        "LORD_ADMIN with id: {} reported message in chat {}. Silent immediate deletion.",
+                        user_id, msg.chat.username().unwrap_or_default()
+                    );
+                    
+                    if let Err(e) = bot.delete_message(msg.chat.id, replied_msg.id).await {
+                        error!("Error deleting message by LORD_ADMIN request: {:?}", e);
+                    }
+                    
+                    if let Err(e) = bot.delete_message(msg.chat.id, msg.id).await {
+                        error!("Error deleting LORD_ADMIN command message: {:?}", e);
+                    }
+
+                    return Ok(());
+                }
+                
+                let reported_user_id = match replied_msg.clone().from {
+                    Some(user) => user.id.0 as i64,
+                    None => {
+                        bot.send_message(
+                            msg.chat.id,
+                            "Невозможно обработать жалобу на это сообщение - отсутствует информация об отправителе."
+                        ).await?;
+                        return Ok(());
+                    }
+                };
+
+                let reported_username = replied_msg
+                    .clone()
+                    .from
+                    .and_then(|user| user.username.clone())
+                    .unwrap_or_else(|| "Unknown User".to_string());
+                
+                let is_reported_user_admin = if !msg.chat.is_private() {
+                    match bot.get_chat_administrators(msg.chat.id).send().await {
+                        Ok(admins) => {
+                            admins.iter().any(|admin| admin.user.id.0 as i64 == reported_user_id)
+                        }
+                        Err(err) => {
+                            error!("Error getting admins list for reported user check: {:?}", err);
+                            false
+                        }
+                    }
+                } else {
+                    false
+                };
+                
+                let white_listed_users = load_white_listed_users(&app_name);
+                
+                if white_listed_users.contains(&reported_user_id) {
+                    info!(
+                        "Ignoring report on white-listed user {} (ID: {})",
+                        reported_username, reported_user_id
+                    );
+                    
+                    bot.send_message(
+                        msg.chat.id,
+                        "Я не буду проверять сообщения от доверенных пользователей."
+                    ).await?;
+                    
+                    return Ok(());
+                }
+                
+                if is_reported_user_admin {
+                    info!(
+                        "Ignoring report on admin user {} (ID: {})",
+                        reported_username, reported_user_id
+                    );
+                    
+                    bot.send_message(
+                        msg.chat.id,
+                        "Я не буду проверять сообщения от администраторов чата, найдите себе другую забаву."
+                    ).await?;
+                    
+                    return Ok(());
+                }
+                
+                info!(
+                    "User | {} | with id: {} reported message in chat {}",
+                    username, user_id, msg.chat.username().unwrap_or_default()
+                );
+                
+                let reported_message_id = replied_msg.id;
+                let reported_chat_id = msg.chat.id;
+                let reported_text = replied_msg.text().unwrap_or("Empty text");
+                let chat_title = replied_msg.chat.title().unwrap_or_else(|| "Unknown Chat");
+
+                let reports_count = {
+                    let message_reports = app_state.message_reports.as_ref().unwrap();
+                    let mut reports = message_reports.lock().await;
+                    let message_id = replied_msg.id.0;
+                    let count = reports.add_report(msg.chat.id.0, message_id);
+                    
+                    if let Err(e) = reports.save_message_reports(&app_state.app_name).await {
+                        error!("Error saving message reports: {}", e);
+                    }
+
+                    count
+                };
+
+                info!(
+                    "Message reported: chat_id: {}, message_id: {}, text: {}, total reports: {}",
+                    reported_chat_id, reported_message_id, reported_text, reports_count
+                );
+                
+                if reports_count >= 3 {
+                    info!(
+                        "Message received 3 or more reports, deleting: chat_id: {}, message_id: {}",
+                        reported_chat_id, reported_message_id
+                    );
+                    
+                    if let Err(e) = bot.delete_message(reported_chat_id, reported_message_id).await {
+                        error!("Error deleting message: {:?}", e);
+                        bot.send_message(
+                            msg.chat.id,
+                            "Не удалось удалить сообщение. Возможно, оно уже удалено или у бота нет прав."
+                        ).await?;
+                    } else {
+                        bot.send_message(
+                            msg.chat.id,
+                            "Сообщение было удалено по многочисленным жалобам участников чата."
+                        ).await?;
+                    }
+                } else {
+                    let message_to_check = format!(
+                        "Текст проверяемого сообщения: \"{}\"\nВНИМАНИЕ! На сообщение поступило: {} жалоб, сообщение необходимо проверить с особым пристрастием!",
+                        reported_text, reports_count
+                    );
+
+                    if let Err(err) = ai_check(
+                        bot.clone(),
+                        replied_msg.clone(),
+                        &message_to_check,
+                        true,
+                        &app_state.app_name,
+                        chat_title,
+                        &reported_username,
+                        reported_user_id as u64,
+                        app_state.clone()
+                    ).await {
+                        error!("Error processing reported message: {:?}", err);
+                        bot.send_message(
+                            msg.chat.id,
+                            "Произошла ошибка при обработке сообщения. Пожалуйста, попробуйте позже."
+                        ).await?;
+                        return Ok(());
+                    }
+                    
+                    let confirm_msg = format!(
+                        "Сообщение зарегистрировано для проверки (всего жалоб: {}). Спасибо за бдительность!",
+                        reports_count
+                    );
+                    bot.send_message(msg.chat.id, confirm_msg).await?;
+                }
+            } else {
+                let warn_msg = "Команда /groot должна быть использована в ответ на сообщение, которое вы хотите пометить.";
+                bot.send_message(msg.chat.id, warn_msg).await?;
+            }
+        },
         _ => {
             bot.send_message(msg.chat.id, "Invalid cmd").await?;
         }

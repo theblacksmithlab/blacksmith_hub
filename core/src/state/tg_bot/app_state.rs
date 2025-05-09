@@ -1,6 +1,6 @@
 use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
-use crate::models::tg_bot::groot_bot::groot_bot::MessageCounts;
+use crate::models::tg_bot::groot_bot::groot_bot::{MessageCounts, MessageReports};
 use crate::models::tg_bot::groot_bot::groot_bot::{ChatMessageStats, ResourcesDialogState};
 use crate::models::tg_bot::the_viper_room_bot::podcast_manager::PodcastManager;
 use async_openai::config::OpenAIConfig;
@@ -19,6 +19,7 @@ pub struct BotAppState {
     pub dialog_states: Option<Mutex<HashMap<u64, ResourcesDialogState>>>,
     pub message_counts: Option<Arc<Mutex<MessageCounts>>>,
     pub chat_message_stats: Option<Arc<Mutex<ChatMessageStats>>>,
+    pub message_reports: Option<Arc<Mutex<MessageReports>>>,
 }
 
 impl BotAppState {
@@ -38,6 +39,7 @@ impl BotAppState {
             dialog_states: None,
             message_counts: None,
             chat_message_stats: None,
+            message_reports: None,
         }
     }
 
@@ -64,6 +66,10 @@ impl BotAppState {
 
         let dialog_states = Some(Mutex::new(HashMap::new()));
 
+        let message_reports = Arc::new(Mutex::new(
+            MessageReports::load_message_reports(&app_name).await.unwrap_or_else(|_| MessageReports::new()),
+        ));
+
         Self {
             llm_client,
             podcast_manager,
@@ -73,6 +79,7 @@ impl BotAppState {
             chat_message_stats: Some(chat_message_stats),
             message_counts: Some(message_counts),
             dialog_states,
+            message_reports: Some(message_reports),
         }
     }
 }
