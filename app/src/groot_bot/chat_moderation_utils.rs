@@ -1,13 +1,5 @@
 use core::models::common::ai::LlmModel;
-use crate::groot_bot::groot_bot_utils::{
-    count_emojis,
-    load_black_listed_users,
-    load_scam_domains,
-    load_white_listed_users,
-    paid_chat_spam_warning,
-    parsing_restricted_words,
-    unpaid_chat_spam_warning
-};
+use crate::groot_bot::groot_bot_utils::{auto_delete_message, count_emojis, load_black_listed_users, load_scam_domains, load_white_listed_users, paid_chat_spam_warning, parsing_restricted_words, unpaid_chat_spam_warning};
 use anyhow::Result;
 use core::ai::common::common::raw_llm_processing_json;
 use core::models::common::app_name::AppName;
@@ -19,9 +11,11 @@ use core::utils::common::get_system_role_or_fallback;
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
 use teloxide::types::{MediaKind, Message, MessageKind};
 use teloxide::Bot;
 use teloxide::prelude::Requester;
+use teloxide_core::payloads::SendMessageSetters;
 use teloxide_core::requests::Request;
 use tracing::{error, info, warn};
 
@@ -744,17 +738,25 @@ pub async fn handle_groot_report(
             reporter_username, reporter_id, chat_title
         );
 
-        let bot_system_message = get_message(AppsSystemMessages::GrootBot(
+        let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
             GrootBotMessages::GrootCmdRestrictionAlert,
         ))
             .await?;
         
-        let formatted_bot_system_message_text = bot_system_message.replace("{}", reporter_username);
+        let formatted_bot_system_message_text = bot_system_message_text.replace("{}", reporter_username);
         
-        bot.send_message(
+        let bot_system_message = bot.send_message(
             original_msg.chat.id,
             formatted_bot_system_message_text
         ).await?;
+        
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+            .await;
 
         return Ok(());
     }
@@ -788,15 +790,23 @@ pub async fn handle_groot_report(
             reported_username, reported_user_id
         );
 
-        let bot_system_message = get_message(AppsSystemMessages::GrootBot(
+        let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
             GrootBotMessages::ReportOnWhiteListedUser,
         ))
             .await?;
         
-        bot.send_message(
+        let bot_system_message = bot.send_message(
             original_msg.chat.id,
-            bot_system_message,
+            bot_system_message_text,
         ).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+            .await;
 
         return Ok(());
     }
@@ -813,15 +823,23 @@ pub async fn handle_groot_report(
             reported_username, reported_user_id
         );
 
-        let bot_system_message = get_message(AppsSystemMessages::GrootBot(
+        let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
             GrootBotMessages::ReportOnChatAdmin,
         ))
             .await?;
         
-        bot.send_message(
+        let bot_system_message = bot.send_message(
             original_msg.chat.id,
-            bot_system_message,
+            bot_system_message_text,
         ).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+            .await;
 
         return Ok(());
     }
@@ -863,25 +881,41 @@ pub async fn handle_groot_report(
         if let Err(e) = bot.delete_message(reported_chat_id, reported_message_id).await {
             error!("Error deleting message: {:?}", e);
 
-            let bot_system_message = get_message(AppsSystemMessages::GrootBot(
+            let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
                 GrootBotMessages::ErrorDeletingMsg,
             ))
                 .await?;
             
-            bot.send_message(
+            let bot_system_message = bot.send_message(
                 original_msg.chat.id,
-                bot_system_message,
+                bot_system_message_text,
             ).await?;
+
+            auto_delete_message(
+                bot.clone(),
+                bot_system_message.chat.id,
+                bot_system_message.id,
+                Duration::from_secs(120),
+            )
+                .await;
         } else {
-            let bot_system_message = get_message(AppsSystemMessages::GrootBot(
+            let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
                 GrootBotMessages::DeletedByReport,
             ))
                 .await?;
             
-            bot.send_message(
+            let bot_system_message = bot.send_message(
                 original_msg.chat.id,
-                bot_system_message,
+                bot_system_message_text,
             ).await?;
+
+            auto_delete_message(
+                bot.clone(),
+                bot_system_message.chat.id,
+                bot_system_message.id,
+                Duration::from_secs(120),
+            )
+                .await;
         }
     } else {
         let message_to_check = format!(
@@ -902,23 +936,41 @@ pub async fn handle_groot_report(
         ).await {
             error!("Error processing reported message: {:?}", err);
 
-            let bot_system_message = get_message(AppsSystemMessages::GrootBot(
+            let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
                 GrootBotMessages::ErrorProcessingMsg,
             ))
                 .await?;
             
-            bot.send_message(
+            let bot_system_message = bot.send_message(
                 original_msg.chat.id,
-                bot_system_message,
+                bot_system_message_text,
             ).await?;
+
+            auto_delete_message(
+                bot.clone(),
+                bot_system_message.chat.id,
+                bot_system_message.id,
+                Duration::from_secs(120),
+            )
+                .await;
+            
             return Err(err.into());
         }
 
-        let confirm_msg = format!(
+        let bot_system_message_text = format!(
             "Сообщение направлено на повторную проверку (всего жалоб: {}). Спасибо за бдительность!",
             reports_count
         );
-        bot.send_message(original_msg.chat.id, confirm_msg).await?;
+        
+        let bot_system_message = bot.send_message(original_msg.chat.id, bot_system_message_text).await?;
+        
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+            .await;
     }
 
     Ok(())

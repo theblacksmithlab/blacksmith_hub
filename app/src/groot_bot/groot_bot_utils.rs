@@ -117,7 +117,7 @@ fn is_forum(msg: &Message) -> bool {
     false
 }
 
-async fn auto_delete_message(bot: Bot, chat_id: ChatId, message_id: MessageId, delay: Duration) {
+pub(crate) async fn auto_delete_message(bot: Bot, chat_id: ChatId, message_id: MessageId, delay: Duration) {
     tokio::spawn(async move {
         sleep(delay).await;
         bot.delete_message(chat_id, message_id).await.ok();
