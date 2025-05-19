@@ -16,7 +16,7 @@ use anyhow::{anyhow, Result};
 use async_openai::Client as LLM_Client;
 use core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;
 use core::models::common::app_name::AppName;
-use core::models::tg_bot::groot_bot::groot_bot_commands::GrootBotCommands;
+use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
 use core::models::tg_bot::request_app_bot::request_app_bot_commands::RequestAppBotCommands;
 use core::models::tg_bot::tester_bot::tester_bot_commands::TesterBotCommands;

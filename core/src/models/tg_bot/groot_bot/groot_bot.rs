@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::fs;
 use teloxide::prelude::Message;
 use tracing::{error, info, warn};
+use teloxide::macros::BotCommands;
 
 pub struct ResourcesDialogState {
     pub awaiting_option_choice: bool,
@@ -234,4 +235,67 @@ pub struct MessageIterationObject {
 pub struct ChatObject {
     pub chat_id: i64,
     pub username: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MessageReports {
+    pub reports: HashMap<String, u32>,
+}
+
+impl MessageReports {
+    pub fn new() -> Self {
+        Self {
+            reports: HashMap::new(),
+        }
+    }
+
+    pub async fn load_message_reports(app_name: &AppName) -> Result<Self> {
+        let path = build_resource_file_path(app_name, "message_reports.json");
+
+        let data = fs::read_to_string(&path).unwrap_or_else(|_| "{}".to_string());
+
+        let message_reports: Self = serde_json::from_str(&data).unwrap_or_else(|_| Self::new());
+
+        Ok(message_reports)
+    }
+
+    pub async fn save_message_reports(&self, app_name: &AppName) -> Result<()> {
+        let path = build_resource_file_path(app_name, "message_reports.json");
+
+        let data =
+            serde_json::to_string_pretty(&self).context("Failed to serialize message reports")?;
+
+        fs::write(&path, data).context(format!(
+            "Failed to write message reports to {}",
+            path.display()
+        ))?;
+
+        Ok(())
+    }
+
+    pub fn get_report_count(&self, chat_id: i64, message_id: i32) -> u32 {
+        let key = format!("{}_{}", chat_id, message_id);
+        *self.reports.get(&key).unwrap_or(&0)
+    }
+
+    pub fn add_report(&mut self, chat_id: i64, message_id: i32) -> u32 {
+        let key = format!("{}_{}", chat_id, message_id);
+        let count = self.reports.entry(key).or_insert(0);
+        *count += 1;
+        *count
+    }
+}
+
+#[derive(BotCommands, Clone, PartialEq, Debug)]
+#[command(rename_rule = "lowercase")]
+pub enum GrootBotCommands {
+    Start,
+    About,
+    Resources,
+    Manual,
+    Logs,
+    Ask,
+    Backup,
+    Results,
+    Groot,
 }

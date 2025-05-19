@@ -16,7 +16,7 @@ pub enum GrootBotMessages {
     StartMessage,
     PrivateCmdUsedInPublicChat,
     NoRightsForUseCmd,
-    StartCmdInPrivateChat,
+    PublicCmdUsedInPrivateChat,
     About,
     Ask,
     AlertForViolatorChannels,
@@ -31,6 +31,14 @@ pub enum GrootBotMessages {
     ManualMessage,
     ResultsTempMessage,
     StartCmdReaction,
+    ReportOnWhiteListedUser,
+    ReportOnChatAdmin,
+    ErrorDeletingMsg,
+    DeletedByReport,
+    ErrorProcessingMsg,
+    NoUserIdWarn,
+    NotCorrectReportUsage,
+    GrootCmdRestrictionAlert,
 }
 
 impl GrootBotMessages {
@@ -39,7 +47,7 @@ impl GrootBotMessages {
             GrootBotMessages::StartMessage => "start_message",
             GrootBotMessages::PrivateCmdUsedInPublicChat => "private_cmd_used_in_public_chat",
             GrootBotMessages::NoRightsForUseCmd => "no_rights_for_use_cmd",
-            GrootBotMessages::StartCmdInPrivateChat => "start_cmd_in_private_chat",
+            GrootBotMessages::PublicCmdUsedInPrivateChat => "public_cmd_used_in_private_chat",
             GrootBotMessages::About => "about",
             GrootBotMessages::Ask => "ask",
             GrootBotMessages::AlertForViolatorChannels => "alert_for_violator_channels",
@@ -54,6 +62,14 @@ impl GrootBotMessages {
             GrootBotMessages::ManualMessage => "manual_message",
             GrootBotMessages::ResultsTempMessage => "results_temp_message",
             GrootBotMessages::StartCmdReaction => "start_cmd_reaction",
+            GrootBotMessages::ReportOnWhiteListedUser => "report_on_white_listed_user",
+            GrootBotMessages::ReportOnChatAdmin => "report_on_chat_admin",
+            GrootBotMessages::ErrorDeletingMsg => "error_deleting_message",
+            GrootBotMessages::DeletedByReport => "deleted_by_report",
+            GrootBotMessages::ErrorProcessingMsg => "error_processing_message",
+            GrootBotMessages::NoUserIdWarn => "no_user_id_warn",
+            GrootBotMessages::NotCorrectReportUsage => "not_correct_report_usage",
+            GrootBotMessages::GrootCmdRestrictionAlert => "groot_cmd_restriction_alert",
         }
     }
 }

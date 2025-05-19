@@ -1,8 +1,5 @@
 use core::models::common::ai::LlmModel;
-use crate::groot_bot::groot_bot_utils::{
-    count_emojis, load_scam_domains, paid_chat_spam_warning, parsing_restricted_words,
-    unpaid_chat_spam_warning,
-};
+use crate::groot_bot::groot_bot_utils::{auto_delete_message, count_emojis, load_black_listed_users, load_scam_domains, load_white_listed_users, paid_chat_spam_warning, parsing_restricted_words, unpaid_chat_spam_warning};
 use anyhow::Result;
 use core::ai::common::common::raw_llm_processing_json;
 use core::models::common::app_name::AppName;
@@ -14,10 +11,14 @@ use core::utils::common::get_system_role_or_fallback;
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
 use teloxide::types::{MediaKind, Message, MessageKind};
 use teloxide::Bot;
 use teloxide::prelude::Requester;
+use teloxide_core::payloads::SendMessageSetters;
+use teloxide_core::requests::Request;
 use tracing::{error, info, warn};
+
 
 pub async fn check_sender(
     bot: Bot,
@@ -89,7 +90,7 @@ pub async fn check_sender(
 
         if black_listed_users.contains(&user_id) {
             if is_paid_chat {
-                // // Temporary turned-off ot ignore scammers' invasion
+                // // Temporary turned-off to ignore scammers' invasion
                 // let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
                 //     GrootBotMessages::AlertForBlackListed,
                 // ))
@@ -711,4 +712,266 @@ pub async fn save_message_counts_to_file(app_state: Arc<BotAppState>) {
     } else {
         info!("Message_counts data successfully saved to file");
     }
+}
+
+pub async fn handle_groot_report(
+    bot: &Bot,
+    app_state: &Arc<BotAppState>,
+    original_msg: &Message,
+    reported_msg: &Message,
+    reporter_id: i64,
+    reporter_username: &str,
+    reported_user_id: i64,
+) -> Result<()> {
+    let chat_title = original_msg.chat.title().unwrap_or_else(|| "Unknown Chat");
+    let is_active = is_user_active(
+        app_state.clone(),
+        original_msg.chat.id.0,
+        reporter_id as u64,
+        reporter_username,
+        chat_title,
+    ).await;
+
+    if !is_active {
+        info!(
+            "User {} with id: {} doesn't have enough activity to use /groot command in chat {}",
+            reporter_username, reporter_id, chat_title
+        );
+
+        let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::GrootCmdRestrictionAlert,
+        ))
+            .await?;
+        
+        let formatted_bot_system_message_text = bot_system_message_text.replace("{}", reporter_username);
+        
+        let bot_system_message = bot.send_message(
+            original_msg.chat.id,
+            formatted_bot_system_message_text
+        ).await?;
+        
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+            .await;
+
+        return Ok(());
+    }
+    
+    let reported_username = reported_msg
+        .clone()
+        .from
+        .and_then(|user| user.username.clone())
+        .unwrap_or_else(|| "Unknown User".to_string());
+
+    let is_reported_user_admin = if !original_msg.chat.is_private() {
+        match bot.get_chat_administrators(original_msg.chat.id).send().await {
+            Ok(admins) => {
+                admins.iter().any(|admin| admin.user.id.0 as i64 == reported_user_id)
+            }
+            Err(err) => {
+                error!("Error getting admins list for reported user check: {:?}", err);
+                false
+            }
+        }
+    } else {
+        false
+    };
+
+    let white_listed_users = load_white_listed_users(&app_state.app_name);
+    let black_listed_users = load_black_listed_users(&app_state.app_name);
+
+    if white_listed_users.contains(&reported_user_id) {
+        info!(
+            "Ignoring report on white-listed user {} (ID: {})",
+            reported_username, reported_user_id
+        );
+
+        let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::ReportOnWhiteListedUser,
+        ))
+            .await?;
+        
+        let bot_system_message = bot.send_message(
+            original_msg.chat.id,
+            bot_system_message_text,
+        ).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+            .await;
+
+        return Ok(());
+    }
+    
+    if black_listed_users.contains(&reporter_id) {
+        info!("Ignoring report on black-listed user {}", reporter_id);
+        
+        return Ok(())
+    }
+
+    if is_reported_user_admin {
+        info!(
+            "Ignoring report on admin user {} (ID: {})",
+            reported_username, reported_user_id
+        );
+
+        let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::ReportOnChatAdmin,
+        ))
+            .await?;
+        
+        let bot_system_message = bot.send_message(
+            original_msg.chat.id,
+            bot_system_message_text,
+        ).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+            .await;
+
+        return Ok(());
+    }
+
+    info!(
+        "User | {} | with id: {} reported message in chat {}",
+        reporter_username, reporter_id, original_msg.chat.username().unwrap_or_default()
+    );
+
+    let reported_message_id = reported_msg.id;
+    let reported_chat_id = original_msg.chat.id;
+    let reported_text = reported_msg.text().unwrap_or("Empty text");
+    let chat_title = reported_msg.chat.title().unwrap_or_else(|| "Unknown Chat");
+
+    let reports_count = {
+        let message_reports = app_state.message_reports.as_ref().unwrap();
+        let mut reports = message_reports.lock().await;
+        let message_id = reported_msg.id.0;
+        let count = reports.add_report(original_msg.chat.id.0, message_id);
+
+        if let Err(e) = reports.save_message_reports(&app_state.app_name).await {
+            error!("Error saving message reports: {}", e);
+        }
+
+        count
+    };
+
+    info!(
+        "Message reported: chat_id: {}, message_id: {}, text: {}, total reports: {}",
+        reported_chat_id, reported_message_id, reported_text, reports_count
+    );
+
+    if reports_count >= 3 {
+        info!(
+            "Message received 3 or more reports, deleting: chat_id: {}, message_id: {}",
+            reported_chat_id, reported_message_id
+        );
+
+        if let Err(e) = bot.delete_message(reported_chat_id, reported_message_id).await {
+            error!("Error deleting message: {:?}", e);
+
+            let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
+                GrootBotMessages::ErrorDeletingMsg,
+            ))
+                .await?;
+            
+            let bot_system_message = bot.send_message(
+                original_msg.chat.id,
+                bot_system_message_text,
+            ).await?;
+
+            auto_delete_message(
+                bot.clone(),
+                bot_system_message.chat.id,
+                bot_system_message.id,
+                Duration::from_secs(120),
+            )
+                .await;
+        } else {
+            let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
+                GrootBotMessages::DeletedByReport,
+            ))
+                .await?;
+            
+            let bot_system_message = bot.send_message(
+                original_msg.chat.id,
+                bot_system_message_text,
+            ).await?;
+
+            auto_delete_message(
+                bot.clone(),
+                bot_system_message.chat.id,
+                bot_system_message.id,
+                Duration::from_secs(120),
+            )
+                .await;
+        }
+    } else {
+        let message_to_check = format!(
+            "Текст проверяемого сообщения: \"{}\"\nВНИМАНИЕ! На сообщение поступило: {} жалоб, сообщение необходимо проверить с особым пристрастием!",
+            reported_text, reports_count
+        );
+
+        if let Err(err) = ai_check(
+            bot.clone(),
+            reported_msg.clone(),
+            &message_to_check,
+            true,
+            &app_state.app_name,
+            chat_title,
+            &reported_username,
+            reported_user_id as u64,
+            app_state.clone()
+        ).await {
+            error!("Error processing reported message: {:?}", err);
+
+            let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
+                GrootBotMessages::ErrorProcessingMsg,
+            ))
+                .await?;
+            
+            let bot_system_message = bot.send_message(
+                original_msg.chat.id,
+                bot_system_message_text,
+            ).await?;
+
+            auto_delete_message(
+                bot.clone(),
+                bot_system_message.chat.id,
+                bot_system_message.id,
+                Duration::from_secs(120),
+            )
+                .await;
+            
+            return Err(err.into());
+        }
+
+        let bot_system_message_text = format!(
+            "Сообщение направлено на повторную проверку (всего жалоб: {}). Спасибо за бдительность!",
+            reports_count
+        );
+        
+        let bot_system_message = bot.send_message(original_msg.chat.id, bot_system_message_text).await?;
+        
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+            .await;
+    }
+
+    Ok(())
 }
