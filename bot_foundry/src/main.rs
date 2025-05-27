@@ -30,6 +30,7 @@ use teloxide::prelude::Update;
 use teloxide::{dptree, Bot};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
+use rustls::crypto::{aws_lc_rs, CryptoProvider};
 
 pub mod groot_bot;
 pub mod probiot_bot;
@@ -39,6 +40,10 @@ pub mod w3a_bot;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if let Err(e) = CryptoProvider::install_default(aws_lc_rs::default_provider()) {
+        error!("Failed to install CryptoProvider: {:?}", e);
+    }
+
     dotenv().ok();
 
     tracing_subscriber::fmt()
