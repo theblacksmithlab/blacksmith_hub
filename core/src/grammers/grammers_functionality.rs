@@ -1,7 +1,3 @@
-use anyhow::{Context, Result};
-use grammers_client::Config as g_Config;
-use grammers_client::{Client as g_Client, SignInError};
-
 use crate::models::common::app_name::AppName;
 use crate::models::the_viper_room::the_viper_room::AuthStage::AuthError;
 use crate::models::the_viper_room::the_viper_room::{AuthStage, TheViperRoomServerResponse};
@@ -9,83 +5,86 @@ use crate::state::the_viper_room::app_state::TheViperRoomAppState;
 use crate::state::the_viper_room::app_state_operation::reset_user_state_with_message;
 use crate::utils::common::update_the_viper_room_user_state;
 use crate::utils::tg_bot::groot_bot::build_resource_file_path;
+use anyhow::{Context, Result};
 use axum::Json;
+use grammers_client::Config as g_Config;
+use grammers_client::{Client as g_Client, SignInError};
 use grammers_session::Session;
-use grammers_tl_types as tl;
-use grammers_tl_types::enums::InputUser;
-use grammers_tl_types::functions::messages::CreateChat;
+// use grammers_tl_types as tl;
+// use grammers_tl_types::enums::InputUser;
+// use grammers_tl_types::functions::messages::CreateChat;
 use std::io::Write;
-use std::path::Path;
+// use std::path::Path;
 use std::sync::Arc;
 use std::{env, fs};
 use tracing::info;
 
-pub async fn create_chat(requester_username: &str, recipient_user: &str) -> Result<()> {
-    let session_file = "common_res/request_app/grammers_system_session/7543812650.session";
-    let session_path = Path::new(&session_file);
-
-    let api_id: i32 = env::var("TELEGRAM_API_ID")
-        .expect("API_ID not set")
-        .parse()
-        .expect("API_ID must be a number");
-    let api_hash = env::var("TELEGRAM_API_HASH").expect("API_HASH not set");
-
-    let client = g_Client::connect(g_Config {
-        session: Session::load_file_or_create(session_path)?,
-        api_id,
-        api_hash,
-        params: Default::default(),
-    })
-    .await?;
-
-    if !client.is_authorized().await? {
-        info!("Achtung! G_Client is not authorized!");
-    } else {
-        info!("Client is ok!");
-    }
-
-    let user_1 = client.resolve_username(requester_username).await?;
-    let user_2 = client.resolve_username(recipient_user).await?;
-
-    let user_1_id = user_1.clone().unwrap().pack().id;
-    let user_1_access_hash = user_1.clone().unwrap().pack().access_hash;
-
-    let user_2_id = user_2.clone().unwrap().pack().id;
-    let user_2_access_hash = user_2.clone().unwrap().pack().access_hash;
-
-    let users = vec![
-        InputUser::User(tl::types::InputUser {
-            user_id: user_1_id,
-            access_hash: user_1_access_hash.expect("REASON"),
-        }),
-        InputUser::User(tl::types::InputUser {
-            user_id: user_2_id,
-            access_hash: user_2_access_hash.expect("REASON"),
-        }),
-    ];
-
-    let title = format!(
-        "reQuest App chat: {} | {}",
-        requester_username, recipient_user
-    );
-
-    let create_chat = CreateChat {
-        users,
-        title: title.to_string(),
-        ttl_period: None,
-    };
-
-    match client.invoke(&create_chat).await {
-        Ok(_response) => {
-            info!("Chat {} successfully created!", title);
-        }
-        Err(e) => {
-            info!("Error creating chat: {:?}", e);
-        }
-    }
-
-    Ok(())
-}
+// pub async fn create_chat(requester_username: &str, recipient_user: &str) -> Result<()> {
+//     let session_file = "common_res/request_app/grammers_system_session/7543812650.session";
+//     let session_path = Path::new(&session_file);
+//
+//     let api_id: i32 = env::var("TELEGRAM_API_ID")
+//         .expect("API_ID not set")
+//         .parse()
+//         .expect("API_ID must be a number");
+//     let api_hash = env::var("TELEGRAM_API_HASH").expect("API_HASH not set");
+//
+//     let client = g_Client::connect(g_Config {
+//         session: Session::load_file_or_create(session_path)?,
+//         api_id,
+//         api_hash,
+//         params: Default::default(),
+//     })
+//     .await?;
+//
+//     if !client.is_authorized().await? {
+//         info!("Achtung! G_Client is not authorized!");
+//     } else {
+//         info!("Client is ok!");
+//     }
+//
+//     let user_1 = client.resolve_username(requester_username).await?;
+//     let user_2 = client.resolve_username(recipient_user).await?;
+//
+//     let user_1_id = user_1.clone().unwrap().pack().id;
+//     let user_1_access_hash = user_1.clone().unwrap().pack().access_hash;
+//
+//     let user_2_id = user_2.clone().unwrap().pack().id;
+//     let user_2_access_hash = user_2.clone().unwrap().pack().access_hash;
+//
+//     let users = vec![
+//         InputUser::User(tl::types::InputUser {
+//             user_id: user_1_id,
+//             access_hash: user_1_access_hash.expect("REASON"),
+//         }),
+//         InputUser::User(tl::types::InputUser {
+//             user_id: user_2_id,
+//             access_hash: user_2_access_hash.expect("REASON"),
+//         }),
+//     ];
+//
+//     let title = format!(
+//         "{} | {}",
+//         requester_username, recipient_user
+//     );
+//
+//     let create_chat = CreateChat {
+//         users,
+//         title: title.to_string(),
+//         ttl_period: None,
+//     };
+//
+//     match client.invoke(&create_chat).await {
+//         Ok(_response) => {
+//             info!("Chat {} successfully created!", title);
+//         }
+//         Err(e) => {
+//             info!("Error creating chat: {:?}", e);
+//         }
+//     }
+//
+//     Ok(())
+// }
 
 pub async fn initialize_grammers_client(session_data: Vec<u8>) -> Result<g_Client> {
     let api_id: i32 = env::var("TELEGRAM_API_ID")

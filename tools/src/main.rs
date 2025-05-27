@@ -1,10 +1,10 @@
 mod qdrant_data_pre_processing;
-mod w3a_qdrant_data_processing;
 mod video_to_audio_converter;
+mod w3a_qdrant_data_processing;
 
 use crate::qdrant_data_pre_processing::validate_input_data;
-use crate::w3a_qdrant_data_processing::{upsert_data_to_qdrant, upsert_w3a_data_to_qdrant};
 use crate::video_to_audio_converter::convert_videos_to_wav;
+use crate::w3a_qdrant_data_processing::{upsert_data_to_qdrant, upsert_w3a_data_to_qdrant};
 use async_openai::Client as LLM_Client;
 use clap::Parser;
 use clap_derive::{Parser, Subcommand};
@@ -50,7 +50,7 @@ async fn main() {
     );
 
     let llm_client = LLM_Client::new();
-    
+
     match cli.command {
         Commands::ConvertVideosToWav => {
             if let Err(e) = convert_videos_to_wav() {

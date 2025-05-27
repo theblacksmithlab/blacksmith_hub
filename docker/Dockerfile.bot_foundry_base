@@ -1,0 +1,58 @@
+FROM rust:latest AS builder
+
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl3 \
+    ffmpeg \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
+    cd whisper.cpp && \
+    make
+
+WORKDIR /usr/src/app
+
+COPY Cargo.toml Cargo.lock ./
+
+COPY core core/
+COPY server server/
+COPY ai_forge ai_forge/
+COPY app app/
+COPY tools tools/
+
+RUN cargo build -p app --release -j 4
+
+FROM debian:bookworm-slim AS runtime-base
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    openssl \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /usr/src/app/target/release/app .
+
+COPY --from=builder /app/whisper.cpp /app/whisper.cpp
+
+RUN chown -R 1001:1000 /app/whisper.cpp && \
+    chmod -R 755 /app/whisper.cpp
+
+RUN ln -s /app/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
+
+RUN mkdir -p tmp && \
+    chown 1001:1000 tmp && \
+    chmod 700 tmp && \
+    chown 1001:1000 /app && \
+    chmod 755 /app
+
+COPY docker/bot_foundry_entrypoint.sh ./entrypoint.sh
+RUN chmod +x entrypoint.sh
+
+USER 1001:1000
+
+ENTRYPOINT ["./entrypoint.sh"]

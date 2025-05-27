@@ -1,4 +1,5 @@
 use crate::ai::common::common::raw_llm_processing;
+use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::TheViperRoomRoleType;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
@@ -16,7 +17,6 @@ use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::sleep;
 use tracing::info;
-use crate::models::common::ai::LlmModel;
 
 pub(crate) async fn get_dialogs(client: &g_Client) -> Result<Vec<types::Dialog>, anyhow::Error> {
     info!("Getting list of updates sources...");

@@ -1,10 +1,9 @@
 use crate::models::common::app_name::AppName;
 use crate::models::tg_bot::groot_bot::groot_bot::ChatObject;
+pub use crate::utils::common::build_resource_file_path;
 use anyhow::{Context, Result};
 use std::fs;
 use tracing::info;
-pub use crate::utils::common::build_resource_file_path;
-
 
 pub fn load_chats_objects_from_file(app_name: &AppName) -> Result<Vec<ChatObject>> {
     let chats_path = build_resource_file_path(app_name, "chats_list.json");

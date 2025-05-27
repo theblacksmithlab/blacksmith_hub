@@ -122,7 +122,7 @@ pub async fn simple_tts<T: OpenAIClientInit + Send + Sync>(
 
 pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
     let start = Instant::now();
-    
+
     if !file_path.exists() {
         return Err(anyhow!(
             "Voice message file not found: {}",
@@ -132,7 +132,7 @@ pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
 
     let model_path = std::env::var("WHISPER_MODEL_PATH")
         .unwrap_or_else(|_| "/root/projects/whisper.cpp/models/ggml-base.bin".to_string());
-    
+
     let output = Command::new("whisper-cli")
         .arg("-m")
         .arg(model_path)
@@ -146,7 +146,7 @@ pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
     match output {
         Ok(output) if output.status.success() => {
             info!("Transcription took: {:?}", start.elapsed());
-            
+
             let stdout = String::from_utf8(output.stdout)?;
 
             if stdout.trim().is_empty() {
@@ -165,7 +165,6 @@ pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
             Err(anyhow!("Failed to execute Whisper CLI: {}", err))
         }
     }
-    
 }
 
 // ElevenLabs TTS functionality
@@ -205,8 +204,8 @@ pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
 // ) -> Result<PathBuf> {
 //     info!("Starting recording podcast...");
 //
-//     let api_key = env::var("ELEVEN_LABS_API_TOKEN")
-//         .map_err(|_| anyhow::anyhow!("ELEVEN_LABS_API_TOKEN not found in environment"))?;
+//     let api_key = env::var("ELEVEN_LABS_API_KEY")
+//         .map_err(|_| anyhow::anyhow!("ELEVEN_LABS_API_KEY not found in environment"))?;
 //
 //     let now = Utc::now();
 //     let utc_plus_3 = now + Duration::hours(3);

@@ -1,8 +1,8 @@
+use crate::models::blacksmith_web::qdrant_collections::BlacksmithLabCollections;
 use crate::models::common::app_name::AppName;
 use crate::models::tg_bot::probiot_bot::qdrant_collections::ProbiotCollections;
 use crate::models::tg_bot::w3a_bot::qdrant_collections::W3ACollections;
 use strum::IntoEnumIterator;
-use crate::models::blacksmith_web::qdrant_collections::BlacksmithLabCollections;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppsCollections {
@@ -27,7 +27,9 @@ impl AppsCollections {
                 .collect(),
             AppName::W3ABot => W3ACollections::iter().map(AppsCollections::W3A).collect(),
             AppName::W3AWeb => W3ACollections::iter().map(AppsCollections::W3A).collect(),
-            AppName::BlacksmithWeb => BlacksmithLabCollections::iter().map(AppsCollections::BlacksmithLab).collect(),
+            AppName::BlacksmithWeb => BlacksmithLabCollections::iter()
+                .map(AppsCollections::BlacksmithLab)
+                .collect(),
             _ => vec![],
         }
     }

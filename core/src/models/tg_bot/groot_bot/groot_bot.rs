@@ -10,9 +10,9 @@ use grammers_client::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use teloxide::macros::BotCommands;
 use teloxide::prelude::Message;
 use tracing::{error, info, warn};
-use teloxide::macros::BotCommands;
 
 pub struct ResourcesDialogState {
     pub awaiting_option_choice: bool,

@@ -157,7 +157,7 @@ pub async fn append_footer_if_needed<T: TempCacheInit + Send + Sync>(
             }
             AppName::W3AWeb => {
                 "".to_string()
-                // // Uncomment to use ResponseFooter for W3AWeb App    
+                // // Uncomment to use ResponseFooter for W3AWeb App
                 // get_message(AppsSystemMessages::W3ABot(W3ABotMessages::ResponseFooter)).await?
             }
             _ => "".to_string(),
@@ -207,17 +207,18 @@ pub async fn get_and_remove_tts_payload(
     }
 }
 
-pub fn reset_tmp_dir(app_name: &AppName) -> std::io::Result<()> {
+pub fn create_app_tmp_dir(app_name: &AppName) -> std::io::Result<()> {
     let base_tmp = PathBuf::from("tmp");
 
-    if base_tmp.exists() {
-        fs::remove_dir_all(&base_tmp)?;
+    if !base_tmp.exists() {
+        fs::create_dir_all(&base_tmp)?;
     }
 
-    fs::create_dir_all(&base_tmp)?;
-
     let app_tmp_dir = app_name.temp_dir();
-    fs::create_dir_all(&app_tmp_dir)?;
-    
+
+    if !app_tmp_dir.exists() {
+        fs::create_dir_all(&app_tmp_dir)?;
+    }
+
     Ok(())
 }

@@ -1,7 +1,3 @@
-use std::sync::Arc;
-use anyhow::anyhow;
-use serde_json::{json, Value};
-use tracing::{error, info, warn};
 use crate::ai::common::common::raw_llm_processing_json;
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
@@ -9,7 +5,11 @@ use crate::models::common::system_roles::W3ARoleType;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::utils::common::{build_resource_file_path, get_system_role_or_fallback};
+use anyhow::anyhow;
 use anyhow::Result;
+use serde_json::{json, Value};
+use std::sync::Arc;
+use tracing::{error, info, warn};
 
 pub async fn get_llm_recommendation<T: OpenAIClientInit + QdrantClientInit + Send + Sync>(
     user_raw_request: &str,
@@ -29,8 +29,9 @@ pub async fn get_llm_recommendation<T: OpenAIClientInit + QdrantClientInit + Sen
         app_state.clone(),
         current_cache,
         app_name,
-        &modules
-    ).await?;
+        &modules,
+    )
+    .await?;
 
     info!("Recommended module: {}", module);
 
@@ -44,8 +45,9 @@ pub async fn get_llm_recommendation<T: OpenAIClientInit + QdrantClientInit + Sen
         app_name,
         &module,
         &blocks,
-        &full_structure
-    ).await?;
+        &full_structure,
+    )
+    .await?;
 
     info!("Recommended block: {}", block);
 
@@ -58,8 +60,9 @@ pub async fn get_llm_recommendation<T: OpenAIClientInit + QdrantClientInit + Sen
         current_cache,
         app_name,
         &lessons,
-        lesson_learned
-    ).await?;
+        lesson_learned,
+    )
+    .await?;
 
     info!("Recommended lesson: {}", lesson);
 
@@ -78,7 +81,7 @@ pub async fn load_academy_structure(app_name: &AppName) -> Result<Value> {
     };
 
     let original_structure: Value = serde_json::from_str(&file_content)?;
-    
+
     let normalized_structure = normalize_structure_case(&original_structure);
 
     Ok(normalized_structure)
@@ -94,14 +97,14 @@ fn normalize_structure_case(structure: &Value) -> Value {
                 new_map.insert(lowercase_key, normalized_value);
             }
             Value::Object(new_map)
-        },
+        }
         Value::Array(arr) => {
             let mut new_arr = Vec::new();
             for item in arr {
                 new_arr.push(normalize_structure_case(item));
             }
             Value::Array(new_arr)
-        },
+        }
         Value::String(s) => Value::String(s.to_lowercase()),
         _ => structure.clone(),
     }
@@ -162,10 +165,7 @@ pub fn get_blocks_from_module(structure: &Value, module: &str) -> Vec<String> {
 pub fn get_lessons_from_block(structure: &Value, module: &str, block: &str) -> Vec<String> {
     let mut lessons = Vec::new();
 
-    if let Some(block_value) = structure
-        .get(module)
-        .and_then(|m| m.get(block))
-    {
+    if let Some(block_value) = structure.get(module).and_then(|m| m.get(block)) {
         if let Some(lessons_obj) = block_value.as_object() {
             for (lesson_title, _) in lessons_obj {
                 lessons.push(lesson_title.clone());
@@ -184,14 +184,16 @@ pub async fn get_module_recommendation<T: OpenAIClientInit + QdrantClientInit + 
     app_name: &AppName,
     modules: &Vec<String>,
 ) -> Result<String> {
-    let system_role = get_system_role_or_fallback(&app_name, W3ARoleType::ModuleRecommendation, None);
+    let system_role =
+        get_system_role_or_fallback(&app_name, W3ARoleType::ModuleRecommendation, None);
 
     let llm_message = format!(
         "Текущий запрос пользователя: {}\nУточнение запроса: {}\nИстория чата: {}\nОсновные модули программы обучения Web3 Academy: {:?}",
         user_raw_request, clarified_request, current_cache, modules
     );
 
-    let result = raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light).await?;
+    let result =
+        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light).await?;
 
     let parsed_json: Value = serde_json::from_str(&result)?;
 
@@ -211,7 +213,10 @@ pub async fn get_module_recommendation<T: OpenAIClientInit + QdrantClientInit + 
             "Invalid module recommendation: '{}', defaulting to BASIC module",
             module_from_llm
         );
-        modules.first().unwrap_or(&"basic".to_string()).to_lowercase()
+        modules
+            .first()
+            .unwrap_or(&"basic".to_string())
+            .to_lowercase()
     };
 
     Ok(module)
@@ -227,12 +232,13 @@ pub async fn get_block_recommendation<T: OpenAIClientInit + QdrantClientInit + S
     blocks: &Vec<String>,
     full_structure: &Value,
 ) -> Result<String> {
-    let system_role = get_system_role_or_fallback(&app_name, W3ARoleType::BlockRecommendation, None);
+    let system_role =
+        get_system_role_or_fallback(&app_name, W3ARoleType::BlockRecommendation, None);
 
     let mut blocks_with_lessons = String::new();
     for block in blocks {
         blocks_with_lessons.push_str(&format!("Блок уроков: {}\nУроки в составе блока:\n", block));
-        
+
         let lessons = get_lessons_from_block(full_structure, module, block);
         for lesson in &lessons {
             blocks_with_lessons.push_str(&format!("- {}\n", lesson));
@@ -246,7 +252,8 @@ pub async fn get_block_recommendation<T: OpenAIClientInit + QdrantClientInit + S
         blocks_with_lessons
     );
 
-    let result = raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Complex).await?;
+    let result =
+        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Complex).await?;
 
     let parsed_json: Value = serde_json::from_str(&result)?;
 
@@ -260,7 +267,8 @@ pub async fn get_block_recommendation<T: OpenAIClientInit + QdrantClientInit + S
     let block_lowercase = block_from_llm.to_lowercase();
 
     let block = if blocks.iter().any(|c| c.to_lowercase() == block_lowercase) {
-        blocks.iter()
+        blocks
+            .iter()
             .find(|&c| c.to_lowercase() == block_lowercase)
             .unwrap_or(blocks.first().unwrap_or(&"".to_string()))
             .clone()
@@ -282,9 +290,10 @@ pub async fn get_lesson_recommendation<T: OpenAIClientInit + QdrantClientInit + 
     current_cache: &str,
     app_name: &AppName,
     lessons: &Vec<String>,
-    lesson_learned: &Vec<String>
+    lesson_learned: &Vec<String>,
 ) -> Result<String> {
-    let system_role = get_system_role_or_fallback(&app_name, W3ARoleType::LessonRecommendation, None);
+    let system_role =
+        get_system_role_or_fallback(&app_name, W3ARoleType::LessonRecommendation, None);
 
     let llm_message = format!(
         "Текущий запрос пользователя: {}\nУточнение запроса: {}\nИстория чата: {}\n\nРелевантные уроки: {:?}\nРанее изученные уроки: {:?}",
@@ -292,7 +301,8 @@ pub async fn get_lesson_recommendation<T: OpenAIClientInit + QdrantClientInit + 
         lessons, lesson_learned
     );
 
-    let result = raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Complex).await?;
+    let result =
+        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Complex).await?;
 
     let parsed_json: Value = serde_json::from_str(&result)?;
 
@@ -306,7 +316,8 @@ pub async fn get_lesson_recommendation<T: OpenAIClientInit + QdrantClientInit + 
     let lesson_lowercase = lesson_from_llm.to_lowercase();
 
     let lesson = if lessons.iter().any(|l| l.to_lowercase() == lesson_lowercase) {
-        lessons.iter()
+        lessons
+            .iter()
             .find(|&l| l.to_lowercase() == lesson_lowercase)
             .unwrap_or(&default_lesson)
             .clone()
