@@ -6,7 +6,7 @@ COPY common_res/messages/common /app/common_res/messages/common
 COPY common_res/messages/probiot_bot /app/common_res/messages/probiot_bot
 COPY common_res/system_roles/probiot /app/common_res/system_roles/probiot
 
-COPY docker/entrypoint.sh .
+COPY docker/bot_foundry_entrypoint.sh ./entrypoint.sh
 RUN chmod +x entrypoint.sh
 
 USER 1001:1000
