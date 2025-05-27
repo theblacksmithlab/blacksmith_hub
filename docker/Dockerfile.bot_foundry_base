@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY --from=builder /usr/src/app/target/release/app .
+COPY --from=builder /usr/src/app/target/release/bot_foundry .
 
 COPY --from=builder /app/whisper.cpp /app/whisper.cpp
 
