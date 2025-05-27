@@ -21,9 +21,9 @@ COPY the_forge the_forge/
 COPY bot_foundry bot_foundry/
 COPY tools tools/
 
-RUN cargo build -p app --release -j 4
+RUN cargo build -p bot_foundry --release -j 4
 
-FROM debian:bookworm-slim AS runtime-base
+FROM debian:bookworm-slim AS bot_foundry_base
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \
