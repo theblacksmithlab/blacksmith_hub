@@ -6,4 +6,4 @@ if [ -z "$APP_NAME" ]; then
     exit 1
 fi
 
-exec /app/app
+exec /app/bot_foundry
