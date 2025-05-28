@@ -13,7 +13,6 @@
 .env
 
 # Extra
-config.yaml
 Cargo.lock
 common_res/the_viper_room/grammers_system_session/
 common_res/groot_bot/current.session
