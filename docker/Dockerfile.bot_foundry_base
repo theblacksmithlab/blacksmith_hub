@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
     cmake \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /tmp/whisper
 RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
     make
@@ -35,8 +35,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY --from=builder /usr/src/app/target/release/bot_foundry .
-
-COPY --from=builder /app/whisper.cpp /app/whisper.cpp
+COPY --from=builder /tmp/whisper/whisper.cpp /app/whisper.cpp
 
 RUN chown -R 1001:1000 /app/whisper.cpp && \
     chmod -R 755 /app/whisper.cpp

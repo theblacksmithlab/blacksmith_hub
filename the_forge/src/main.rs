@@ -11,6 +11,7 @@ use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
 use dotenv::dotenv;
 use std::env;
 use std::sync::Arc;
+use rustls::crypto::{aws_lc_rs, CryptoProvider};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
@@ -20,6 +21,10 @@ mod uniframe_studio;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if let Err(e) = CryptoProvider::install_default(aws_lc_rs::default_provider()) {
+        error!("Failed to install CryptoProvider: {:?}", e);
+    }
+    
     dotenv().ok();
 
     tracing_subscriber::fmt()

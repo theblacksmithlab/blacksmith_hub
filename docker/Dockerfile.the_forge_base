@@ -43,15 +43,15 @@ RUN chown -R 1001:1000 /etc/letsencrypt/live && \
     chmod 600 /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem && \
     chmod 644 /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
 
-RUN mkdir -p /tmp && \
-    chown 1001:1000 /tmp && \
-    chmod 700 /tmp && \
+RUN mkdir -p tmp && \
+    chown 1001:1000 tmp && \
+    chmod 700 tmp && \
     chown -R 1001:1000 /app && \
     chmod 755 /app
 
-COPY docker/the_forge_entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+COPY docker/the_forge_entrypoint.sh ./entrypoint.sh
+RUN chmod +x entrypoint.sh
 
 USER 1001:1000
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["./entrypoint.sh"]

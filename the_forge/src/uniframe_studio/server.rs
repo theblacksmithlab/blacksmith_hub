@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tracing::info;
 
 pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>) -> Result<()> {
-    let _ = CryptoProvider::install_default(aws_lc_rs::default_provider());
+    // let _ = CryptoProvider::install_default(aws_lc_rs::default_provider());
 
     let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
         .load()
