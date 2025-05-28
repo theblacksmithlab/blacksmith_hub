@@ -1,4 +1,4 @@
-FROM forge-base
+FROM the_forge_base
 
 USER root
 
