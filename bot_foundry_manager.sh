@@ -110,19 +110,16 @@ if [ "$1" == "full-redeploy" ]; then
 
     print_message "${BLUE}" "=== Full redeployment process for $BOT_NAME ==="
 
-    # 1. Остановить и удалить только указанного бота
     print_message "${YELLOW}" "1. Stopping and removing $BOT_NAME..."
     docker-compose stop $BOT_NAME
     docker-compose rm -f $BOT_NAME
 
-    # 2. Удалить образ указанного бота
     IMAGE_ID=$(docker images -q blacksmith_lab_${BOT_NAME})
     if [[ -n "$IMAGE_ID" ]]; then
         print_message "${YELLOW}" "Removing $BOT_NAME image: $IMAGE_ID"
         docker rmi -f "$IMAGE_ID"
     fi
 
-    # 3. Пересобрать базу
     print_message "${YELLOW}" "2. Rebuilding base image..."
     BASE_IMAGE_ID=$(docker images -q bot_foundry_base)
     if [[ -n "$BASE_IMAGE_ID" ]]; then
@@ -132,7 +129,6 @@ if [ "$1" == "full-redeploy" ]; then
 
     docker-compose build bot_foundry_base
 
-    # 4. Пересобрать и запустить только указанного бота
     print_message "${YELLOW}" "3. Rebuilding and starting $BOT_NAME..."
     docker-compose build $BOT_NAME
     docker-compose up -d $BOT_NAME

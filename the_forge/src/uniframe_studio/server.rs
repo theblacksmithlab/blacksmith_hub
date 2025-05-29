@@ -8,13 +8,10 @@ use core::state::server_common::app_state::ServerAppState;
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use core::utils::server::server::start_server;
 use http::StatusCode;
-use rustls::crypto::{aws_lc_rs, CryptoProvider};
 use std::sync::Arc;
 use tracing::info;
 
 pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>) -> Result<()> {
-    // let _ = CryptoProvider::install_default(aws_lc_rs::default_provider());
-
     let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
         .load()
         .await;

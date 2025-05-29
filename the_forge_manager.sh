@@ -17,13 +17,13 @@ print_help() {
     print_message "${YELLOW}" "Usage:"
     echo "  ./the_forge_manager.sh base [rebuild]             - Rebuild the base image"
     echo "  ./the_forge_manager.sh <service> [restart|redeploy]  - Manage a specific service"
-    echo "  ./the_forge_manager.sh full-redeploy <service>    - Rebuild base and redeploy service"
+    echo "  ./the_forge_manager.sh full-redeploy <service>    - Rebuild base and redeploy specific service only"
     echo ""
     echo "Examples:"
     echo "  ./the_forge_manager.sh base rebuild               - Rebuild the_forge_base image"
     echo "  ./the_forge_manager.sh blacksmith_web restart     - Restart the blacksmith_web service"
     echo "  ./the_forge_manager.sh uniframe_studio redeploy   - Full redeploy of the uniframe_studio service"
-    echo "  ./the_forge_manager.sh full-redeploy blacksmith_web - Rebuild base and redeploy blacksmith_web"
+    echo "  ./the_forge_manager.sh full-redeploy blacksmith_web - Rebuild base and redeploy blacksmith_web only"
     echo ""
 
     print_message "${YELLOW}" "Available services:"
@@ -32,11 +32,6 @@ print_help() {
         echo "  - $service"
     done
 }
-
-if [ "$1" == "help" ] || [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
-    print_help
-    exit 0
-fi
 
 rebuild_base() {
     print_message "${GREEN}" "Rebuilding the_forge_base image..."
@@ -68,14 +63,14 @@ rebuild_base() {
 
 restart_service() {
     local service=$1
-    print_message "${GREEN}" "Simple restart for container: $service..."
+    print_message "${GREEN}" "Simple restart for service: $service..."
     docker-compose restart $service
-    print_message "${GREEN}" "Container restarted successfully!"
+    print_message "${GREEN}" "Service restarted successfully!"
 }
 
 redeploy_service() {
     local service=$1
-    print_message "${GREEN}" "Full redeployment for container: $service..."
+    print_message "${GREEN}" "Full redeployment for service: $service..."
     docker-compose stop $service
     docker-compose rm -f $service
 
@@ -87,7 +82,7 @@ redeploy_service() {
 
     docker-compose build $service
     docker-compose up -d $service
-    print_message "${GREEN}" "Container redeployed successfully!"
+    print_message "${GREEN}" "Service redeployed successfully!"
 }
 
 if [ -z "$1" ]; then
@@ -113,12 +108,37 @@ if [ "$1" == "full-redeploy" ]; then
         exit 1
     fi
 
-    print_message "${BLUE}" "=== Full redeployment process ==="
-    print_message "${YELLOW}" "1. Rebuilding base image..."
-    rebuild_base
-    print_message "${YELLOW}" "2. Redeploying $SERVICE_NAME..."
-    redeploy_service $SERVICE_NAME
-    print_message "${GREEN}" "Full redeployment completed successfully!"
+    print_message "${BLUE}" "=== Full redeployment process for $SERVICE_NAME ==="
+
+    print_message "${YELLOW}" "1. Stopping and removing $SERVICE_NAME..."
+    docker-compose stop $SERVICE_NAME
+    docker-compose rm -f $SERVICE_NAME
+
+    IMAGE_ID=$(docker images -q blacksmith_lab_${SERVICE_NAME})
+    if [[ -n "$IMAGE_ID" ]]; then
+        print_message "${YELLOW}" "Removing $SERVICE_NAME image: $IMAGE_ID"
+        docker rmi -f "$IMAGE_ID"
+    fi
+
+    print_message "${YELLOW}" "2. Rebuilding base image..."
+    BASE_IMAGE_ID=$(docker images -q the_forge_base)
+    if [[ -n "$BASE_IMAGE_ID" ]]; then
+        print_message "${YELLOW}" "Removing the_forge_base image: $BASE_IMAGE_ID"
+        docker rmi -f "$BASE_IMAGE_ID"
+    fi
+
+    docker-compose build the_forge_base
+
+    print_message "${YELLOW}" "3. Rebuilding and starting $SERVICE_NAME..."
+    docker-compose build $SERVICE_NAME
+    docker-compose up -d $SERVICE_NAME
+
+    print_message "${GREEN}" "Full redeployment of $SERVICE_NAME completed successfully!"
+    exit 0
+fi
+
+if [ "$1" == "help" ] || [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+    print_help
     exit 0
 fi
 
