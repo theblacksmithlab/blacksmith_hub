@@ -171,7 +171,7 @@ pub async fn resources_cmd_handler(
                 bot.send_message(
                     msg.chat.id,
                     "Пожалуйста, предоставьте id пользователя для добавления в 'белый список'\n\n\
-                ВНИМАНИЕ! id пользователя можно получить с помощью бота: @username_to_id_bot, @userdatailsbot и др.",
+                ВНИМАНИЕ! id пользователя можно получить с помощью бота: @username_to_id_bot и др.",
                 )
                     .reply_markup(keyboard)
                     .await?;

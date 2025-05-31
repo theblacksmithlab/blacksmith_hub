@@ -34,15 +34,15 @@ pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>)
 fn get_uniframe_studio_router(uniframe_studio_app_state: Arc<UniframeStudioAppState>) -> Router {
     Router::new()
         .route(
-            "/api/dubbing/pipeline/prepare",
+            "/api/uniframe/dubbing/prepare",
             post(prepare_dubbing_pipeline).options(|| async { StatusCode::OK }),
         )
         .route(
-            "/api/dubbing/pipeline/start",
+            "/api/uniframe/dubbing/start",
             post(start_dubbing_pipeline).options(|| async { StatusCode::OK }),
         )
         .route(
-            "/api/dubbing/pipeline/{pipeline_id}/status",
+            "/api/uniframe/dubbing/{pipeline_id}/status",
             get(get_dubbing_pipeline_status).options(|| async { StatusCode::OK }),
         )
         .with_state(uniframe_studio_app_state)

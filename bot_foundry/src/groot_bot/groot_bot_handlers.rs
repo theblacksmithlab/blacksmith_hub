@@ -403,7 +403,15 @@ pub async fn groot_bot_command_handler(
                 ))
                 .await?;
 
-                bot.send_message(msg.chat.id, bot_msg).await?;
+                let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
+
+                auto_delete_message(
+                    bot.clone(),
+                    bot_system_message.chat.id,
+                    bot_system_message.id,
+                    Duration::from_secs(120),
+                )
+                    .await;
             }
         }
         _ => {

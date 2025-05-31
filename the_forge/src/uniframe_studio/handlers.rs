@@ -7,13 +7,15 @@ use core::models::uniframe_studio::uniframe_studio::{
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
 use std::sync::Arc;
-use tracing::{error, info, instrument};
+use tracing::{debug, error, info, instrument};
 
 #[instrument(skip(state, request))]
 pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<DubbingPipelinePrepareRequest>,
 ) -> Result<Json<DubbingPipelinePrepareResponse>, (StatusCode, Json<ApiError>)> {
+    debug!("Preparing DubbingPipeline");
+    
     if request.filename.is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,

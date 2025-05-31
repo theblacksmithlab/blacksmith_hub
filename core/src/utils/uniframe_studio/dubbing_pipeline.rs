@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
-use tracing::{error, info, instrument};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -53,6 +53,8 @@ impl DubbingPipelineService {
         tracing::Span::current().record("pipeline_id", &pipeline_id);
         let job_id = Uuid::new_v4().to_string();
 
+        debug!("Preparing pipeline {} | job_id: {}", pipeline_id, job_id);
+        
         let s3_key = format!("uploads/{}/input/{}", pipeline_id, request.filename);
         let video_s3_url = format!(
             "s3://{}/{}",
