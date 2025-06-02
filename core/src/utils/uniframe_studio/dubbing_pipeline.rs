@@ -272,7 +272,9 @@ impl DubbingPipelineService {
             None,
             None,
         ).await;
-
+            
+        info!("User's subscription tier: {}", is_premium);
+        
         let dubbing_job_request = DubbingJobRequest {
             job_id: job_id.clone(),
             video_url: request.video_url,
