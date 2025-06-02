@@ -7,14 +7,14 @@ use core::models::uniframe_studio::uniframe_studio::{
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
 use std::sync::Arc;
-use tracing::{debug, error, info, instrument};
+use tracing::{error, info, instrument};
 
 #[instrument(skip(state, request))]
 pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<DubbingPipelinePrepareRequest>,
 ) -> Result<Json<DubbingPipelinePrepareResponse>, (StatusCode, Json<ApiError>)> {
-    debug!("Preparing DubbingPipeline");
+    info!("Preparing DubbingPipeline");
     
     if request.filename.is_empty() {
         return Err((
@@ -97,7 +97,7 @@ pub async fn start_dubbing_pipeline(
     }
 
     let user_is_premium = is_premium_user(None).await;
-
+    
     match state
         .dubbing_pipeline_service
         .start_pipeline(request, user_is_premium)

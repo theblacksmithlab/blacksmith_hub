@@ -42,13 +42,14 @@ pub struct DubbingPipelineStatus {
     pub pipeline_id: String,
     pub job_id: String,
     pub status: String,
-    pub current_stage: String,
+    pub step_description: String,
     pub progress_percentage: Option<i32>,
     pub created_at: String,
     pub updated_at: String,
     pub completed_at: Option<String>,
     pub result_urls: Option<HashMap<String, String>>,
     pub error_message: Option<String>,
+    pub processing_steps: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -76,11 +77,13 @@ pub struct DubbingJobStatus {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_steps: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    pub step_description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub progress_percentage: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub processing_steps: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

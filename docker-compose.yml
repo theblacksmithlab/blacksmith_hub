@@ -73,16 +73,10 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DUBBING_SERVICE_URL=http://uniframe-dubbing-service:8000
-    networks:
-      - uniframe-network
+      - DUBBING_SERVICE_URL=http://AI_SERVER_IP:8000
     deploy:
       resources:
         limits:
           cpus: '4'
           memory: 4G
     restart: unless-stopped
-
-networks:
-  uniframe-network:
-    external: true

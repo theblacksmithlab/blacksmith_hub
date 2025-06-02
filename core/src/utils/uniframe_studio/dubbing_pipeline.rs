@@ -12,21 +12,23 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
-use tracing::{debug, error, info, instrument};
+use tracing::{error, info, instrument};
 use uuid::Uuid;
+use crate::gpu_client::immers_cloud_client::ImmersCloudClient;
 
 #[derive(Debug, Clone)]
 struct PipelineState {
     pipeline_id: String,
     job_id: String,
     status: String,
-    current_stage: String,
+    step_description: String,
     progress_percentage: Option<i32>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     completed_at: Option<DateTime<Utc>>,
     result_urls: Option<HashMap<String, String>>,
     error_message: Option<String>,
+    processing_steps: Option<Vec<String>>,
 }
 
 pub struct DubbingPipelineService {
@@ -53,7 +55,7 @@ impl DubbingPipelineService {
         tracing::Span::current().record("pipeline_id", &pipeline_id);
         let job_id = Uuid::new_v4().to_string();
 
-        debug!("Preparing pipeline {} | job_id: {}", pipeline_id, job_id);
+        info!("Preparing pipeline {} | job_id: {}", pipeline_id, job_id);
         
         let s3_key = format!("uploads/{}/input/{}", pipeline_id, request.filename);
         let video_s3_url = format!(
@@ -82,7 +84,9 @@ impl DubbingPipelineService {
             video_s3_url,
             expires_in: 3600,
         };
-
+        
+        info!("Prepare fn server response: {:?}", response);
+        
         Ok(response)
     }
 
@@ -92,10 +96,182 @@ impl DubbingPipelineService {
         request: DubbingPipelineRequest,
         is_premium: bool,
     ) -> Result<DubbingPipelineResponse> {
-        let pipeline_id = request.pipeline_id;
-        let job_id = request.job_id;
+        let pipeline_id = request.pipeline_id.clone();
+        let job_id = request.job_id.clone();
+        let now = Utc::now();
 
         tracing::Span::current().record("pipeline_id", &pipeline_id);
+
+        let initial_pipeline_state = PipelineState {
+            pipeline_id: pipeline_id.clone(),
+            job_id: job_id.clone(),
+            status: "initializing".to_string(),
+            step_description: "Setting up technical environment...".to_string(),
+            progress_percentage: Some(0),
+            created_at: now,
+            updated_at: now,
+            completed_at: None,
+            result_urls: None,
+            error_message: None,
+            processing_steps: None,
+        };
+
+        {
+            let mut pipelines = self.pipelines.lock().await;
+            pipelines.insert(pipeline_id.clone(), initial_pipeline_state);
+        }
+
+        let response = DubbingPipelineResponse {
+            pipeline_id: pipeline_id.clone(),
+            job_id: job_id.clone(),
+            status: "initializing".to_string(),
+            created_at: now.to_rfc3339(),
+        };
+
+        let request_clone = request;
+        let dubbing_client = self.dubbing_client.clone();
+        let s3_client = self.s3_client.clone();
+        let pipelines = self.pipelines.clone();
+
+        tokio::spawn(async move {
+            Self::pipeline_processor(
+                pipeline_id,
+                job_id,
+                request_clone,
+                is_premium,
+                dubbing_client,
+                s3_client,
+                pipelines,
+            ).await;
+        });
+
+        Ok(response)
+    }
+
+    async fn pipeline_processor(
+        pipeline_id: String,
+        job_id: String,
+        request: DubbingPipelineRequest,
+        is_premium: bool,
+        dubbing_client: UniframeDubbingClient,
+        s3_client: Arc<S3Client>,
+        pipelines: Arc<Mutex<HashMap<String, PipelineState>>>,
+    ) {
+        info!("Starting pipeline processor for pipeline_id={}", pipeline_id);
+        
+        let gpu_result = async {
+            info!("Checking GPU processing service status...");
+
+            let immers_cloud_client = ImmersCloudClient::new(
+                &std::env::var("IMMERS_USERNAME").context("IMMERS_USERNAME not set")?,
+                &std::env::var("IMMERS_PASSWORD").context("IMMERS_PASSWORD not set")?,
+                &std::env::var("IMMERS_PROJECT").context("IMMERS_PROJECT not set")?,
+                std::env::var("IMMERS_AI_SERVER_ID").context("IMMERS_AI_SERVER_ID not set")?
+            ).await.context("Failed to initialize Immers.Cloud client")?;
+
+            let gpu_service_status = immers_cloud_client.get_service_status().await?;
+
+            info!("GPU processing service status: {}", gpu_service_status);
+
+            if gpu_service_status == "SHELVED_OFFLOADED" || gpu_service_status == "SHELVED" {
+                info!("GPU processing service is sleeping, initiating wake-up process...");
+
+                Self::update_pipeline_status(
+                    &pipelines,
+                    &pipeline_id,
+                    "initializing",
+                    "Resurrecting system components...",
+                    Some(0),
+                    None,
+                    None,
+                ).await;
+
+                immers_cloud_client.unshelve_server().await?;
+
+                Self::update_pipeline_status(
+                    &pipelines,
+                    &pipeline_id,
+                    "initializing",
+                    "Warming up GPUs...",
+                    Some(0),
+                    None,
+                    None,
+                ).await;
+
+                immers_cloud_client.wait_for_service_active(600).await?;
+
+                info!("GPU processing service is now active, waiting for services to start...");
+
+                Self::update_pipeline_status(
+                    &pipelines,
+                    &pipeline_id,
+                    "initializing",
+                    "Preparing technical environment...",
+                    Some(0),
+                    None,
+                    None,
+                ).await;
+
+                tokio::time::sleep(Duration::from_secs(90)).await;
+                
+                let max_attempts = 30;
+                for attempt in 1..=max_attempts {
+                    info!("Checking GPU processing service readiness, attempt {}/{}", attempt, max_attempts);
+
+                    match dubbing_client.health_check().await {
+                        Ok(_) => {
+                            info!("GPU processing service is ready");
+                            break;
+                        }
+                        Err(e) => {
+                            if attempt == max_attempts {
+                                return Err(anyhow::anyhow!("GPU processing service failed to become ready: {}", e));
+                            }
+                            tokio::time::sleep(Duration::from_secs(10)).await;
+                        }
+                    }
+                }
+
+                info!("GPU processing service and services are ready for processing");
+            } else if gpu_service_status == "ACTIVE" {
+                info!("GPU processing service is already active");
+                
+                if let Err(e) = dubbing_client.health_check().await {
+                    return Err(anyhow::anyhow!("GPU processing service is not responding: {}", e));
+                }
+            } else {
+                return Err(anyhow::anyhow!("GPU processing service is in unexpected state: {}", gpu_service_status));
+            }
+
+            Ok(())
+        }.await;
+        
+        if let Err(e) = gpu_result {
+            error!("Failed to prepare GPU service: {}", e);
+            Self::update_pipeline_status(
+                &pipelines,
+                &pipeline_id,
+                "failed",
+                "Technical environment initialization failed",
+                Some(0),
+                None,
+                Some(&format!("Failed to prepare GPU service: {}", e)),
+            ).await;
+            return;
+        }
+        
+        
+        info!("GPU service ready, submitting job to processing service...");
+
+        Self::update_pipeline_status(
+            &pipelines,
+            &pipeline_id,
+            "initializing",
+            "Launching processing pipeline...",
+            Some(0),
+            None,
+            None,
+        ).await;
 
         let dubbing_job_request = DubbingJobRequest {
             job_id: job_id.clone(),
@@ -108,63 +284,49 @@ impl DubbingPipelineService {
             api_keys: request.api_keys,
         };
 
-        info!("Initiating dubbing job for pipeline {}", pipeline_id);
-        let job_status = self
-            .dubbing_client
-            .process_video(dubbing_job_request)
-            .await
-            .context("Failed to initiate dubbing job")?;
+        let job_submission_result = dubbing_client.process_video(dubbing_job_request).await;
 
-        let now = Utc::now();
-        let pipeline_state = PipelineState {
-            pipeline_id: pipeline_id.clone(),
-            job_id: job_status.job_id.clone(),
-            status: job_status.status.clone(),
-            current_stage: job_status
-                .description
-                .clone()
-                .unwrap_or_else(|| format!("Step {}", job_status.step.unwrap_or(0))),
-            progress_percentage: job_status.progress_percentage,
-            created_at: now,
-            updated_at: now,
-            completed_at: job_status.completed_at.as_ref().map(|_| now),
-            result_urls: None,
-            error_message: job_status.error_message.clone(),
-        };
-
-        {
-            let mut pipelines = self.pipelines.lock().await;
-            pipelines.insert(pipeline_id.clone(), pipeline_state);
+        match job_submission_result {
+            Ok(job_status) => {
+                info!("Successfully submitted job to processing service");
+                
+                Self::update_pipeline_status(
+                    &pipelines,
+                    &pipeline_id,
+                    &job_status.status,
+                    &job_status.step_description.unwrap_or_else(|| "Processing started".to_string()),
+                    job_status.progress_percentage,
+                    None,
+                    job_status.error_message.as_deref(),
+                ).await;
+                
+                
+                info!("Starting pipeline monitoring process...");
+                
+                Self::run_dubbing_pipeline_process(
+                    pipeline_id,
+                    job_id,
+                    dubbing_client,
+                    s3_client,
+                    pipelines,
+                ).await;
+            }
+            Err(e) => {
+                error!("Failed to submit job to processing service: {}", e);
+                Self::update_pipeline_status(
+                    &pipelines,
+                    &pipeline_id,
+                    "failed",
+                    "Processing pipeline launch failed",
+                    Some(0),
+                    None,
+                    Some(&format!("Failed to submit job: {}", e)),
+                ).await;
+            }
         }
-
-        let dubbing_client = self.dubbing_client.clone();
-        let s3_client = self.s3_client.clone();
-        let pipelines = self.pipelines.clone();
-        let pipeline_id_clone = pipeline_id.clone();
-        let job_id_clone = job_id.clone();
-
-        tokio::spawn(async move {
-            Self::run_pipeline_process(
-                pipeline_id_clone,
-                job_id_clone,
-                dubbing_client,
-                s3_client,
-                pipelines,
-            )
-            .await;
-        });
-
-        let response = DubbingPipelineResponse {
-            pipeline_id,
-            job_id: job_status.job_id,
-            status: job_status.status,
-            created_at: now.to_rfc3339(),
-        };
-
-        Ok(response)
     }
-
-    async fn run_pipeline_process(
+    
+    async fn run_dubbing_pipeline_process(
         pipeline_id: String,
         job_id: String,
         dubbing_client: UniframeDubbingClient,
@@ -185,8 +347,8 @@ impl DubbingPipelineService {
 
             match dubbing_client.get_job_status(&job_id).await {
                 Ok(status) => {
-                    let current_stage = status
-                        .description
+                    let step_description = status
+                        .step_description
                         .clone()
                         .unwrap_or_else(|| format!("Processing step {}", status.step.unwrap_or(0)));
 
@@ -194,7 +356,7 @@ impl DubbingPipelineService {
                         &pipelines,
                         &pipeline_id,
                         &status.status,
-                        &current_stage,
+                        &step_description,
                         status.progress_percentage,
                         None,
                         status.error_message.as_deref(),
@@ -381,7 +543,7 @@ impl DubbingPipelineService {
         pipelines: &Arc<Mutex<HashMap<String, PipelineState>>>,
         pipeline_id: &str,
         status: &str,
-        current_stage: &str,
+        step_description: &str,
         progress_percentage: Option<i32>,
         result_urls: Option<HashMap<String, String>>,
         error_message: Option<&str>,
@@ -397,7 +559,7 @@ impl DubbingPipelineService {
 
         if let Some(pipeline) = pipelines.get_mut(pipeline_id) {
             pipeline.status = status.to_string();
-            pipeline.current_stage = current_stage.to_string();
+            pipeline.step_description = step_description.to_string();
             pipeline.progress_percentage = progress_percentage;
             pipeline.updated_at = now;
             pipeline.completed_at = completed_at;
@@ -423,13 +585,14 @@ impl DubbingPipelineService {
             pipeline_id: pipeline.pipeline_id.clone(),
             job_id: pipeline.job_id.clone(),
             status: pipeline.status.clone(),
-            current_stage: pipeline.current_stage.clone(),
+            step_description: pipeline.step_description.clone(),
             progress_percentage: pipeline.progress_percentage,
             created_at: pipeline.created_at.to_rfc3339(),
             updated_at: pipeline.updated_at.to_rfc3339(),
             completed_at: pipeline.completed_at.map(|dt| dt.to_rfc3339()),
             result_urls: pipeline.result_urls.clone(),
             error_message: pipeline.error_message.clone(),
+            processing_steps: pipeline.processing_steps.clone(),
         };
 
         Ok(status)

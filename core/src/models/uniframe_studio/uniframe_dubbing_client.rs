@@ -91,4 +91,19 @@ impl UniframeDubbingClient {
             anyhow::bail!("Dubbing Client API error: {}", error_text);
         }
     }
+
+    pub async fn health_check(&self) -> Result<()> {
+        let response = self
+            .client
+            .get(&format!("{}/health", self.base_url))
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Health check failed: {}", response.status()))
+        }
+    }
 }
