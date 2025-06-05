@@ -14,7 +14,7 @@ pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<DubbingPipelinePrepareRequest>,
 ) -> Result<Json<DubbingPipelinePrepareResponse>, (StatusCode, Json<ApiError>)> {
-    info!("Preparing DubbingPipeline");
+    info!("Preparing dubbing pipeline...");
     
     if request.filename.is_empty() {
         return Err((
@@ -47,7 +47,7 @@ pub async fn start_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<DubbingPipelineRequest>,
 ) -> Result<Json<DubbingPipelineResponse>, (StatusCode, Json<ApiError>)> {
-    info!("Received dubbing pipeline request");
+    info!("Starting dubbing pipeline {}...", request.pipeline_id);
 
     if !request.video_url.starts_with("s3://") {
         return Err((
@@ -68,34 +68,8 @@ pub async fn start_dubbing_pipeline(
             }),
         ));
     }
-
-    if !request.api_keys.contains_key("openai")
-        || request.api_keys.get("openai").unwrap().is_empty()
-    {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ApiError {
-                code: "MISSING_API_KEY".to_string(),
-                message: "OpenAI API key is required".to_string(),
-            }),
-        ));
-    }
-
-    if request.tts_provider == "elevenlabs" {
-        if !request.api_keys.contains_key("elevenlabs")
-            || request.api_keys.get("elevenlabs").unwrap().is_empty()
-        {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                Json(ApiError {
-                    code: "MISSING_API_KEY".to_string(),
-                    message: "ElevenLabs API key is required for ElevenLabs TTS provider"
-                        .to_string(),
-                }),
-            ));
-        }
-    }
-
+    
+    // TODO: Implement user's subscription tier detection
     let user_is_premium = is_premium_user(None).await;
     
     match state

@@ -26,7 +26,6 @@ pub struct DubbingPipelineRequest {
     pub tts_voice: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_language: Option<String>,
-    pub api_keys: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -62,7 +61,6 @@ pub struct DubbingJobRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_language: Option<String>,
     pub is_premium: bool,
-    pub api_keys: HashMap<String, String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
