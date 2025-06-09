@@ -235,7 +235,7 @@ fn normalize_titles(
     )
 }
 
-fn normalize_structure_file() -> Result<(), String> {
+fn _normalize_structure_file() -> Result<(), String> {
     let file_path = "./common_res/w3a/w3a_learning_structure.txt";
 
     let content =

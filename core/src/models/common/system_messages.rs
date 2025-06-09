@@ -3,8 +3,6 @@ pub enum AppsSystemMessages {
     ProbiotBot(ProbiotBotMessages),
     TheViperRoom(TheViperRoomMessages),
     TheViperRoomBot(TheViperRoomBotMessages),
-    RequestApp(RequestAppMessages),
-    RequestAppBot(RequestAppBotMessages),
     Common(CommonMessages),
     W3ABot(W3ABotMessages),
     W3A(W3AMessages),
@@ -176,36 +174,6 @@ impl TheViperRoomBotMessages {
         match self {
             TheViperRoomBotMessages::DonationFooter => "donation_footer",
             TheViperRoomBotMessages::WrongCmdOrNoRightsMessage => "wrong_cmd_or_no_rights_message",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum RequestAppMessages {
-    TestMessage1,
-    TestMessage2,
-}
-
-impl RequestAppMessages {
-    pub fn as_str(&self) -> &str {
-        match self {
-            RequestAppMessages::TestMessage1 => "test_message_1",
-            RequestAppMessages::TestMessage2 => "test_message_2",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum RequestAppBotMessages {
-    TestMessage1,
-    TestMessage2,
-}
-
-impl RequestAppBotMessages {
-    pub fn as_str(&self) -> &str {
-        match self {
-            RequestAppBotMessages::TestMessage1 => "test_message_1",
-            RequestAppBotMessages::TestMessage2 => "test_message_2",
         }
     }
 }

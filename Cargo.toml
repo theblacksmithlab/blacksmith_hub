@@ -1,12 +1,11 @@
 [workspace]
 members = [
     "core",
-    "server",
-    "ai_forge",
-    "app",
+    "the_forge",
+    "bot_foundry",
     "tools",
 ]
-default-members = ["ai_forge"]
+default-members = ["the_forge"]
 
 resolver = "2"
 
@@ -24,7 +23,6 @@ teloxide = { version = "0.15.0", features = ["macros"] }
 teloxide-core = { version = "0.11.2", package = "teloxide-core" }
 grammers-client = "0.7.0"
 grammers-session = "0.7.0"
-grammers-tl-types = "0.7.0"
 
 # Database & Storage
 sqlx = { version = "0.8.2", features = ["sqlite", "runtime-tokio", "migrate"] }
@@ -46,10 +44,13 @@ reqwest = "0.12.5"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
+# AWS S3 Storage
+aws-sdk-s3 = "1.86.0"
+aws-config = "1.6.3"
+
 # Utilities
 anyhow = "1.0.86"
 dotenv = "0.15"
-lazy_static = "1.5.0"
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1.85"
 uuid = "1.12.1"
@@ -64,3 +65,4 @@ clap = "4.5"
 clap_derive = "4.5"
 unicode-normalization = "0.1.24"
 walkdir = "2.5.0"
+rustls = "0.23.27"

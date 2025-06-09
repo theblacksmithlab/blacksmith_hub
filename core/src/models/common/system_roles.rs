@@ -2,7 +2,6 @@
 pub enum AppsSystemRoles {
     Probiot(ProbiotRoleType),
     W3A(W3ARoleType),
-    RequestApp(RequestAppSystemRoleType),
     TheViperRoom(TheViperRoomRoleType),
     Groot(GrootRoleType),
     BlacksmithLab(BlacksmithLabRoleType),
@@ -13,7 +12,6 @@ impl AppsSystemRoles {
         match self {
             AppsSystemRoles::Probiot(role) => role.as_str(),
             AppsSystemRoles::W3A(role) => role.as_str(),
-            AppsSystemRoles::RequestApp(role) => role.as_str(),
             AppsSystemRoles::TheViperRoom(role) => role.as_str(),
             AppsSystemRoles::Groot(role) => role.as_str(),
             AppsSystemRoles::BlacksmithLab(role) => role.as_str(),
@@ -101,29 +99,6 @@ impl W3ARoleType {
 }
 
 impl AsRef<str> for W3ARoleType {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum RequestAppSystemRoleType {
-    ProcessingUsersBioText,
-    // ProcessingUsersRequestText,
-    ReorderingResults,
-}
-
-impl RequestAppSystemRoleType {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            RequestAppSystemRoleType::ProcessingUsersBioText => "processing_users_bio_text",
-            // RequestAppSystemRoleType::ProcessingUsersRequestText => "processing_users_request_text",
-            RequestAppSystemRoleType::ReorderingResults => "reordering_results",
-        }
-    }
-}
-
-impl AsRef<str> for RequestAppSystemRoleType {
     fn as_ref(&self) -> &str {
         self.as_str()
     }

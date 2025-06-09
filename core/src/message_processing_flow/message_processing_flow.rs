@@ -1,11 +1,13 @@
-use crate::ai::common::common::tokenize_and_truncate;
 use crate::ai::common::common::raw_llm_processing;
+use crate::ai::common::common::tokenize_and_truncate;
 use crate::message_processing_flow::check_request_for_crap_content::check_request_for_common_case;
 use crate::message_processing_flow::clarify_request::clarify_request;
+use crate::message_processing_flow::llm_recommendation_system::get_llm_recommendation;
+use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::qdrant_collection_manager::AppsCollections;
-use crate::models::common::system_roles::{BlacksmithLabRoleType, ProbiotRoleType};
 use crate::models::common::system_roles::{AppsSystemRoles, W3ARoleType};
+use crate::models::common::system_roles::{BlacksmithLabRoleType, ProbiotRoleType};
 use crate::rag_system::context_builder::DefaultContextBuilder;
 use crate::rag_system::get_results_via_rag_system::get_results_via_rag_system::get_results_via_rag_system;
 use crate::rag_system::retriever::QdrantRetriever;
@@ -22,9 +24,6 @@ use crate::utils::tg_bot::tg_bot::{add_user_message_to_cache, get_cache_as_strin
 use anyhow::Result;
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use crate::message_processing_flow::llm_recommendation_system::get_llm_recommendation;
-use crate::models::common::ai::LlmModel;
-
 
 pub async fn process_user_raw_request<
     T: OpenAIClientInit + QdrantClientInit + TempCacheInit + Send + Sync,
@@ -65,8 +64,8 @@ pub async fn process_user_raw_request<
             app_state.clone(),
             app_name.clone(),
         )
-            .await?;
-        
+        .await?;
+
         let (response_for_special_case_request, extra_data) = handle_special_case_request(
             user_raw_request,
             &clarified_request,
@@ -98,10 +97,7 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
         _ => get_advanced_rag_config(),
     };
 
-    info!(
-        "Collections names for RAG system: {:?}",
-        collection_names
-    );
+    info!("Collections names for RAG system: {:?}", collection_names);
 
     let rag_system_search_result = get_results_via_rag_system(
         clarified_request,
@@ -121,7 +117,8 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
             .await
             .unwrap_or_else(|_| (search_result_content.clone(), max_tokens));
 
-    let (additional_context, extra_data) = if matches!(app_name, AppName::W3AWeb | AppName::W3ABot) {
+    let (additional_context, extra_data) = if matches!(app_name, AppName::W3AWeb | AppName::W3ABot)
+    {
         let initial_search_result_lesson_learned = rag_system_search_result
             .documents
             .first()
@@ -176,13 +173,18 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
         }
     );
 
-    info!("LLM message for user's request main processing: {}", llm_message);
+    info!(
+        "LLM message for user's request main processing: {}",
+        llm_message
+    );
 
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::MainProcessing)),
         AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::MainProcessing)),
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::MainProcessing)),
-        AppName::BlacksmithWeb =>Some(AppsSystemRoles::BlacksmithLab(BlacksmithLabRoleType::MainProcessing)),
+        AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
+            BlacksmithLabRoleType::MainProcessing,
+        )),
         _ => None,
     };
 
@@ -218,9 +220,15 @@ pub async fn handle_common_case_request<T: OpenAIClientInit + Send + Sync>(
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(
             ProbiotRoleType::CommonCaseRequestProcessing,
         )),
-        AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::CommonCaseRequestProcessing)),
-        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::CommonCaseRequestProcessing)),
-        AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(BlacksmithLabRoleType::CommonCaseRequestProcessing)),
+        AppName::W3ABot => Some(AppsSystemRoles::W3A(
+            W3ARoleType::CommonCaseRequestProcessing,
+        )),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(
+            W3ARoleType::CommonCaseRequestProcessing,
+        )),
+        AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
+            BlacksmithLabRoleType::CommonCaseRequestProcessing,
+        )),
         _ => None,
     };
 
@@ -251,29 +259,29 @@ pub async fn handle_common_case_request<T: OpenAIClientInit + Send + Sync>(
 // ) -> Result<String> {
 //     let w3a_academy_learning_structure =
 //         get_message(AppsSystemMessages::W3A(W3AMessages::W3AStudyStructure)).await?;
-// 
+//
 //     let system_role = get_system_role_or_fallback(&app_name, W3ARoleType::Recommendation, None);
-// 
+//
 //     let llm_message = format!("User's current query: {}\nUser's refined query: {}\nChat history: {}\nWeb3 Academy learning structure:{}\nCompleted lessons:{:?}\n", user_raw_request, clarified_request, current_cache, w3a_academy_learning_structure, lesson_learned);
-// 
+//
 //     let result =
 //         raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Complex).await?;
-// 
+//
 //     info!("LLM lesson recommendation: {}", result);
-// 
+//
 //     let parsed_json: Value = serde_json::from_str(&result).map_err(|err| {
 //         error!("Failed to parse LLM response as JSON: {}", err);
 //         err
 //     })?;
-// 
+//
 //     let llm_lesson_recommendation = parsed_json
 //         .get("Recommended lesson")
 //         .and_then(|v| v.as_str())
 //         .unwrap_or("")
 //         .to_lowercase();
-// 
+//
 //     info!("Extracted recommendation: {}", llm_lesson_recommendation);
-// 
+//
 //     if !llm_lesson_recommendation.is_empty()
 //         && !lesson_exists_in_structure(&llm_lesson_recommendation, &w3a_academy_learning_structure)
 //     {
@@ -283,7 +291,7 @@ pub async fn handle_common_case_request<T: OpenAIClientInit + Send + Sync>(
 //         );
 //         return Ok(String::new());
 //     }
-// 
+//
 //     Ok(llm_lesson_recommendation)
 // }
 
@@ -365,10 +373,7 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
         return Ok((actual_context.to_string(), lessons_learned));
     }
 
-    info!(
-        "Recursive search attempts counter: {}",
-        attempt_counter
-    );
+    info!("Recursive search attempts counter: {}", attempt_counter);
 
     if attempt_counter >= max_attempts {
         warn!(
@@ -383,7 +388,10 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
         current_token_count, min_tokens, max_attempts
     );
 
-    info!("Actual learned lessons: {:?} at the step #{} of attempts counter", lessons_learned, attempt_counter);
+    info!(
+        "Actual learned lessons: {:?} at the step #{} of attempts counter",
+        lessons_learned, attempt_counter
+    );
 
     let llm_recommendation = get_llm_recommendation(
         user_raw_request,
@@ -402,8 +410,7 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
 
     info!(
         "Actual learned lessons after update: {:?} at the step #{} of attempts counter",
-        updated_lessons_learned,
-        attempt_counter
+        updated_lessons_learned, attempt_counter
     );
 
     let raw_additional_search_result_content = get_additional_context_by_llm_recommendation(
@@ -452,6 +459,6 @@ async fn fetch_additional_context<T: OpenAIClientInit + QdrantClientInit + Send 
         updated_attempt_counter,
     ))
     .await?;
-    
+
     Ok((final_context, final_lessons))
 }

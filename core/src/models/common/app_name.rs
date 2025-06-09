@@ -8,13 +8,12 @@ pub enum AppName {
     ProbiotBot,
     TheViperRoom,
     TheViperRoomBot,
-    RequestApp,
-    RequestAppBot,
     TesterBot,
     W3ABot,
     W3AWeb,
     BlacksmithWeb,
     GrootBot,
+    UniframeStudio,
 }
 
 impl AppName {
@@ -23,13 +22,12 @@ impl AppName {
             AppName::ProbiotBot => "probiot_bot",
             AppName::TheViperRoom => "the_viper_room",
             AppName::TheViperRoomBot => "the_viper_room_bot",
-            AppName::RequestApp => "request_app",
-            AppName::RequestAppBot => "request_app_bot",
             AppName::TesterBot => "tester_bot",
             AppName::W3ABot => "w3a_bot",
             AppName::W3AWeb => "w3a_web",
             AppName::BlacksmithWeb => "blacksmith_web",
             AppName::GrootBot => "groot_bot",
+            AppName::UniframeStudio => "uniframe_studio",
         }
     }
 }
@@ -42,13 +40,12 @@ impl FromStr for AppName {
             "probiot_bot" => Ok(AppName::ProbiotBot),
             "the_viper_room" => Ok(AppName::TheViperRoom),
             "the_viper_room_bot" => Ok(AppName::TheViperRoomBot),
-            "request_app" => Ok(AppName::RequestApp),
-            "request_app_bot" => Ok(AppName::RequestAppBot),
             "tester_bot" => Ok(AppName::TesterBot),
             "w3a_bot" => Ok(AppName::W3ABot),
             "w3a_web" => Ok(AppName::W3AWeb),
             "blacksmith_web" => Ok(AppName::BlacksmithWeb),
             "groot_bot" => Ok(AppName::GrootBot),
+            "uniframe_studio" => Ok(AppName::UniframeStudio),
             _ => Err(()),
         }
     }

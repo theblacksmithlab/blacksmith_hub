@@ -1,7 +1,7 @@
 use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
-use crate::models::tg_bot::groot_bot::groot_bot::{MessageCounts, MessageReports};
 use crate::models::tg_bot::groot_bot::groot_bot::{ChatMessageStats, ResourcesDialogState};
+use crate::models::tg_bot::groot_bot::groot_bot::{MessageCounts, MessageReports};
 use crate::models::tg_bot::the_viper_room_bot::podcast_manager::PodcastManager;
 use async_openai::config::OpenAIConfig;
 use async_openai::Client as LLM_Client;
@@ -67,7 +67,9 @@ impl BotAppState {
         let dialog_states = Some(Mutex::new(HashMap::new()));
 
         let message_reports = Arc::new(Mutex::new(
-            MessageReports::load_message_reports(&app_name).await.unwrap_or_else(|_| MessageReports::new()),
+            MessageReports::load_message_reports(&app_name)
+                .await
+                .unwrap_or_else(|_| MessageReports::new()),
         ));
 
         Self {
