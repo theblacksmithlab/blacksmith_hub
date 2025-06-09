@@ -103,7 +103,10 @@ impl UniframeDubbingClient {
         if response.status().is_success() {
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Health check failed: {}", response.status()))
+            Err(anyhow::anyhow!(
+                "Health check failed: {}",
+                response.status()
+            ))
         }
     }
 }

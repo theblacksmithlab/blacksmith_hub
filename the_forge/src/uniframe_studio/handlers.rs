@@ -15,7 +15,7 @@ pub async fn prepare_dubbing_pipeline(
     Json(request): Json<DubbingPipelinePrepareRequest>,
 ) -> Result<Json<DubbingPipelinePrepareResponse>, (StatusCode, Json<ApiError>)> {
     info!("Preparing dubbing pipeline...");
-    
+
     if request.filename.is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -68,10 +68,10 @@ pub async fn start_dubbing_pipeline(
             }),
         ));
     }
-    
+
     // TODO: Implement user's subscription tier detection
     let user_is_premium = is_premium_user(None).await;
-    
+
     match state
         .dubbing_pipeline_service
         .start_pipeline(request, user_is_premium)

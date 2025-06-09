@@ -1,3 +1,4 @@
+use crate::gpu_client::immers_cloud_client::ImmersCloudClient;
 use crate::models::uniframe_studio::uniframe_dubbing_client::UniframeDubbingClient;
 use crate::models::uniframe_studio::uniframe_studio::{
     DubbingJobRequest, DubbingJobResult, DubbingPipelinePrepareRequest,
@@ -14,7 +15,6 @@ use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, instrument};
 use uuid::Uuid;
-use crate::gpu_client::immers_cloud_client::ImmersCloudClient;
 
 #[derive(Debug, Clone)]
 struct PipelineState {
@@ -56,7 +56,7 @@ impl DubbingPipelineService {
         let job_id = Uuid::new_v4().to_string();
 
         info!("Preparing pipeline {} | job_id: {}", pipeline_id, job_id);
-        
+
         let s3_key = format!("uploads/{}/input/{}", pipeline_id, request.filename);
         let video_s3_url = format!(
             "s3://{}/{}",
@@ -85,8 +85,11 @@ impl DubbingPipelineService {
             expires_in: 3600,
         };
 
-        info!("Pipeline {} prepared successfully | job_id: {}", pipeline_id, job_id);
-        
+        info!(
+            "Pipeline {} prepared successfully | job_id: {}",
+            pipeline_id, job_id
+        );
+
         Ok(response)
     }
 
@@ -142,7 +145,8 @@ impl DubbingPipelineService {
                 dubbing_client,
                 s3_client,
                 pipelines,
-            ).await;
+            )
+            .await;
         });
 
         Ok(response)
@@ -164,14 +168,21 @@ impl DubbingPipelineService {
                 &std::env::var("IMMERS_USERNAME").context("IMMERS_USERNAME not set")?,
                 &std::env::var("IMMERS_PASSWORD").context("IMMERS_PASSWORD not set")?,
                 &std::env::var("IMMERS_PROJECT").context("IMMERS_PROJECT not set")?,
-                std::env::var("IMMERS_AI_SERVER_ID").context("IMMERS_AI_SERVER_ID not set")?
-            ).await.context("Failed to initialize Immers.Cloud client")?;
+                std::env::var("IMMERS_AI_SERVER_ID").context("IMMERS_AI_SERVER_ID not set")?,
+            )
+            .await
+            .context("Failed to initialize Immers.Cloud client")?;
 
             let gpu_processing_service_status = immers_cloud_client.get_service_status().await?;
 
-            info!("GPU processing service status: {}", gpu_processing_service_status);
+            info!(
+                "GPU processing service status: {}",
+                gpu_processing_service_status
+            );
 
-            if gpu_processing_service_status == "SHELVED_OFFLOADED" || gpu_processing_service_status == "SHELVED" {
+            if gpu_processing_service_status == "SHELVED_OFFLOADED"
+                || gpu_processing_service_status == "SHELVED"
+            {
                 info!("GPU processing service is sleeping, initiating wake-up process...");
 
                 Self::update_pipeline_status(
@@ -182,7 +193,9 @@ impl DubbingPipelineService {
                     Some(1),
                     None,
                     None,
-                ).await;
+                    None,
+                )
+                .await;
 
                 immers_cloud_client.unshelve_server().await?;
 
@@ -194,11 +207,15 @@ impl DubbingPipelineService {
                     Some(1),
                     None,
                     None,
-                ).await;
+                    None,
+                )
+                .await;
 
                 immers_cloud_client.wait_for_service_active(600).await?;
 
-                info!("GPU processing service is now active, waiting for it's components to start...");
+                info!(
+                    "GPU processing service is now active, waiting for it's components to start..."
+                );
 
                 Self::update_pipeline_status(
                     &pipelines,
@@ -208,13 +225,18 @@ impl DubbingPipelineService {
                     Some(1),
                     None,
                     None,
-                ).await;
+                    None,
+                )
+                .await;
 
                 tokio::time::sleep(Duration::from_secs(90)).await;
-                
+
                 let max_attempts = 30;
                 for attempt in 1..=max_attempts {
-                    info!("Checking GPU processing service readiness, attempt {}/{}", attempt, max_attempts);
+                    info!(
+                        "Checking GPU processing service readiness, attempt {}/{}",
+                        attempt, max_attempts
+                    );
 
                     match dubbing_client.health_check().await {
                         Ok(_) => {
@@ -223,7 +245,10 @@ impl DubbingPipelineService {
                         }
                         Err(e) => {
                             if attempt == max_attempts {
-                                return Err(anyhow::anyhow!("GPU processing service failed to become ready: {}", e));
+                                return Err(anyhow::anyhow!(
+                                    "GPU processing service failed to become ready: {}",
+                                    e
+                                ));
                             }
                             tokio::time::sleep(Duration::from_secs(10)).await;
                         }
@@ -233,17 +258,24 @@ impl DubbingPipelineService {
                 info!("GPU processing service and it's components are ready for processing");
             } else if gpu_processing_service_status == "ACTIVE" {
                 info!("GPU processing service is already active");
-                
+
                 if let Err(e) = dubbing_client.health_check().await {
-                    return Err(anyhow::anyhow!("GPU processing service is not responding: {}", e));
+                    return Err(anyhow::anyhow!(
+                        "GPU processing service is not responding: {}",
+                        e
+                    ));
                 }
             } else {
-                return Err(anyhow::anyhow!("GPU processing service is in unexpected state: {}", gpu_processing_service_status));
+                return Err(anyhow::anyhow!(
+                    "GPU processing service is in unexpected state: {}",
+                    gpu_processing_service_status
+                ));
             }
 
             Ok(())
-        }.await;
-        
+        }
+        .await;
+
         if let Err(e) = gpu_processing_service_init {
             error!("Failed to prepare GPU service: {}", e);
             Self::update_pipeline_status(
@@ -254,11 +286,12 @@ impl DubbingPipelineService {
                 Some(0),
                 None,
                 Some(&format!("Failed to prepare GPU service: {}", e)),
-            ).await;
+                None,
+            )
+            .await;
             return;
         }
-        
-        
+
         info!("GPU service ready, submitting job to processing service...");
 
         Self::update_pipeline_status(
@@ -269,7 +302,9 @@ impl DubbingPipelineService {
             Some(1),
             None,
             None,
-        ).await;
+            None,
+        )
+        .await;
 
         let dubbing_job_request = DubbingJobRequest {
             job_id: job_id.clone(),
@@ -288,27 +323,31 @@ impl DubbingPipelineService {
         match job_submission_result {
             Ok(job_status) => {
                 info!("Successfully submitted job to dubbing service");
-                
+
                 Self::update_pipeline_status(
                     &pipelines,
                     &pipeline_id,
                     &job_status.status,
-                    &job_status.step_description.unwrap_or_else(|| "Processing started".to_string()),
+                    &job_status
+                        .step_description
+                        .unwrap_or_else(|| "Processing started".to_string()),
                     job_status.progress_percentage,
                     None,
                     job_status.error_message.as_deref(),
-                ).await;
-                
-                
+                    job_status.processing_steps,
+                )
+                .await;
+
                 info!("Starting pipeline monitoring process...");
-                
+
                 Self::run_dubbing_pipeline_process(
                     pipeline_id,
                     job_id,
                     dubbing_client,
                     s3_client,
                     pipelines,
-                ).await;
+                )
+                .await;
             }
             Err(e) => {
                 error!("Failed to submit job to processing service: {}", e);
@@ -320,11 +359,13 @@ impl DubbingPipelineService {
                     Some(0),
                     None,
                     Some(&format!("Failed to submit job: {}", e)),
-                ).await;
+                    None,
+                )
+                .await;
             }
         }
     }
-    
+
     async fn run_dubbing_pipeline_process(
         pipeline_id: String,
         job_id: String,
@@ -354,6 +395,7 @@ impl DubbingPipelineService {
                         status.progress_percentage,
                         None,
                         status.error_message.as_deref(),
+                        status.processing_steps,
                     )
                     .await;
 
@@ -366,6 +408,7 @@ impl DubbingPipelineService {
                                 "generating_results",
                                 "Retrieving result urls...",
                                 Some(99),
+                                None,
                                 None,
                                 None,
                             )
@@ -382,6 +425,7 @@ impl DubbingPipelineService {
                                 Some(0),
                                 None,
                                 status.error_message.as_deref(),
+                                None,
                             )
                             .await;
                             break;
@@ -400,6 +444,7 @@ impl DubbingPipelineService {
                             Some(0),
                             None,
                             Some(&format!("Failed to get job status: {}", e)),
+                            None,
                         )
                         .await;
                         return;
@@ -431,6 +476,7 @@ impl DubbingPipelineService {
                                 Some(100),
                                 Some(urls),
                                 None,
+                                None,
                             )
                             .await;
                         }
@@ -444,6 +490,7 @@ impl DubbingPipelineService {
                                 Some(0),
                                 None,
                                 Some(&format!("Failed to process result URLs: {}", e)),
+                                None,
                             )
                             .await;
                         }
@@ -458,6 +505,7 @@ impl DubbingPipelineService {
                         Some(0),
                         None,
                         Some("Job completed but no result URLs provided"),
+                        None,
                     )
                     .await;
                 }
@@ -472,6 +520,7 @@ impl DubbingPipelineService {
                     Some(0),
                     None,
                     Some(&format!("Failed to get job results: {}", e)),
+                    None,
                 )
                 .await;
             }
@@ -485,6 +534,7 @@ impl DubbingPipelineService {
                     Some(0),
                     None,
                     Some("Maximum waiting time exceeded"),
+                    None,
                 )
                 .await;
             }
@@ -541,6 +591,7 @@ impl DubbingPipelineService {
         progress_percentage: Option<i32>,
         result_urls: Option<HashMap<String, String>>,
         error_message: Option<&str>,
+        processing_steps: Option<Vec<String>>,
     ) {
         let now = Utc::now();
         let completed_at = if status == "completed" || status == "failed" {
@@ -564,6 +615,10 @@ impl DubbingPipelineService {
 
             if let Some(error) = error_message {
                 pipeline.error_message = Some(error.to_string());
+            }
+
+            if let Some(steps) = processing_steps {
+                pipeline.processing_steps = Some(steps);
             }
         }
     }

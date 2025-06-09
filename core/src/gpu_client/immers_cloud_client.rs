@@ -2,7 +2,7 @@ use anyhow::Result;
 use reqwest::Client;
 use serde_json::json;
 use std::time::Duration;
-use tracing::{info, error};
+use tracing::{error, info};
 
 #[derive(Debug, Clone)]
 pub struct ImmersCloudClient {
@@ -19,9 +19,7 @@ impl ImmersCloudClient {
         project_name: &str,
         server_id: String,
     ) -> Result<Self> {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()?;
+        let client = Client::builder().timeout(Duration::from_secs(30)).build()?;
 
         let auth_response = client
             .post("https://api.immers.cloud:5000/v3/auth/tokens")
@@ -68,7 +66,7 @@ impl ImmersCloudClient {
             server_id,
         })
     }
-    
+
     pub async fn shelve_server(&self) -> Result<()> {
         info!("Shelving AI server: {}", self.server_id);
 
@@ -91,7 +89,7 @@ impl ImmersCloudClient {
             Err(anyhow::anyhow!("Failed to shelve server"))
         }
     }
-    
+
     pub async fn unshelve_server(&self) -> Result<()> {
         info!("Unshelving AI server: {}", self.server_id);
 
@@ -114,7 +112,7 @@ impl ImmersCloudClient {
             Err(anyhow::anyhow!("Failed to unshelve server"))
         }
     }
-    
+
     pub async fn get_service_status(&self) -> Result<String> {
         let response = self
             .client
@@ -134,7 +132,7 @@ impl ImmersCloudClient {
 
         Ok(status)
     }
-    
+
     pub async fn wait_for_service_active(&self, max_wait_seconds: u64) -> Result<()> {
         let start_time = std::time::Instant::now();
 
@@ -148,7 +146,9 @@ impl ImmersCloudClient {
             }
 
             if start_time.elapsed().as_secs() > max_wait_seconds {
-                return Err(anyhow::anyhow!("Timeout waiting for server to become active"));
+                return Err(anyhow::anyhow!(
+                    "Timeout waiting for server to become active"
+                ));
             }
 
             tokio::time::sleep(Duration::from_secs(10)).await;

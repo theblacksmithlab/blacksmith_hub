@@ -173,8 +173,8 @@ pub async fn resources_cmd_handler(
                     "Пожалуйста, предоставьте id пользователя для добавления в 'белый список'\n\n\
                 ВНИМАНИЕ! id пользователя можно получить с помощью бота: @username_to_id_bot и др.",
                 )
-                    .reply_markup(keyboard)
-                    .await?;
+                .reply_markup(keyboard)
+                .await?;
 
                 state.awaiting_edit_type = false;
                 state.awaiting_data_entry = true;

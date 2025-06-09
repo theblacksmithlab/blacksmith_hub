@@ -23,6 +23,7 @@ use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
 use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;
+use rustls::crypto::{aws_lc_rs, CryptoProvider};
 use std::env;
 use std::sync::Arc;
 use teloxide::dispatching::{HandlerExt, UpdateFilterExt, UpdateHandler};
@@ -30,7 +31,6 @@ use teloxide::prelude::Update;
 use teloxide::{dptree, Bot};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
-use rustls::crypto::{aws_lc_rs, CryptoProvider};
 
 pub mod groot_bot;
 pub mod probiot_bot;

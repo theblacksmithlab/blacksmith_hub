@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod config;
+pub mod gpu_client;
 pub mod grammers;
 pub mod local_db;
 pub mod message_processing_flow;
@@ -8,4 +9,3 @@ pub mod rag_system;
 pub mod state;
 pub mod temp_cache;
 pub mod utils;
-pub mod gpu_client;

@@ -411,7 +411,7 @@ pub async fn groot_bot_command_handler(
                     bot_system_message.id,
                     Duration::from_secs(120),
                 )
-                    .await;
+                .await;
             }
         }
         _ => {
