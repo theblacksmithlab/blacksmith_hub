@@ -117,7 +117,9 @@ async fn check_rate_limit(db_pool: &Pool<Sqlite>, email: &str) -> Result<(), i64
         .await
     {
         if let Some(row) = row {
-            let last_request: i64 = row.get("created_at");
+            let last_request_str: String = row.get("created_at");
+            let last_request: i64 = last_request_str.parse().unwrap_or(0);
+
             let last_request_time = chrono::DateTime::from_timestamp(last_request, 0).unwrap();
             let next_allowed = last_request_time + Duration::minutes(5);
             let remaining = (next_allowed - Utc::now()).num_minutes();
