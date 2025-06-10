@@ -68,6 +68,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.uniframe_studio
+    volumes:
+      - ./common_res:/app/common_res
     env_file:
       - .env
     ports:
