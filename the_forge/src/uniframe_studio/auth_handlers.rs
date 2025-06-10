@@ -1,7 +1,3 @@
-use lettre::{
-    message::header::ContentType, transport::smtp::authentication::Credentials, Message,
-    SmtpTransport, Transport,
-};
 use uuid::Uuid;
 use chrono::{Duration, Utc};
 use axum::extract::State;
@@ -24,12 +20,11 @@ use axum::{
 };
 use axum::body::Body;
 
-/// Processing magic link request
+// Processing magic link request
 pub async fn handle_send_magic_link(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<SendMagicLinkRequest>,
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<AuthError>)> {
-    info!("handle_send_magic_link fn activated!");
     let email = request.email.trim().to_lowercase();
 
     if !is_valid_email(&email) {
@@ -41,11 +36,7 @@ pub async fn handle_send_magic_link(
         ));
     }
 
-    info!("Extracting db_pool from App_State");
-    
     let db_pool = app_state.get_db_pool();
-
-    info!("Db_pool extracted from App_State");
 
     if let Err(remaining_time) = check_rate_limit(db_pool, &email).await {
         return Err((
@@ -58,9 +49,7 @@ pub async fn handle_send_magic_link(
 
     let token = Uuid::new_v4().to_string();
     let expires_at = Utc::now() + Duration::hours(1);
-    
-    info!("Sending query to SQLite db...");
-    
+
     let query = "
         INSERT INTO auth_magic_links (id, email, token, expires_at)
         VALUES (?, ?, ?, ?)
@@ -90,7 +79,7 @@ pub async fn handle_send_magic_link(
     );
 
     info!("magic_link is: {}", magic_link);
-    
+
     if let Err(e) = send_magic_link_email(&email, &magic_link).await {
         error!("Failed to send email: {}", e);
         return Err((
@@ -139,37 +128,34 @@ async fn check_rate_limit(db_pool: &Pool<Sqlite>, email: &str) -> Result<(), i64
 }
 
 async fn send_magic_link_email(email: &str, magic_link: &str) -> anyhow::Result<()> {
-    let smtp_username = std::env::var("SMTP_USERNAME")?;
-    let smtp_password = std::env::var("SMTP_PASSWORD")?;
-    
-    info!("Sending e-mail with creds: {} | {}", smtp_username, smtp_password);
-    
-    let email_body = format!(
-        "Click this link to sign in: {}\n\nThis link expires in 1 hour.",
-        magic_link
-    );
+    let api_key = std::env::var("BREVO_API_KEY")?;
 
-    let email_msg = Message::builder()
-        .from(smtp_username.parse()?)
-        .to(email.parse()?)
-        .subject("Sign in to Uniframe Studio")
-        .header(ContentType::TEXT_PLAIN)
-        .body(email_body)?;
+    let client = reqwest::Client::new();
+    let response = client
+        .post("https://api.brevo.com/v3/smtp/email")
+        .header("api-key", api_key)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "sender": {"email": "noreply@blacksmith-lab.com"},
+            "to": [{"email": email}],
+            "subject": "Sign in to Uniframe Studio",
+            "textContent": format!("Click this link to sign in: {}\n\nThis link expires in 1 hour.", magic_link)
+        }))
+        .send()
+        .await?;
 
-    let creds = Credentials::new(smtp_username, smtp_password);
-    let mailer = SmtpTransport::relay("smtp.gmail.com")?
-        .credentials(creds)
-        .build();
-
-    mailer.send(&email_msg)?;
-    Ok(())
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Email API failed: {}", response.text().await?))
+    }
 }
 
 fn is_valid_email(email: &str) -> bool {
     email.contains('@') && email.contains('.') && email.len() > 5
 }
 
-/// Token verifying
+// Token verifying
 pub async fn handle_verify_token(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<VerifyTokenRequest>,
@@ -304,7 +290,7 @@ async fn create_or_get_user(
 }
 
 
-/// Checking session
+// Checking session
 pub async fn handle_check_session(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     headers: HeaderMap,
@@ -390,7 +376,7 @@ async fn verify_session_token(
     Ok(email)
 }
 
-/// Auth middleware
+// Auth middleware
 pub async fn auth_middleware(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     mut req: Request<Body>,

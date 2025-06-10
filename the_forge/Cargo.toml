@@ -22,6 +22,6 @@ aws-config.workspace = true
 rustls.workspace = true
 sqlx.workspace = true
 chrono.workspace = true
-lettre.workspace = true
+reqwest.workspace = true
 
 core = { path = "../core" }
