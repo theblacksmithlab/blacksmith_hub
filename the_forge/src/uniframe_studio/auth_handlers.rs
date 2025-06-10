@@ -29,6 +29,7 @@ pub async fn handle_send_magic_link(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<SendMagicLinkRequest>,
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<AuthError>)> {
+    info!("handle_send_magic_link fn activated!");
     let email = request.email.trim().to_lowercase();
 
     if !is_valid_email(&email) {
@@ -40,7 +41,11 @@ pub async fn handle_send_magic_link(
         ));
     }
 
+    info!("Extracting db_pool from App_State");
+    
     let db_pool = app_state.get_db_pool();
+
+    info!("Db_pool extracted from App_State");
 
     if let Err(remaining_time) = check_rate_limit(db_pool, &email).await {
         return Err((
@@ -117,8 +122,7 @@ async fn check_rate_limit(db_pool: &Pool<Sqlite>, email: &str) -> Result<(), i64
         .await
     {
         if let Some(row) = row {
-            let last_request_str: String = row.get("created_at");
-            let last_request: i64 = last_request_str.parse().unwrap_or(0);
+            let last_request: i64 = row.get("created_at");
 
             let last_request_time = chrono::DateTime::from_timestamp(last_request, 0).unwrap();
             let next_allowed = last_request_time + Duration::minutes(5);
