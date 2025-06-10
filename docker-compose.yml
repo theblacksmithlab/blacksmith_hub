@@ -1,5 +1,11 @@
 version: '3.8'
 
+networks:
+  uniframe-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+
 services:
   bot_foundry_base:
     build:
@@ -82,3 +88,8 @@ services:
           cpus: '4'
           memory: 4G
     restart: unless-stopped
+    networks:
+      - uniframe-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4

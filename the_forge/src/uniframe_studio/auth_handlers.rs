@@ -82,19 +82,16 @@ pub async fn handle_send_magic_link(
                              token
     );
 
-    // if let Err(e) = send_magic_link_email(&email, &magic_link).await {
-    //     error!("Failed to send email: {}", e);
-    //     return Err((
-    //         StatusCode::INTERNAL_SERVER_ERROR,
-    //         Json(AuthError {
-    //             error: "Failed to send email".to_string(),
-    //         }),
-    //     ));
-    // }
+    if let Err(e) = send_magic_link_email(&email, &magic_link).await {
+        error!("Failed to send email: {}", e);
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(AuthError {
+                error: "Failed to send email".to_string(),
+            }),
+        ));
+    }
 
-    info!("🔗 Magic link for {}: {}", email, magic_link);
-    info!("🎯 Token: {}", token);
-    
     info!("Magic link sent to: {}", email);
 
     Ok(Json(AuthResponse {
