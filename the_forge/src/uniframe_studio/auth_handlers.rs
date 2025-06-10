@@ -136,7 +136,7 @@ async fn send_magic_link_email(email: &str, magic_link: &str) -> anyhow::Result<
         .header("api-key", api_key)
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
-            "sender": {"email": "noreply@blacksmith-lab.com"},
+            "sender": {"email": "thecableguy303808909@gmail.com"},
             "to": [{"email": email}],
             "subject": "Sign in to Uniframe Studio",
             "textContent": format!("Click this link to sign in: {}\n\nThis link expires in 1 hour.", magic_link)
