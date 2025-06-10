@@ -58,7 +58,9 @@ pub async fn handle_send_magic_link(
 
     let token = Uuid::new_v4().to_string();
     let expires_at = Utc::now() + Duration::hours(1);
-
+    
+    info!("Sending query to SQLite db...");
+    
     let query = "
         INSERT INTO auth_magic_links (id, email, token, expires_at)
         VALUES (?, ?, ?, ?)
@@ -87,6 +89,8 @@ pub async fn handle_send_magic_link(
                              token
     );
 
+    info!("magic_link is: {}", magic_link);
+    
     if let Err(e) = send_magic_link_email(&email, &magic_link).await {
         error!("Failed to send email: {}", e);
         return Err((
@@ -137,7 +141,9 @@ async fn check_rate_limit(db_pool: &Pool<Sqlite>, email: &str) -> Result<(), i64
 async fn send_magic_link_email(email: &str, magic_link: &str) -> anyhow::Result<()> {
     let smtp_username = std::env::var("SMTP_USERNAME")?;
     let smtp_password = std::env::var("SMTP_PASSWORD")?;
-
+    
+    info!("Sending e-mail with creds: {} | {}", smtp_username, smtp_password);
+    
     let email_body = format!(
         "Click this link to sign in: {}\n\nThis link expires in 1 hour.",
         magic_link
