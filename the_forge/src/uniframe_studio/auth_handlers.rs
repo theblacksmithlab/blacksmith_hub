@@ -30,7 +30,7 @@ pub async fn handle_send_magic_link(
     Json(request): Json<SendMagicLinkRequest>,
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<AuthError>)> {
     let email = request.email.trim().to_lowercase();
-    
+
     if !is_valid_email(&email) {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -41,7 +41,7 @@ pub async fn handle_send_magic_link(
     }
 
     let db_pool = app_state.get_db_pool();
-    
+
     if let Err(remaining_time) = check_rate_limit(db_pool, &email).await {
         return Err((
             StatusCode::TOO_MANY_REQUESTS,
@@ -50,10 +50,10 @@ pub async fn handle_send_magic_link(
             }),
         ));
     }
-    
+
     let token = Uuid::new_v4().to_string();
     let expires_at = Utc::now() + Duration::hours(1);
-    
+
     let query = "
         INSERT INTO auth_magic_links (id, email, token, expires_at)
         VALUES (?, ?, ?, ?)
@@ -78,20 +78,23 @@ pub async fn handle_send_magic_link(
     
     let magic_link = format!("{}?token={}",
                              std::env::var("UNIFRAME_STUDIO_FRONTEND_URL")
-                                 .unwrap_or("http://localhost:5173".to_string()), 
+                                 .unwrap_or("http://localhost:5173".to_string()),
                              token
     );
 
-    if let Err(e) = send_magic_link_email(&email, &magic_link).await {
-        error!("Failed to send email: {}", e);
-        return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(AuthError {
-                error: "Failed to send email".to_string(),
-            }),
-        ));
-    }
+    // if let Err(e) = send_magic_link_email(&email, &magic_link).await {
+    //     error!("Failed to send email: {}", e);
+    //     return Err((
+    //         StatusCode::INTERNAL_SERVER_ERROR,
+    //         Json(AuthError {
+    //             error: "Failed to send email".to_string(),
+    //         }),
+    //     ));
+    // }
 
+    info!("🔗 Magic link for {}: {}", email, magic_link);
+    info!("🎯 Token: {}", token);
+    
     info!("Magic link sent to: {}", email);
 
     Ok(Json(AuthResponse {
@@ -105,8 +108,8 @@ async fn check_rate_limit(db_pool: &Pool<Sqlite>, email: &str) -> Result<(), i64
     let five_minutes_ago = Utc::now() - Duration::minutes(5);
 
     let query = "
-        SELECT created_at FROM auth_magic_links 
-        WHERE email = ? AND created_at > ? 
+        SELECT created_at FROM auth_magic_links
+        WHERE email = ? AND created_at > ?
         ORDER BY created_at DESC LIMIT 1
     ";
 
@@ -166,9 +169,9 @@ pub async fn handle_verify_token(
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<AuthError>)> {
     let token = request.token.trim();
     let db_pool = app_state.get_db_pool();
-    
+
     let query = "
-        SELECT email, expires_at, used FROM auth_magic_links 
+        SELECT email, expires_at, used FROM auth_magic_links
         WHERE token = ? AND used = FALSE
     ";
 
@@ -199,7 +202,7 @@ pub async fn handle_verify_token(
 
     let email: String = magic_link_row.get("email");
     let expires_at: i64 = magic_link_row.get("expires_at");
-    
+
     let expires_time = chrono::DateTime::from_timestamp(expires_at, 0).unwrap();
     if Utc::now() > expires_time {
         return Err((
@@ -224,9 +227,9 @@ pub async fn handle_verify_token(
                 }),
             )
         })?;
-    
+
     let user_id = create_or_get_user(db_pool, &email).await?;
-    
+
     let session_token = Uuid::new_v4().to_string();
     let session_expires = Utc::now() + Duration::days(30);
 
@@ -270,7 +273,7 @@ async fn create_or_get_user(
     if let Ok(Some(row)) = sqlx::query(query).bind(email).fetch_optional(db_pool).await {
         return Ok(row.get("id"));
     }
-    
+
     let user_id = Uuid::new_v4().to_string();
     let insert_query = "INSERT INTO auth_users (id, email) VALUES (?, ?)";
 
@@ -300,7 +303,7 @@ pub async fn handle_check_session(
     headers: HeaderMap,
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<AuthError>)> {
     let db_pool = app_state.get_db_pool();
-    
+
     let session_token = match extract_session_token(&headers) {
         Some(token) => token,
         None => {
@@ -312,7 +315,7 @@ pub async fn handle_check_session(
             ));
         }
     };
-    
+
     match verify_session_token(db_pool, &session_token).await {
         Ok(user_email) => {
             Ok(Json(AuthResponse {
@@ -347,7 +350,7 @@ async fn verify_session_token(
     session_token: &str
 ) -> Result<String, String> {
     let query = "
-        SELECT u.email, s.expires_at 
+        SELECT u.email, s.expires_at
         FROM auth_sessions s
         JOIN auth_users u ON s.user_id = u.id
         WHERE s.token = ?
@@ -368,7 +371,7 @@ async fn verify_session_token(
 
     let email: String = row.get("email");
     let expires_at: i64 = row.get("expires_at");
-    
+
     let expires_time = chrono::DateTime::from_timestamp(expires_at, 0).unwrap();
     if Utc::now() > expires_time {
         let delete_query = "DELETE FROM auth_sessions WHERE token = ?";
@@ -388,7 +391,7 @@ pub async fn auth_middleware(
 ) -> Result<Response, StatusCode> {
     let headers = req.headers();
     let db_pool = app_state.get_db_pool();
-    
+
     let session_token = match extract_session_token(headers) {
         Some(token) => token,
         None => {
@@ -396,11 +399,11 @@ pub async fn auth_middleware(
             return Err(StatusCode::UNAUTHORIZED);
         }
     };
-    
+
     match verify_session_token(db_pool, &session_token).await {
         Ok(user_email) => {
             req.extensions_mut().insert(user_email);
-            
+
             let response = next.run(req).await;
             Ok(response)
         }
