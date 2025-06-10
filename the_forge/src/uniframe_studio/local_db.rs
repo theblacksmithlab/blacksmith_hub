@@ -48,24 +48,24 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
         CREATE TABLE IF NOT EXISTS auth_users (
             id TEXT PRIMARY KEY,
             email TEXT UNIQUE NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at INTEGER DEFAULT (strftime('%s', 'now'))
         );
 
         CREATE TABLE IF NOT EXISTS auth_sessions (
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
             token TEXT UNIQUE NOT NULL,
-            expires_at DATETIME NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            expires_at INTEGER NOT NULL,
+            created_at INTEGER DEFAULT (strftime('%s', 'now'))
         );
 
         CREATE TABLE IF NOT EXISTS auth_magic_links (
             id TEXT PRIMARY KEY,
             email TEXT NOT NULL,
             token TEXT UNIQUE NOT NULL,
-            expires_at DATETIME NOT NULL,
+            expires_at INTEGER NOT NULL,
             used BOOLEAN DEFAULT FALSE,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at INTEGER DEFAULT (strftime('%s', 'now'))
         );
     ";
 
