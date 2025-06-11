@@ -18,6 +18,13 @@ pub struct AuthResponse {
 }
 
 #[derive(Serialize)]
+pub struct SessionCheckResponse {
+    pub valid: bool,
+    pub user_email: String,
+    pub expires_at: i64,
+}
+
+#[derive(Serialize)]
 pub struct AuthError {
     pub error: String,
 }

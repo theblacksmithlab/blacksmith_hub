@@ -11,7 +11,8 @@ use core::models::uniframe_studio::auth_models::{
     SendMagicLinkRequest,
     AuthResponse,
     AuthError,
-    VerifyTokenRequest
+    VerifyTokenRequest,
+    SessionCheckResponse,
 };
 use axum::{
     http::Request,
@@ -294,7 +295,8 @@ async fn create_or_get_user(
 pub async fn handle_check_session(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     headers: HeaderMap,
-) -> Result<Json<AuthResponse>, (StatusCode, Json<AuthError>)> {
+) -> Result<Json<SessionCheckResponse>, (StatusCode, Json<AuthError>)> {
+    info!("Debugging handling check_session");
     let db_pool = app_state.get_db_pool();
 
     let session_token = match extract_session_token(&headers) {
@@ -310,20 +312,15 @@ pub async fn handle_check_session(
     };
 
     match verify_session_token(db_pool, &session_token).await {
-        Ok(user_email) => {
-            Ok(Json(AuthResponse {
-                success: true,
-                message: format!("Session valid for user: {}", user_email),
-                session_token: Some(session_token),
+        Ok((user_email, expires_at)) => {
+            Ok(Json(SessionCheckResponse {
+                valid: true,
+                user_email,
+                expires_at,
             }))
         }
         Err(error_msg) => {
-            Err((
-                StatusCode::UNAUTHORIZED,
-                Json(AuthError {
-                    error: error_msg,
-                }),
-            ))
+            Err((StatusCode::UNAUTHORIZED, Json(AuthError { error: error_msg })))
         }
     }
 }
@@ -341,7 +338,7 @@ fn extract_session_token(headers: &HeaderMap) -> Option<String> {
 async fn verify_session_token(
     db_pool: &Pool<Sqlite>,
     session_token: &str
-) -> Result<String, String> {
+) -> Result<(String, i64), String> {
     let query = "
         SELECT u.email, s.expires_at
         FROM auth_sessions s
@@ -373,7 +370,7 @@ async fn verify_session_token(
         return Err("Session has expired".to_string());
     }
 
-    Ok(email)
+    Ok((email, expires_at))
 }
 
 // Auth middleware
@@ -394,7 +391,7 @@ pub async fn auth_middleware(
     };
 
     match verify_session_token(db_pool, &session_token).await {
-        Ok(user_email) => {
+        Ok((user_email, _)) => {
             req.extensions_mut().insert(user_email);
 
             let response = next.run(req).await;
