@@ -1,23 +1,19 @@
 use crate::models::uniframe_studio::uniframe_dubbing_client::UniframeDubbingClient;
 use crate::utils::uniframe_studio::dubbing_pipeline::DubbingPipelineService;
 use aws_sdk_s3::Client as S3Client;
-use std::sync::Arc;
 use sqlx::{Pool, Sqlite};
+use std::sync::Arc;
 
 pub struct UniframeStudioAppState {
     pub s3_client: Arc<S3Client>,
     pub dubbing_service_url: String,
     pub dubbing_client: UniframeDubbingClient,
     pub dubbing_pipeline_service: DubbingPipelineService,
-    pub local_db_pool: Pool<Sqlite>
+    pub local_db_pool: Pool<Sqlite>,
 }
 
 impl UniframeStudioAppState {
-    pub fn new(
-        s3_client: S3Client,
-        dubbing_service_url: String,
-        db_pool: Pool<Sqlite>,
-    ) -> Self {
+    pub fn new(s3_client: S3Client, dubbing_service_url: String, db_pool: Pool<Sqlite>) -> Self {
         let dubbing_client = UniframeDubbingClient::new(dubbing_service_url.clone());
 
         let dubbing_pipeline_service =

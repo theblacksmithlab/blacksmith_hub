@@ -1,4 +1,4 @@
-pub mod handlers;
-pub mod server;
-pub mod local_db;
 mod auth_handlers;
+pub mod handlers;
+pub mod local_db;
+pub mod server;

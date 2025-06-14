@@ -1,25 +1,17 @@
-use uuid::Uuid;
-use chrono::{Duration, Utc};
+use axum::body::Body;
 use axum::extract::State;
 use axum::Json;
+use axum::{http::Request, middleware::Next, response::Response};
+use chrono::{Duration, Utc};
+use core::models::uniframe_studio::auth_models::{
+    AuthError, AuthResponse, SendMagicLinkRequest, SessionCheckResponse, VerifyTokenRequest,
+};
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::{HeaderMap, StatusCode};
-use std::sync::Arc;
 use sqlx::{Pool, Row, Sqlite};
+use std::sync::Arc;
 use tracing::{error, info, warn};
-use core::models::uniframe_studio::auth_models::{
-    SendMagicLinkRequest,
-    AuthResponse,
-    AuthError,
-    VerifyTokenRequest,
-    SessionCheckResponse,
-};
-use axum::{
-    http::Request,
-    middleware::Next,
-    response::Response,
-};
-use axum::body::Body;
+use uuid::Uuid;
 
 // Processing magic link request
 pub async fn handle_send_magic_link(
@@ -72,14 +64,13 @@ pub async fn handle_send_magic_link(
             }),
         ));
     }
-    
-    let magic_link = format!("{}?token={}",
-                             std::env::var("UNIFRAME_STUDIO_FRONTEND_URL")
-                                 .unwrap_or("http://localhost:5173".to_string()),
-                             token
-    );
 
-    info!("magic_link is: {}", magic_link);
+    let magic_link = format!(
+        "{}?token={}",
+        std::env::var("UNIFRAME_STUDIO_FRONTEND_URL")
+            .unwrap_or("http://localhost:5173".to_string()),
+        token
+    );
 
     if let Err(e) = send_magic_link_email(&email, &magic_link).await {
         error!("Failed to send email: {}", e);
@@ -148,7 +139,10 @@ async fn send_magic_link_email(email: &str, magic_link: &str) -> anyhow::Result<
     if response.status().is_success() {
         Ok(())
     } else {
-        Err(anyhow::anyhow!("Email API failed: {}", response.text().await?))
+        Err(anyhow::anyhow!(
+            "Log-in link sending API failed: {}",
+            response.text().await?
+        ))
     }
 }
 
@@ -169,11 +163,7 @@ pub async fn handle_verify_token(
         WHERE token = ? AND used = FALSE
     ";
 
-    let magic_link_row = match sqlx::query(query)
-        .bind(token)
-        .fetch_optional(db_pool)
-        .await
-    {
+    let magic_link_row = match sqlx::query(query).bind(token).fetch_optional(db_pool).await {
         Ok(Some(row)) => row,
         Ok(None) => {
             return Err((
@@ -290,7 +280,6 @@ async fn create_or_get_user(
     Ok(user_id)
 }
 
-
 // Checking session
 pub async fn handle_check_session(
     State(app_state): State<Arc<UniframeStudioAppState>>,
@@ -312,16 +301,15 @@ pub async fn handle_check_session(
     };
 
     match verify_session_token(db_pool, &session_token).await {
-        Ok((user_email, expires_at)) => {
-            Ok(Json(SessionCheckResponse {
-                valid: true,
-                user_email,
-                expires_at,
-            }))
-        }
-        Err(error_msg) => {
-            Err((StatusCode::UNAUTHORIZED, Json(AuthError { error: error_msg })))
-        }
+        Ok((user_email, expires_at)) => Ok(Json(SessionCheckResponse {
+            valid: true,
+            user_email,
+            expires_at,
+        })),
+        Err(error_msg) => Err((
+            StatusCode::UNAUTHORIZED,
+            Json(AuthError { error: error_msg }),
+        )),
     }
 }
 
@@ -337,7 +325,7 @@ fn extract_session_token(headers: &HeaderMap) -> Option<String> {
 
 async fn verify_session_token(
     db_pool: &Pool<Sqlite>,
-    session_token: &str
+    session_token: &str,
 ) -> Result<(String, i64), String> {
     let query = "
         SELECT u.email, s.expires_at
@@ -365,7 +353,10 @@ async fn verify_session_token(
     let expires_time = chrono::DateTime::from_timestamp(expires_at, 0).unwrap();
     if Utc::now() > expires_time {
         let delete_query = "DELETE FROM auth_sessions WHERE token = ?";
-        let _ = sqlx::query(delete_query).bind(session_token).execute(db_pool).await;
+        let _ = sqlx::query(delete_query)
+            .bind(session_token)
+            .execute(db_pool)
+            .await;
 
         return Err("Session has expired".to_string());
     }

@@ -1,9 +1,9 @@
+use anyhow::Context;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{Executor, SqlitePool};
-use std::{env, fs};
-use anyhow::Context;
 use std::path::Path;
 use std::str::FromStr;
+use std::{env, fs};
 use tracing::{info, warn};
 
 pub async fn setup_uniframe_studio_db() -> anyhow::Result<SqlitePool> {
@@ -29,8 +29,8 @@ pub async fn setup_uniframe_studio_db() -> anyhow::Result<SqlitePool> {
             .context("Error: invalid DATABASE_URL format")?
             .create_if_missing(true),
     )
-        .await
-        .context("Error connecting to db pool")?;
+    .await
+    .context("Error connecting to db pool")?;
 
     info!("Uniframe Studio db pool initialized successfully");
 
