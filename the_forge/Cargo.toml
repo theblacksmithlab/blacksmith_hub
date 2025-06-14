@@ -20,5 +20,8 @@ serde_json.workspace = true
 aws-sdk-s3.workspace = true
 aws-config.workspace = true
 rustls.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+reqwest.workspace = true
 
 core = { path = "../core" }

@@ -1,6 +1,10 @@
+use crate::uniframe_studio::auth_handlers::{
+    auth_middleware, handle_check_session, handle_send_magic_link, handle_verify_token,
+};
 use crate::uniframe_studio::handlers::{
     get_dubbing_pipeline_status, prepare_dubbing_pipeline, start_dubbing_pipeline,
 };
+use crate::uniframe_studio::local_db::setup_uniframe_studio_db;
 use anyhow::Result;
 use axum::routing::{get, post};
 use axum::Router;
@@ -21,8 +25,13 @@ pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>)
     let dubbing_service_url =
         std::env::var("DUBBING_SERVICE_URL").unwrap_or("http://localhost:8000".to_string());
 
-    let uniframe_studio_app_state =
-        Arc::new(UniframeStudioAppState::new(s3_client, dubbing_service_url));
+    let uniframe_studio_db_pool = setup_uniframe_studio_db().await?;
+
+    let uniframe_studio_app_state = Arc::new(UniframeStudioAppState::new(
+        s3_client,
+        dubbing_service_url,
+        uniframe_studio_db_pool,
+    ));
 
     let router = get_uniframe_studio_router(uniframe_studio_app_state);
 
@@ -32,7 +41,21 @@ pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>)
 }
 
 fn get_uniframe_studio_router(uniframe_studio_app_state: Arc<UniframeStudioAppState>) -> Router {
-    Router::new()
+    let public_routes = Router::new()
+        .route(
+            "/api/uniframe/auth/send_magic_link",
+            post(handle_send_magic_link).options(|| async { StatusCode::OK }),
+        )
+        .route(
+            "/api/uniframe/auth/verify_token",
+            post(handle_verify_token).options(|| async { StatusCode::OK }),
+        )
+        .route(
+            "/api/uniframe/auth/check_session",
+            get(handle_check_session).options(|| async { StatusCode::OK }),
+        );
+
+    let protected_routes = Router::new()
         .route(
             "/api/uniframe/dubbing/prepare",
             post(prepare_dubbing_pipeline).options(|| async { StatusCode::OK }),
@@ -45,5 +68,13 @@ fn get_uniframe_studio_router(uniframe_studio_app_state: Arc<UniframeStudioAppSt
             "/api/uniframe/dubbing/{pipeline_id}/status",
             get(get_dubbing_pipeline_status).options(|| async { StatusCode::OK }),
         )
+        .layer(axum::middleware::from_fn_with_state(
+            uniframe_studio_app_state.clone(),
+            auth_middleware,
+        ));
+
+    Router::new()
+        .merge(public_routes)
+        .merge(protected_routes)
         .with_state(uniframe_studio_app_state)
 }
