@@ -373,6 +373,8 @@ pub async fn auth_middleware(
     let headers = req.headers();
     let db_pool = app_state.get_db_pool();
 
+    info!("debug 3");
+    
     let session_token = match extract_session_token(headers) {
         Some(token) => token,
         None => {
@@ -381,8 +383,11 @@ pub async fn auth_middleware(
         }
     };
 
+    info!("debug 4");
+    
     match verify_session_token(db_pool, &session_token).await {
         Ok((_user_email, user_id)) => {
+            info!("debug 5");
             req.extensions_mut().insert(user_id);
 
             let response = next.run(req).await;

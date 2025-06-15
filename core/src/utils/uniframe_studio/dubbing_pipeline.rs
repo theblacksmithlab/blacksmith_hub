@@ -121,7 +121,9 @@ impl DubbingPipelineService {
                     .build()?,
             )
             .await?;
-
+        
+        info!("debug 1");
+        
         sqlx::query(
             "INSERT INTO dubbing_pipelines (
                                job_id, user_id, status, step_description,
@@ -141,6 +143,8 @@ impl DubbingPipelineService {
         .execute(&self.db_pool)
         .await?;
 
+        info!("debug 2");
+        
         let response = DubbingPipelinePrepareResponse {
             job_id: job_id.clone(),
             upload_url: upload_url.uri().to_string(),
