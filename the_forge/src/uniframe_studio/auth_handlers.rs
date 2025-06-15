@@ -327,7 +327,7 @@ async fn verify_session_token(
     session_token: &str,
 ) -> Result<(String, String), String> {
     let query = "
-        SELECT u.email, s.expires_at
+        SELECT u.email, s.user_id, s.expires_at
         FROM auth_sessions s
         JOIN auth_users u ON s.user_id = u.id
         WHERE s.token = ?
