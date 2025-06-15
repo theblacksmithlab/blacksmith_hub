@@ -333,6 +333,8 @@ async fn verify_session_token(
         WHERE s.token = ?
     ";
 
+    info!("debug 6");
+    
     let row = match sqlx::query(query)
         .bind(session_token)
         .fetch_optional(db_pool)
@@ -346,10 +348,14 @@ async fn verify_session_token(
         }
     };
 
+    info!("debug 7");
+    
     let email: String = row.get("email");
     let user_id: String = row.get("user_id");
     let expires_at: i64 = row.get("expires_at");
 
+    info!("debug 8");
+    
     let expires_time = chrono::DateTime::from_timestamp(expires_at, 0).unwrap();
     if Utc::now() > expires_time {
         let delete_query = "DELETE FROM auth_sessions WHERE token = ?";
