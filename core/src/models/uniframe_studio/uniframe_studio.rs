@@ -9,7 +9,6 @@ pub struct DubbingPipelinePrepareRequest {
 
 #[derive(Debug, Serialize)]
 pub struct DubbingPipelinePrepareResponse {
-    pub pipeline_id: String,
     pub job_id: String,
     pub upload_url: String,
     pub video_s3_url: String,
@@ -18,7 +17,6 @@ pub struct DubbingPipelinePrepareResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct DubbingPipelineRequest {
-    pub pipeline_id: String,
     pub job_id: String,
     pub video_url: String,
     pub target_language: String,
@@ -30,7 +28,6 @@ pub struct DubbingPipelineRequest {
 
 #[derive(Debug, Serialize)]
 pub struct DubbingPipelineResponse {
-    pub pipeline_id: String,
     pub job_id: String,
     pub status: String,
     pub created_at: String,
@@ -38,7 +35,6 @@ pub struct DubbingPipelineResponse {
 
 #[derive(Debug, Serialize)]
 pub struct DubbingPipelineStatus {
-    pub pipeline_id: String,
     pub job_id: String,
     pub status: String,
     pub step_description: String,
@@ -49,6 +45,8 @@ pub struct DubbingPipelineStatus {
     pub result_urls: Option<HashMap<String, String>>,
     pub error_message: Option<String>,
     pub processing_steps: Option<Vec<String>>,
+    pub stage: Option<String>,
+    pub current_step_index: Option<i32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -98,4 +96,44 @@ pub struct DubbingJobResult {
 pub struct ApiError {
     pub code: String,
     pub message: String,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct DubbingPipeline {
+    pub job_id: String,
+    pub user_id: Option<String>,
+    pub status: String,
+    pub step_description: String,
+    pub progress_percentage: Option<i32>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub completed_at: Option<i64>,
+    pub result_urls: Option<String>,
+    pub error_message: Option<String>,
+    pub processing_steps: Option<String>,
+    pub video_s3_url: Option<String>,
+    pub filename: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub enum PipelineStage {
+    Preparation,
+    Processing,
+    Finalization,
+}
+
+impl PipelineStage {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            PipelineStage::Preparation => "preparation",
+            PipelineStage::Processing => "processing",
+            PipelineStage::Finalization => "finalization",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StepInfo {
+    pub description: &'static str,
+    pub stage: PipelineStage,
 }

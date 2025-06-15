@@ -1,5 +1,5 @@
 use axum::extract::{Path, State};
-use axum::Json;
+use axum::{Extension, Json};
 use core::models::uniframe_studio::uniframe_studio::{
     ApiError, DubbingPipelinePrepareRequest, DubbingPipelinePrepareResponse,
     DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus,
@@ -12,6 +12,7 @@ use tracing::{error, info, instrument};
 #[instrument(skip(state, request))]
 pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
+    Extension(user_id): Extension<String>,
     Json(request): Json<DubbingPipelinePrepareRequest>,
 ) -> Result<Json<DubbingPipelinePrepareResponse>, (StatusCode, Json<ApiError>)> {
     info!("Preparing dubbing pipeline...");
@@ -28,7 +29,7 @@ pub async fn prepare_dubbing_pipeline(
 
     match state
         .dubbing_pipeline_service
-        .prepare_pipeline(request)
+        .prepare_pipeline(request, Some(user_id))
         .await
     {
         Ok(response) => Ok(Json(response)),
@@ -45,9 +46,10 @@ pub async fn prepare_dubbing_pipeline(
 #[instrument(skip(state, request), fields(pipeline_id))]
 pub async fn start_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
+    Extension(user_id): Extension<String>,
     Json(request): Json<DubbingPipelineRequest>,
 ) -> Result<Json<DubbingPipelineResponse>, (StatusCode, Json<ApiError>)> {
-    info!("Starting dubbing pipeline {}...", request.pipeline_id);
+    info!("Starting dubbing pipeline for job: {}...", request.job_id);
 
     if !request.video_url.starts_with("s3://") {
         return Err((
@@ -70,7 +72,7 @@ pub async fn start_dubbing_pipeline(
     }
 
     // TODO: Implement user's subscription tier detection
-    let user_is_premium = is_premium_user(None).await;
+    let user_is_premium = is_premium_user(Some(&user_id)).await;
 
     match state
         .dubbing_pipeline_service
@@ -78,10 +80,9 @@ pub async fn start_dubbing_pipeline(
         .await
     {
         Ok(response) => {
-            tracing::Span::current().record("pipeline_id", &response.pipeline_id);
             info!(
-                "Successfully started dubbing pipeline {}",
-                response.pipeline_id
+                "Successfully started dubbing pipeline for job: {} initiated by user {}",
+                response.job_id, user_id
             );
             Ok(Json(response))
         }
@@ -98,44 +99,34 @@ pub async fn start_dubbing_pipeline(
     }
 }
 
-#[instrument(skip(state))]
 pub async fn get_dubbing_pipeline_status(
     State(state): State<Arc<UniframeStudioAppState>>,
-    Path(pipeline_id): Path<String>,
+    Extension(user_id): Extension<String>,
+    Path(job_id): Path<String>,
 ) -> Result<Json<DubbingPipelineStatus>, (StatusCode, Json<ApiError>)> {
     info!(
-        "Retrieving dubbing pipeline status for pipeline_id={}",
-        pipeline_id
+        "Getting pipeline status for job {} by user {}",
+        job_id, user_id
     );
 
     match state
         .dubbing_pipeline_service
-        .get_pipeline_status(&pipeline_id)
+        .get_pipeline_status(&job_id)
         .await
     {
         Ok(status) => {
-            info!("Successfully retrieved pipeline status");
+            info!("Retrieved pipeline status for job {}", job_id);
             Ok(Json(status))
         }
         Err(e) => {
             error!("Failed to get pipeline status: {}", e);
-            if e.to_string().contains("Pipeline not found") {
-                Err((
-                    StatusCode::NOT_FOUND,
-                    Json(ApiError {
-                        code: "PIPELINE_NOT_FOUND".to_string(),
-                        message: format!("Pipeline not found: {}", pipeline_id),
-                    }),
-                ))
-            } else {
-                Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ApiError {
-                        code: "PIPELINE_STATUS_ERROR".to_string(),
-                        message: format!("Failed to get pipeline status: {}", e),
-                    }),
-                ))
-            }
+            Err((
+                StatusCode::NOT_FOUND,
+                Json(ApiError {
+                    code: "PIPELINE_NOT_FOUND".to_string(),
+                    message: format!("Pipeline not found: {}", e),
+                }),
+            ))
         }
     }
 }

@@ -7,12 +7,12 @@ use std::time::Duration;
 use tracing::info;
 
 #[derive(Debug, Clone)]
-pub struct UniframeDubbingClient {
+pub struct DubbingClient {
     client: Client,
     base_url: String,
 }
 
-impl UniframeDubbingClient {
+impl DubbingClient {
     pub fn new(base_url: String) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))

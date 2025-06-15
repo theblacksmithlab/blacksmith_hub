@@ -133,7 +133,7 @@ impl ImmersCloudClient {
         Ok(status)
     }
 
-    pub async fn wait_for_service_active(&self, max_wait_seconds: u64) -> Result<()> {
+    pub async fn wait_for_instance_active(&self, max_wait_seconds: u64) -> Result<()> {
         let start_time = std::time::Instant::now();
 
         loop {

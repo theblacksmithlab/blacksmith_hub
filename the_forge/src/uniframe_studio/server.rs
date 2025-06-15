@@ -65,7 +65,7 @@ fn get_uniframe_studio_router(uniframe_studio_app_state: Arc<UniframeStudioAppSt
             post(start_dubbing_pipeline).options(|| async { StatusCode::OK }),
         )
         .route(
-            "/api/uniframe/dubbing/{pipeline_id}/status",
+            "/api/uniframe/dubbing/{job_id}/status",
             get(get_dubbing_pipeline_status).options(|| async { StatusCode::OK }),
         )
         .layer(axum::middleware::from_fn_with_state(

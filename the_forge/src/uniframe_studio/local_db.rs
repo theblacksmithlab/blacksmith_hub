@@ -67,6 +67,23 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             used BOOLEAN DEFAULT FALSE,
             created_at INTEGER DEFAULT (strftime('%s', 'now'))
         );
+
+        CREATE TABLE IF NOT EXISTS dubbing_pipelines (
+            job_id TEXT PRIMARY KEY,
+            user_id TEXT,
+            status TEXT NOT NULL DEFAULT 'preparing',
+            step_description TEXT NOT NULL DEFAULT 'Preparing pipeline...',
+            progress_percentage INTEGER,
+            created_at INTEGER DEFAULT (strftime('%s', 'now')),
+            updated_at INTEGER DEFAULT (strftime('%s', 'now')),
+            completed_at INTEGER,
+            result_urls TEXT,
+            error_message TEXT,
+            processing_steps TEXT,
+            original_video_s3_url TEXT,
+            filename TEXT,
+            FOREIGN KEY (user_id) REFERENCES auth_users(id)
+        );
     ";
 
     pool.execute(query).await?;

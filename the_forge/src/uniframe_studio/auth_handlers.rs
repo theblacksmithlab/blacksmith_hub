@@ -285,7 +285,6 @@ pub async fn handle_check_session(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     headers: HeaderMap,
 ) -> Result<Json<SessionCheckResponse>, (StatusCode, Json<AuthError>)> {
-    info!("Debugging handling check_session");
     let db_pool = app_state.get_db_pool();
 
     let session_token = match extract_session_token(&headers) {
@@ -301,10 +300,10 @@ pub async fn handle_check_session(
     };
 
     match verify_session_token(db_pool, &session_token).await {
-        Ok((user_email, expires_at)) => Ok(Json(SessionCheckResponse {
+        Ok((user_email, _user_id)) => Ok(Json(SessionCheckResponse {
             valid: true,
             user_email,
-            expires_at,
+            expires_at: 0,
         })),
         Err(error_msg) => Err((
             StatusCode::UNAUTHORIZED,
@@ -326,7 +325,7 @@ fn extract_session_token(headers: &HeaderMap) -> Option<String> {
 async fn verify_session_token(
     db_pool: &Pool<Sqlite>,
     session_token: &str,
-) -> Result<(String, i64), String> {
+) -> Result<(String, String), String> {
     let query = "
         SELECT u.email, s.expires_at
         FROM auth_sessions s
@@ -348,6 +347,7 @@ async fn verify_session_token(
     };
 
     let email: String = row.get("email");
+    let user_id: String = row.get("user_id");
     let expires_at: i64 = row.get("expires_at");
 
     let expires_time = chrono::DateTime::from_timestamp(expires_at, 0).unwrap();
@@ -361,7 +361,7 @@ async fn verify_session_token(
         return Err("Session has expired".to_string());
     }
 
-    Ok((email, expires_at))
+    Ok((email, user_id))
 }
 
 // Auth middleware
@@ -382,8 +382,8 @@ pub async fn auth_middleware(
     };
 
     match verify_session_token(db_pool, &session_token).await {
-        Ok((user_email, _)) => {
-            req.extensions_mut().insert(user_email);
+        Ok((_user_email, user_id)) => {
+            req.extensions_mut().insert(user_id);
 
             let response = next.run(req).await;
             Ok(response)
