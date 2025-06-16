@@ -19,7 +19,7 @@ pub async fn handle_send_magic_link(
     Json(request): Json<SendMagicLinkRequest>,
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<AuthError>)> {
     let email = request.email.trim().to_lowercase();
-
+    
     if !is_valid_email(&email) {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -28,7 +28,9 @@ pub async fn handle_send_magic_link(
             }),
         ));
     }
-
+    
+    info!("Got auth-request from user with e-mail: {}", email);
+    
     let db_pool = app_state.get_db_pool();
 
     if let Err(remaining_time) = check_rate_limit(db_pool, &email).await {
@@ -52,7 +54,7 @@ pub async fn handle_send_magic_link(
         .bind(Uuid::new_v4().to_string())
         .bind(&email)
         .bind(&token)
-        .bind(expires_at.timestamp())
+        .bind(expires_at.to_rfc3339())
         .execute(db_pool)
         .await
     {
@@ -127,6 +129,8 @@ async fn check_rate_limit(db_pool: &Pool<Sqlite>, email: &str) -> Result<(), i64
 }
 
 async fn send_magic_link_email(email: &str, magic_link: &str) -> anyhow::Result<()> {
+    info!("Sending magic link to email: {}", email);
+    
     let api_key = std::env::var("BREVO_API_KEY")?;
 
     let client = reqwest::Client::new();
@@ -162,6 +166,8 @@ pub async fn handle_verify_token(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<VerifyTokenRequest>,
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<AuthError>)> {
+    info!("Authorizing user...");
+    
     let token = request.token.trim();
     let db_pool = app_state.get_db_pool();
 
