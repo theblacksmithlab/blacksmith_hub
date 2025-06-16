@@ -102,7 +102,7 @@ impl DubbingPipelineService {
 
         info!("Generated job_id for dubbing pipeline: {}", job_id);
 
-        let s3_key = format!("uploads/{}/input/{}", job_id, request.filename);
+        let s3_key = format!("uploads/{}/input/{}", job_id, request.system_file_name);
         let video_s3_url = format!(
             "s3://{}/{}",
             std::env::var("S3_BUCKET").unwrap_or("default-bucket".to_string()),
@@ -121,15 +121,13 @@ impl DubbingPipelineService {
                     .build()?,
             )
             .await?;
-        
-        info!("debug 1");
-        
+
         sqlx::query(
             "INSERT INTO dubbing_pipelines (
                                job_id, user_id, status, step_description,
-                               progress_percentage, original_video_s3_url, filename, created_at,
-                               updated_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                               progress_percentage, original_video_s3_url, system_file_name,
+                               original_file_name, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&job_id)
         .bind(&user_id)
@@ -137,14 +135,13 @@ impl DubbingPipelineService {
         .bind("Preparing pipeline...")
         .bind(0i32)
         .bind(&video_s3_url)
-        .bind(&request.filename)
+        .bind(&request.system_file_name)
+        .bind(&request.original_file_name)
         .bind(now.timestamp())
         .bind(now.timestamp())
         .execute(&self.db_pool)
         .await?;
 
-        info!("debug 2");
-        
         let response = DubbingPipelinePrepareResponse {
             job_id: job_id.clone(),
             upload_url: upload_url.uri().to_string(),
@@ -704,7 +701,7 @@ impl DubbingPipelineService {
         SELECT 
             job_id, status, step_description, progress_percentage,
             created_at, updated_at, completed_at, result_urls,
-            error_message, processing_steps
+            error_message, processing_steps, system_file_name, original_filename
         FROM dubbing_pipelines 
         WHERE job_id = ?
     ";
@@ -748,6 +745,7 @@ impl DubbingPipelineService {
             processing_steps: processing_steps_value,
             stage: Some(stage),
             current_step_index,
+            original_file_name: row.get("original_file_name"),
         };
 
         Ok(status)

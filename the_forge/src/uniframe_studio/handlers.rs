@@ -2,7 +2,7 @@ use axum::extract::{Path, State};
 use axum::{Extension, Json};
 use core::models::uniframe_studio::uniframe_studio::{
     ApiError, DubbingPipelinePrepareRequest, DubbingPipelinePrepareResponse,
-    DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus,
+    DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus, UserJob
 };
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
@@ -17,7 +17,7 @@ pub async fn prepare_dubbing_pipeline(
 ) -> Result<Json<DubbingPipelinePrepareResponse>, (StatusCode, Json<ApiError>)> {
     info!("Preparing dubbing pipeline...");
 
-    if request.filename.is_empty() {
+    if request.system_file_name.is_empty() || request.original_file_name.is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(ApiError {
@@ -133,5 +133,50 @@ pub async fn get_dubbing_pipeline_status(
 
 pub async fn is_premium_user(_user_id: Option<&str>) -> bool {
     // TODO: Implement user's subscription tier detection fn
-    false
+    true
+}
+
+pub async fn get_user_jobs(
+    State(app_state): State<Arc<UniframeStudioAppState>>,
+    Extension(user_id): Extension<String>,
+) -> Result<Json<Vec<UserJob>>, StatusCode> {
+    let db_pool = app_state.get_db_pool();
+
+    let query = "
+        SELECT 
+            job_id,
+            original_file_name,
+            status,
+            created_at,
+            updated_at,
+            progress_percentage
+        FROM dubbing_pipelines
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+    ";
+
+    let rows = sqlx::query_as::<_, (String, String, String, i64, i64, Option<i32>)>(query)
+        .bind(&user_id)
+        .fetch_all(db_pool)
+        .await
+        .map_err(|e| {
+            error!("Failed to fetch user jobs: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let jobs: Vec<UserJob> = rows
+        .into_iter()
+        .map(|(job_id, original_file_name, status, created_at, updated_at, progress_percentage)| {
+            UserJob {
+                job_id,
+                original_file_name,
+                status,
+                created_at: created_at.to_string(),
+                updated_at: updated_at.to_string(),
+                progress_percentage,
+            }
+        })
+        .collect();
+
+    Ok(Json(jobs))
 }

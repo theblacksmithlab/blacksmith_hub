@@ -332,8 +332,6 @@ async fn verify_session_token(
         JOIN auth_users u ON s.user_id = u.id
         WHERE s.token = ?
     ";
-
-    info!("debug 6");
     
     let row = match sqlx::query(query)
         .bind(session_token)
@@ -348,13 +346,9 @@ async fn verify_session_token(
         }
     };
 
-    info!("debug 7");
-    
     let email: String = row.get("email");
     let user_id: String = row.get("user_id");
     let expires_at: i64 = row.get("expires_at");
-
-    info!("debug 8");
     
     let expires_time = chrono::DateTime::from_timestamp(expires_at, 0).unwrap();
     if Utc::now() > expires_time {
@@ -379,8 +373,6 @@ pub async fn auth_middleware(
     let headers = req.headers();
     let db_pool = app_state.get_db_pool();
 
-    info!("debug 3");
-    
     let session_token = match extract_session_token(headers) {
         Some(token) => token,
         None => {
@@ -389,11 +381,8 @@ pub async fn auth_middleware(
         }
     };
 
-    info!("debug 4");
-    
     match verify_session_token(db_pool, &session_token).await {
         Ok((_user_email, user_id)) => {
-            info!("debug 5");
             req.extensions_mut().insert(user_id);
 
             let response = next.run(req).await;

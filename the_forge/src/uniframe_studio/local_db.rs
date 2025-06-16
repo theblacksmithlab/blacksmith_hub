@@ -81,7 +81,8 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             error_message TEXT,
             processing_steps TEXT,
             original_video_s3_url TEXT,
-            filename TEXT,
+            system_file_name TEXT,
+            original_file_name TEXT,
             FOREIGN KEY (user_id) REFERENCES auth_users(id)
         );
     ";

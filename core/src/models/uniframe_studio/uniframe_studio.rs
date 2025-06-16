@@ -3,7 +3,8 @@ use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct DubbingPipelinePrepareRequest {
-    pub filename: String,
+    pub system_file_name: String,
+    pub original_file_name: String,
     pub content_type: String,
 }
 
@@ -47,6 +48,7 @@ pub struct DubbingPipelineStatus {
     pub processing_steps: Option<Vec<String>>,
     pub stage: Option<String>,
     pub current_step_index: Option<i32>,
+    pub original_file_name: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -136,4 +138,14 @@ impl PipelineStage {
 pub struct StepInfo {
     pub description: &'static str,
     pub stage: PipelineStage,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UserJob {
+    pub job_id: String,
+    pub original_file_name: String,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub progress_percentage: Option<i32>,
 }
