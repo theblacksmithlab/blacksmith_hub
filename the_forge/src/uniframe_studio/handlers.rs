@@ -155,7 +155,7 @@ pub async fn get_user_jobs(
         ORDER BY created_at DESC
     ";
 
-    let rows = sqlx::query_as::<_, (String, String, String, i64, i64, Option<i32>)>(query)
+    let rows = sqlx::query_as::<_, (String, String, String, String, String, Option<i32>)>(query)
         .bind(&user_id)
         .fetch_all(db_pool)
         .await
@@ -171,8 +171,8 @@ pub async fn get_user_jobs(
                 job_id,
                 original_file_name,
                 status,
-                created_at: created_at.to_string(),
-                updated_at: updated_at.to_string(),
+                created_at,
+                updated_at,
                 progress_percentage,
             }
         })

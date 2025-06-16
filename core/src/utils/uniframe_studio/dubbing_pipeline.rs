@@ -137,8 +137,8 @@ impl DubbingPipelineService {
         .bind(&video_s3_url)
         .bind(&request.system_file_name)
         .bind(&request.original_file_name)
-        .bind(now.timestamp())
-        .bind(now.timestamp())
+            .bind(now.to_rfc3339())
+            .bind(now.to_rfc3339())
         .execute(&self.db_pool)
         .await?;
 
@@ -643,7 +643,7 @@ impl DubbingPipelineService {
     ) {
         let now = Utc::now();
         let completed_at = if status == "completed" || status == "failed" {
-            Some(now.timestamp())
+            Some(now.to_rfc3339())
         } else {
             None
         };
@@ -687,7 +687,7 @@ impl DubbingPipelineService {
             .bind(error_message)
             .bind(processing_steps_json)
             .bind(completed_at)
-            .bind(now.timestamp())
+            .bind(now.to_rfc3339())
             .bind(job_id)
             .execute(db_pool)
             .await
@@ -712,9 +712,9 @@ impl DubbingPipelineService {
             .await?
             .ok_or_else(|| anyhow::anyhow!("Pipeline not found"))?;
 
-        let created_at: i64 = row.get("created_at");
-        let updated_at: i64 = row.get("updated_at");
-        let completed_at: Option<i64> = row.get("completed_at");
+        let created_at: String = row.get("created_at");
+        let updated_at: String = row.get("updated_at");
+        let completed_at: Option<String> = row.get("completed_at");
 
         let result_urls: Option<String> = row.get("result_urls");
         let result_urls_vec = result_urls.and_then(|json| serde_json::from_str(&json).ok());
@@ -732,14 +732,9 @@ impl DubbingPipelineService {
             status: row.get("status"),
             step_description: row.get("step_description"),
             progress_percentage: row.get("progress_percentage"),
-            created_at: DateTime::from_timestamp(created_at, 0)
-                .unwrap()
-                .to_rfc3339(),
-            updated_at: DateTime::from_timestamp(updated_at, 0)
-                .unwrap()
-                .to_rfc3339(),
-            completed_at: completed_at
-                .map(|ts| DateTime::from_timestamp(ts, 0).unwrap().to_rfc3339()),
+            created_at,
+            updated_at,
+            completed_at,
             result_urls: result_urls_vec,
             error_message: row.get("error_message"),
             processing_steps: processing_steps_value,
