@@ -58,7 +58,6 @@ async fn main() -> Result<()> {
     }
 
     let config_path = get_config_path(&app_name);
-    info!("Using {}'s config from: {}", app_name.as_str(), config_path);
 
     let config_builder = Config::builder().add_source(File::with_name(&config_path));
     let config: AppConfig = config_builder.build()?.try_deserialize()?;

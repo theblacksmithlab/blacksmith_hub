@@ -48,7 +48,7 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
         CREATE TABLE IF NOT EXISTS auth_users (
             id TEXT PRIMARY KEY,
             email TEXT UNIQUE NOT NULL,
-            created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            created_at TEXT DEFAULT (datetime('now'))
         );
 
         CREATE TABLE IF NOT EXISTS auth_sessions (
@@ -56,7 +56,7 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             user_id TEXT NOT NULL,
             token TEXT UNIQUE NOT NULL,
             expires_at INTEGER NOT NULL,
-            created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            created_at TEXT DEFAULT (datetime('now'))
         );
 
         CREATE TABLE IF NOT EXISTS auth_magic_links (
@@ -65,7 +65,7 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             token TEXT UNIQUE NOT NULL,
             expires_at INTEGER NOT NULL,
             used BOOLEAN DEFAULT FALSE,
-            created_at INTEGER DEFAULT (strftime('%s', 'now'))
+            created_at TEXT DEFAULT (datetime('now'))
         );
 
         CREATE TABLE IF NOT EXISTS dubbing_pipelines (
@@ -74,8 +74,8 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             status TEXT NOT NULL DEFAULT 'preparing',
             step_description TEXT NOT NULL DEFAULT 'Preparing pipeline...',
             progress_percentage INTEGER,
-            created_at INTEGER DEFAULT (strftime('%s', 'now')),
-            updated_at INTEGER DEFAULT (strftime('%s', 'now')),
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
             completed_at INTEGER,
             result_urls TEXT,
             error_message TEXT,

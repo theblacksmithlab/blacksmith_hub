@@ -2,7 +2,7 @@ use axum::body::Body;
 use axum::extract::State;
 use axum::Json;
 use axum::{http::Request, middleware::Next, response::Response};
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use core::models::uniframe_studio::auth_models::{
     AuthError, AuthResponse, SendMagicLinkRequest, SessionCheckResponse, VerifyTokenRequest,
 };
@@ -92,7 +92,7 @@ pub async fn handle_send_magic_link(
 }
 
 async fn check_rate_limit(db_pool: &Pool<Sqlite>, email: &str) -> Result<(), i64> {
-    let five_minutes_ago = Utc::now() - Duration::minutes(5);
+    let five_minutes_ago = (Utc::now() - Duration::minutes(5)).to_rfc3339();
 
     let query = "
         SELECT created_at FROM auth_magic_links
@@ -102,14 +102,21 @@ async fn check_rate_limit(db_pool: &Pool<Sqlite>, email: &str) -> Result<(), i64
 
     if let Ok(row) = sqlx::query(query)
         .bind(email)
-        .bind(five_minutes_ago.timestamp())
+        .bind(&five_minutes_ago)
         .fetch_optional(db_pool)
         .await
     {
         if let Some(row) = row {
-            let last_request: i64 = row.get("created_at");
+            let last_request: String = row.get("created_at");
 
-            let last_request_time = chrono::DateTime::from_timestamp(last_request, 0).unwrap();
+            let last_request_time = match DateTime::parse_from_rfc3339(&last_request) {
+                Ok(dt) => dt.with_timezone(&Utc),
+                Err(e) => {
+                    error!("Failed to parse created_at: {}", e);
+                    return Err(1);
+                }
+            };
+
             let next_allowed = last_request_time + Duration::minutes(5);
             let remaining = (next_allowed - Utc::now()).num_minutes();
             return Err(remaining.max(1));
@@ -185,9 +192,21 @@ pub async fn handle_verify_token(
     };
 
     let email: String = magic_link_row.get("email");
-    let expires_at: i64 = magic_link_row.get("expires_at");
+    let expires_at: String = magic_link_row.get("expires_at");
 
-    let expires_time = chrono::DateTime::from_timestamp(expires_at, 0).unwrap();
+    let expires_time = match DateTime::parse_from_rfc3339(&expires_at) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(e) => {
+            error!("Failed to parse expires_at: {}", e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthError {
+                    error: "Invalid date format in database".to_string(),
+                }),
+            ));
+        }
+    };
+    
     if Utc::now() > expires_time {
         return Err((
             StatusCode::UNAUTHORIZED,
@@ -226,7 +245,7 @@ pub async fn handle_verify_token(
         .bind(Uuid::new_v4().to_string())
         .bind(&user_id)
         .bind(&session_token)
-        .bind(session_expires.timestamp())
+        .bind(session_expires.to_rfc3339())
         .execute(db_pool)
         .await
         .map_err(|e| {
@@ -332,7 +351,7 @@ async fn verify_session_token(
         JOIN auth_users u ON s.user_id = u.id
         WHERE s.token = ?
     ";
-    
+
     let row = match sqlx::query(query)
         .bind(session_token)
         .fetch_optional(db_pool)
@@ -348,9 +367,16 @@ async fn verify_session_token(
 
     let email: String = row.get("email");
     let user_id: String = row.get("user_id");
-    let expires_at: i64 = row.get("expires_at");
-    
-    let expires_time = chrono::DateTime::from_timestamp(expires_at, 0).unwrap();
+    let expires_at: String = row.get("expires_at");
+
+    let expires_time = match DateTime::parse_from_rfc3339(&expires_at) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(e) => {
+            error!("Failed to parse expires_at: {}", e);
+            return Err("Invalid date format in database".to_string());
+        }
+    };
+
     if Utc::now() > expires_time {
         let delete_query = "DELETE FROM auth_sessions WHERE token = ?";
         let _ = sqlx::query(delete_query)
