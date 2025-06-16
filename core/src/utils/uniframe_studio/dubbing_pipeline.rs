@@ -701,7 +701,7 @@ impl DubbingPipelineService {
         SELECT 
             job_id, status, step_description, progress_percentage,
             created_at, updated_at, completed_at, result_urls,
-            error_message, processing_steps, system_file_name, original_filename
+            error_message, processing_steps, system_file_name, original_file_name
         FROM dubbing_pipelines 
         WHERE job_id = ?
     ";
