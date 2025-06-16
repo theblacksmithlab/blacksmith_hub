@@ -13,7 +13,6 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-// Processing magic link request
 pub async fn handle_send_magic_link(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<SendMagicLinkRequest>,
@@ -79,7 +78,7 @@ pub async fn handle_send_magic_link(
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AuthError {
-                error: "Failed to send email".to_string(),
+                error: "Failed to send magic link email".to_string(),
             }),
         ));
     }
@@ -88,7 +87,7 @@ pub async fn handle_send_magic_link(
 
     Ok(Json(AuthResponse {
         success: true,
-        message: "Magic link sent successfully".to_string(),
+        message: "Magic link email sent successfully".to_string(),
         session_token: None,
     }))
 }
@@ -129,8 +128,6 @@ async fn check_rate_limit(db_pool: &Pool<Sqlite>, email: &str) -> Result<(), i64
 }
 
 async fn send_magic_link_email(email: &str, magic_link: &str) -> anyhow::Result<()> {
-    info!("Sending magic link to email: {}", email);
-    
     let api_key = std::env::var("BREVO_API_KEY")?;
 
     let client = reqwest::Client::new();
@@ -279,30 +276,61 @@ async fn create_or_get_user(
 ) -> Result<String, (StatusCode, Json<AuthError>)> {
     let query = "SELECT id FROM auth_users WHERE email = ?";
 
-    if let Ok(Some(row)) = sqlx::query(query).bind(email).fetch_optional(db_pool).await {
-        return Ok(row.get("id"));
+    match sqlx::query(query).bind(email).fetch_optional(db_pool).await {
+        Ok(Some(row)) => {
+            return Ok(row.get("id"));
+        }
+        Ok(None) => {
+        }
+        Err(e) => {
+            error!("Database error while looking up user: {}", e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthError {
+                    error: "Database error occurred".to_string(),
+                }),
+            ));
+        }
     }
 
     let user_id = Uuid::new_v4().to_string();
     let insert_query = "INSERT INTO auth_users (id, email) VALUES (?, ?)";
 
-    sqlx::query(insert_query)
+    match sqlx::query(insert_query)
         .bind(&user_id)
         .bind(email)
         .execute(db_pool)
         .await
-        .map_err(|e| {
-            error!("Failed to create user: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(AuthError {
-                    error: "Failed to create user".to_string(),
-                }),
-            )
-        })?;
-
-    info!("Created new user: {}", email);
-    Ok(user_id)
+    {
+        Ok(_) => {
+            info!("Created new user: {}", email);
+            Ok(user_id)
+        }
+        Err(e) => {
+            if e.to_string().contains("UNIQUE constraint") {
+                match sqlx::query(query).bind(email).fetch_optional(db_pool).await {
+                    Ok(Some(row)) => Ok(row.get("id")),
+                    _ => {
+                        error!("Failed to create user due to race condition: {}", e);
+                        Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(AuthError {
+                                error: "Failed to create user".to_string(),
+                            }),
+                        ))
+                    }
+                }
+            } else {
+                error!("Failed to create user: {}", e);
+                Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(AuthError {
+                        error: "Failed to create user".to_string(),
+                    }),
+                ))
+            }
+        }
+    }
 }
 
 // Checking session
@@ -328,7 +356,6 @@ pub async fn handle_check_session(
         Ok((user_email, _user_id)) => Ok(Json(SessionCheckResponse {
             valid: true,
             user_email,
-            expires_at: 0,
         })),
         Err(error_msg) => Err((
             StatusCode::UNAUTHORIZED,

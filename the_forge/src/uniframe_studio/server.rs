@@ -1,7 +1,8 @@
 use crate::uniframe_studio::auth_handlers::{
     auth_middleware, handle_check_session, handle_send_magic_link, handle_verify_token,
 };
-use crate::uniframe_studio::handlers::{get_dubbing_pipeline_status, get_user_jobs, prepare_dubbing_pipeline, start_dubbing_pipeline};
+use crate::uniframe_studio::handlers::{get_dubbing_pipeline_status, get_user_jobs, 
+                                       prepare_dubbing_pipeline, start_dubbing_pipeline};
 use crate::uniframe_studio::local_db::setup_uniframe_studio_db;
 use anyhow::Result;
 use axum::routing::{get, post};

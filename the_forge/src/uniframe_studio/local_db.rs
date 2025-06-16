@@ -55,7 +55,7 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
             token TEXT UNIQUE NOT NULL,
-            expires_at INTEGER NOT NULL,
+            expires_at TEXT NOT NULL,
             created_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -63,7 +63,7 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             id TEXT PRIMARY KEY,
             email TEXT NOT NULL,
             token TEXT UNIQUE NOT NULL,
-            expires_at INTEGER NOT NULL,
+            expires_at TEXT NOT NULL,
             used BOOLEAN DEFAULT FALSE,
             created_at TEXT DEFAULT (datetime('now'))
         );
@@ -76,7 +76,7 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             progress_percentage INTEGER,
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now')),
-            completed_at INTEGER,
+            completed_at TEXT,
             result_urls TEXT,
             error_message TEXT,
             processing_steps TEXT,
