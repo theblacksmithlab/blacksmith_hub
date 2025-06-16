@@ -21,7 +21,7 @@ pub async fn setup_uniframe_studio_db() -> anyhow::Result<SqlitePool> {
         }
 
         fs::File::create(db_path).context("Error creating db file for Uniframe Studio")?;
-        warn!("Uniframe Studio db file {} created.", db_path);
+        warn!("New db file for Uniframe Studio created at: {}", db_path);
     }
 
     let pool = SqlitePool::connect_with(

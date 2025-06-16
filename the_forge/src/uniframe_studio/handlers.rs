@@ -2,7 +2,7 @@ use axum::extract::{Path, State};
 use axum::{Extension, Json};
 use core::models::uniframe_studio::uniframe_studio::{
     ApiError, DubbingPipelinePrepareRequest, DubbingPipelinePrepareResponse,
-    DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus, UserJob
+    DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus, UserJob,
 };
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
@@ -166,16 +166,18 @@ pub async fn get_user_jobs(
 
     let jobs: Vec<UserJob> = rows
         .into_iter()
-        .map(|(job_id, original_file_name, status, created_at, updated_at, progress_percentage)| {
-            UserJob {
-                job_id,
-                original_file_name,
-                status,
-                created_at,
-                updated_at,
-                progress_percentage,
-            }
-        })
+        .map(
+            |(job_id, original_file_name, status, created_at, updated_at, progress_percentage)| {
+                UserJob {
+                    job_id,
+                    original_file_name,
+                    status,
+                    created_at,
+                    updated_at,
+                    progress_percentage,
+                }
+            },
+        )
         .collect();
 
     Ok(Json(jobs))

@@ -137,8 +137,8 @@ impl DubbingPipelineService {
         .bind(&video_s3_url)
         .bind(&request.system_file_name)
         .bind(&request.original_file_name)
-            .bind(now.to_rfc3339())
-            .bind(now.to_rfc3339())
+        .bind(now.to_rfc3339())
+        .bind(now.to_rfc3339())
         .execute(&self.db_pool)
         .await?;
 

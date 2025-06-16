@@ -1,3 +1,4 @@
+use crate::uniframe_studio::local_utils::create_magic_link_html;
 use axum::body::Body;
 use axum::extract::State;
 use axum::Json;
@@ -18,7 +19,7 @@ pub async fn handle_send_magic_link(
     Json(request): Json<SendMagicLinkRequest>,
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<AuthError>)> {
     let email = request.email.trim().to_lowercase();
-    
+
     if !is_valid_email(&email) {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -27,9 +28,9 @@ pub async fn handle_send_magic_link(
             }),
         ));
     }
-    
+
     info!("Got auth-request from user with e-mail: {}", email);
-    
+
     let db_pool = app_state.get_db_pool();
 
     if let Err(remaining_time) = check_rate_limit(db_pool, &email).await {
@@ -139,7 +140,8 @@ async fn send_magic_link_email(email: &str, magic_link: &str) -> anyhow::Result<
             "sender": {"email": "thecableguy303808909@gmail.com"},
             "to": [{"email": email}],
             "subject": "Sign in to Uniframe Studio",
-            "textContent": format!("Click this link to sign in: {}\n\nThis link expires in 1 hour.", magic_link)
+            "textContent": format!("Click this link to sign in: {}\n\nThis link expires in 1 hour.", magic_link),
+            "htmlContent": create_magic_link_html(magic_link)
         }))
         .send()
         .await?;
@@ -158,13 +160,12 @@ fn is_valid_email(email: &str) -> bool {
     email.contains('@') && email.contains('.') && email.len() > 5
 }
 
-// Token verifying
 pub async fn handle_verify_token(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<VerifyTokenRequest>,
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<AuthError>)> {
     info!("Authorizing user...");
-    
+
     let token = request.token.trim();
     let db_pool = app_state.get_db_pool();
 
@@ -209,7 +210,7 @@ pub async fn handle_verify_token(
             ));
         }
     };
-    
+
     if Utc::now() > expires_time {
         return Err((
             StatusCode::UNAUTHORIZED,
@@ -280,8 +281,7 @@ async fn create_or_get_user(
         Ok(Some(row)) => {
             return Ok(row.get("id"));
         }
-        Ok(None) => {
-        }
+        Ok(None) => {}
         Err(e) => {
             error!("Database error while looking up user: {}", e);
             return Err((
@@ -333,7 +333,6 @@ async fn create_or_get_user(
     }
 }
 
-// Checking session
 pub async fn handle_check_session(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     headers: HeaderMap,
@@ -423,7 +422,6 @@ async fn verify_session_token(
     Ok((email, user_id))
 }
 
-// Auth middleware
 pub async fn auth_middleware(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     mut req: Request<Body>,
