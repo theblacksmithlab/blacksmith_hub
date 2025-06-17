@@ -147,7 +147,7 @@ pub async fn get_user_jobs(
             job_id,
             original_file_name,
             status,
-            created_at,
+            created_at
         FROM dubbing_pipelines
         WHERE user_id = ?
         ORDER BY created_at DESC
