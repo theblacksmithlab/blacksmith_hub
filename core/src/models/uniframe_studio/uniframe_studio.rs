@@ -25,6 +25,8 @@ pub struct DubbingPipelineRequest {
     pub tts_voice: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transcription_keywords: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -146,6 +148,4 @@ pub struct UserJob {
     pub original_file_name: String,
     pub status: String,
     pub created_at: String,
-    pub updated_at: String,
-    pub progress_percentage: Option<i32>,
 }

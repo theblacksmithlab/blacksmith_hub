@@ -148,14 +148,12 @@ pub async fn get_user_jobs(
             original_file_name,
             status,
             created_at,
-            updated_at,
-            progress_percentage
         FROM dubbing_pipelines
         WHERE user_id = ?
         ORDER BY created_at DESC
     ";
 
-    let rows = sqlx::query_as::<_, (String, String, String, String, String, Option<i32>)>(query)
+    let rows = sqlx::query_as::<_, (String, String, String, String)>(query)
         .bind(&user_id)
         .fetch_all(db_pool)
         .await
@@ -167,14 +165,12 @@ pub async fn get_user_jobs(
     let jobs: Vec<UserJob> = rows
         .into_iter()
         .map(
-            |(job_id, original_file_name, status, created_at, updated_at, progress_percentage)| {
+            |(job_id, original_file_name, status, created_at)| {
                 UserJob {
                     job_id,
                     original_file_name,
                     status,
                     created_at,
-                    updated_at,
-                    progress_percentage,
                 }
             },
         )

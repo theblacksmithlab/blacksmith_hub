@@ -164,7 +164,9 @@ impl DubbingPipelineService {
     ) -> Result<DubbingPipelineResponse> {
         let job_id = request.job_id.clone();
         let now = Utc::now();
-
+        
+        info!("Keywords: {:?}", request.transcription_keywords);
+        
         Self::update_pipeline_status(
             &self.db_pool,
             &job_id,
