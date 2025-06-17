@@ -76,7 +76,7 @@ pub async fn start_dubbing_pipeline(
 
     match state
         .dubbing_pipeline_service
-        .start_pipeline(request, user_is_premium)
+        .start_pipeline(request, user_is_premium, state.clone())
         .await
     {
         Ok(response) => {
@@ -164,16 +164,12 @@ pub async fn get_user_jobs(
 
     let jobs: Vec<UserJob> = rows
         .into_iter()
-        .map(
-            |(job_id, original_file_name, status, created_at)| {
-                UserJob {
-                    job_id,
-                    original_file_name,
-                    status,
-                    created_at,
-                }
-            },
-        )
+        .map(|(job_id, original_file_name, status, created_at)| UserJob {
+            job_id,
+            original_file_name,
+            status,
+            created_at,
+        })
         .collect();
 
     Ok(Json(jobs))

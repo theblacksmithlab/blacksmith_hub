@@ -5,6 +5,7 @@ pub enum AppsSystemRoles {
     TheViperRoom(TheViperRoomRoleType),
     Groot(GrootRoleType),
     BlacksmithLab(BlacksmithLabRoleType),
+    UniframeStudio(UniframeStudioRoleType),
 }
 
 impl AppsSystemRoles {
@@ -15,6 +16,7 @@ impl AppsSystemRoles {
             AppsSystemRoles::TheViperRoom(role) => role.as_str(),
             AppsSystemRoles::Groot(role) => role.as_str(),
             AppsSystemRoles::BlacksmithLab(role) => role.as_str(),
+            AppsSystemRoles::UniframeStudio(role) => role.as_str(),
         }
     }
 }
@@ -39,6 +41,25 @@ impl GrootRoleType {
 }
 
 impl AsRef<str> for GrootRoleType {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UniframeStudioRoleType {
+    ValidateKeywords,
+}
+
+impl UniframeStudioRoleType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            UniframeStudioRoleType::ValidateKeywords => "validate_keywords",
+        }
+    }
+}
+
+impl AsRef<str> for UniframeStudioRoleType {
     fn as_ref(&self) -> &str {
         self.as_str()
     }

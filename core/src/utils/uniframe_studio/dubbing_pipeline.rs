@@ -5,6 +5,8 @@ use crate::models::uniframe_studio::uniframe_studio::{
     DubbingPipelinePrepareResponse, DubbingPipelineRequest, DubbingPipelineResponse,
     DubbingPipelineStatus, PipelineStage, StepInfo,
 };
+use crate::state::uniframe_studio::app_state::UniframeStudioAppState;
+use crate::utils::uniframe_studio::uniframe_studio::validate_transcription_keywords;
 use anyhow::{Context, Result};
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::Client as S3Client;
@@ -13,7 +15,7 @@ use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
-use tracing::{error, info, instrument};
+use tracing::{error, info};
 use uuid::Uuid;
 
 pub struct DubbingPipelineService {
@@ -90,8 +92,7 @@ impl DubbingPipelineService {
 
         (stage.to_string(), current_step_index)
     }
-
-    #[instrument(skip(self, request), fields(pipeline_id))]
+    
     pub async fn prepare_pipeline(
         &self,
         request: DubbingPipelinePrepareRequest,
@@ -156,17 +157,17 @@ impl DubbingPipelineService {
         Ok(response)
     }
 
-    #[instrument(skip(self, request), fields(pipeline_id))]
     pub async fn start_pipeline(
         &self,
         request: DubbingPipelineRequest,
         is_premium: bool,
+        app_state: Arc<UniframeStudioAppState>,
     ) -> Result<DubbingPipelineResponse> {
         let job_id = request.job_id.clone();
         let now = Utc::now();
-        
+
         info!("Keywords: {:?}", request.transcription_keywords);
-        
+
         Self::update_pipeline_status(
             &self.db_pool,
             &job_id,
@@ -198,6 +199,7 @@ impl DubbingPipelineService {
                 dubbing_client,
                 s3_client,
                 db_pool,
+                app_state,
             )
             .await;
         });
@@ -212,7 +214,17 @@ impl DubbingPipelineService {
         dubbing_client: DubbingClient,
         s3_client: Arc<S3Client>,
         db_pool: Pool<Sqlite>,
+        app_state: Arc<UniframeStudioAppState>,
     ) {
+        let validated_transcription_keywords = match request.transcription_keywords {
+            Some(transcription_keywords) => {
+                Some(validate_transcription_keywords(transcription_keywords, app_state).await)
+            }
+            None => None,
+        };
+        
+        info!("{:?}", validated_transcription_keywords);
+
         let gpu_processing_instance_init = async {
             info!("Checking GPU processing instance status...");
 
@@ -366,6 +378,7 @@ impl DubbingPipelineService {
             tts_voice: request.tts_voice,
             source_language: request.source_language,
             is_premium,
+            transcription_keywords: validated_transcription_keywords,
         };
 
         let job_submission_result = dubbing_client.process_video(dubbing_job_request).await;

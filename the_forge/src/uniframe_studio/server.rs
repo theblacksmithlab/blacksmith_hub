@@ -6,6 +6,7 @@ use crate::uniframe_studio::handlers::{
 };
 use crate::uniframe_studio::local_db::setup_uniframe_studio_db;
 use anyhow::Result;
+use async_openai::Client as LLM_Client;
 use axum::routing::{get, post};
 use axum::Router;
 use core::state::server_common::app_state::ServerAppState;
@@ -22,6 +23,8 @@ pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>)
 
     let s3_client = aws_sdk_s3::Client::new(&aws_config);
 
+    let llm_client = LLM_Client::new();
+
     let dubbing_service_url =
         std::env::var("DUBBING_SERVICE_URL").unwrap_or("http://localhost:8000".to_string());
 
@@ -31,6 +34,7 @@ pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>)
         s3_client,
         dubbing_service_url,
         uniframe_studio_db_pool,
+        llm_client,
     ));
 
     let router = get_uniframe_studio_router(uniframe_studio_app_state);
