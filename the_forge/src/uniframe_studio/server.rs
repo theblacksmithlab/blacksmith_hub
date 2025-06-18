@@ -2,10 +2,11 @@ use crate::uniframe_studio::auth_handlers::{
     auth_middleware, handle_check_session, handle_send_magic_link, handle_verify_token,
 };
 use crate::uniframe_studio::handlers::{
-    get_dubbing_pipeline_status, prepare_dubbing_pipeline, start_dubbing_pipeline,
+    get_dubbing_pipeline_status, get_user_jobs, prepare_dubbing_pipeline, start_dubbing_pipeline,
 };
 use crate::uniframe_studio::local_db::setup_uniframe_studio_db;
 use anyhow::Result;
+use async_openai::Client as LLM_Client;
 use axum::routing::{get, post};
 use axum::Router;
 use core::state::server_common::app_state::ServerAppState;
@@ -22,6 +23,8 @@ pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>)
 
     let s3_client = aws_sdk_s3::Client::new(&aws_config);
 
+    let llm_client = LLM_Client::new();
+
     let dubbing_service_url =
         std::env::var("DUBBING_SERVICE_URL").unwrap_or("http://localhost:8000".to_string());
 
@@ -31,6 +34,7 @@ pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>)
         s3_client,
         dubbing_service_url,
         uniframe_studio_db_pool,
+        llm_client,
     ));
 
     let router = get_uniframe_studio_router(uniframe_studio_app_state);
@@ -65,8 +69,12 @@ fn get_uniframe_studio_router(uniframe_studio_app_state: Arc<UniframeStudioAppSt
             post(start_dubbing_pipeline).options(|| async { StatusCode::OK }),
         )
         .route(
-            "/api/uniframe/dubbing/{pipeline_id}/status",
+            "/api/uniframe/dubbing/{job_id}/status",
             get(get_dubbing_pipeline_status).options(|| async { StatusCode::OK }),
+        )
+        .route(
+            "/api/uniframe/user/jobs",
+            get(get_user_jobs).options(|| async { StatusCode::OK }),
         )
         .layer(axum::middleware::from_fn_with_state(
             uniframe_studio_app_state.clone(),

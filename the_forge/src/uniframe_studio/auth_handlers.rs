@@ -1,8 +1,9 @@
+use crate::uniframe_studio::local_utils::create_magic_link_html;
 use axum::body::Body;
 use axum::extract::State;
 use axum::Json;
 use axum::{http::Request, middleware::Next, response::Response};
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use core::models::uniframe_studio::auth_models::{
     AuthError, AuthResponse, SendMagicLinkRequest, SessionCheckResponse, VerifyTokenRequest,
 };
@@ -13,7 +14,6 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-// Processing magic link request
 pub async fn handle_send_magic_link(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<SendMagicLinkRequest>,
@@ -28,6 +28,8 @@ pub async fn handle_send_magic_link(
             }),
         ));
     }
+
+    info!("Got auth-request from user with e-mail: {}", email);
 
     let db_pool = app_state.get_db_pool();
 
@@ -52,7 +54,7 @@ pub async fn handle_send_magic_link(
         .bind(Uuid::new_v4().to_string())
         .bind(&email)
         .bind(&token)
-        .bind(expires_at.timestamp())
+        .bind(expires_at.to_rfc3339())
         .execute(db_pool)
         .await
     {
@@ -77,7 +79,7 @@ pub async fn handle_send_magic_link(
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(AuthError {
-                error: "Failed to send email".to_string(),
+                error: "Failed to send magic link email".to_string(),
             }),
         ));
     }
@@ -86,13 +88,13 @@ pub async fn handle_send_magic_link(
 
     Ok(Json(AuthResponse {
         success: true,
-        message: "Magic link sent successfully".to_string(),
+        message: "Magic link email sent successfully".to_string(),
         session_token: None,
     }))
 }
 
 async fn check_rate_limit(db_pool: &Pool<Sqlite>, email: &str) -> Result<(), i64> {
-    let five_minutes_ago = Utc::now() - Duration::minutes(5);
+    let five_minutes_ago = (Utc::now() - Duration::minutes(5)).to_rfc3339();
 
     let query = "
         SELECT created_at FROM auth_magic_links
@@ -102,14 +104,21 @@ async fn check_rate_limit(db_pool: &Pool<Sqlite>, email: &str) -> Result<(), i64
 
     if let Ok(row) = sqlx::query(query)
         .bind(email)
-        .bind(five_minutes_ago.timestamp())
+        .bind(&five_minutes_ago)
         .fetch_optional(db_pool)
         .await
     {
         if let Some(row) = row {
-            let last_request: i64 = row.get("created_at");
+            let last_request: String = row.get("created_at");
 
-            let last_request_time = chrono::DateTime::from_timestamp(last_request, 0).unwrap();
+            let last_request_time = match DateTime::parse_from_rfc3339(&last_request) {
+                Ok(dt) => dt.with_timezone(&Utc),
+                Err(e) => {
+                    error!("Failed to parse created_at: {}", e);
+                    return Err(1);
+                }
+            };
+
             let next_allowed = last_request_time + Duration::minutes(5);
             let remaining = (next_allowed - Utc::now()).num_minutes();
             return Err(remaining.max(1));
@@ -131,7 +140,8 @@ async fn send_magic_link_email(email: &str, magic_link: &str) -> anyhow::Result<
             "sender": {"email": "thecableguy303808909@gmail.com"},
             "to": [{"email": email}],
             "subject": "Sign in to Uniframe Studio",
-            "textContent": format!("Click this link to sign in: {}\n\nThis link expires in 1 hour.", magic_link)
+            "textContent": format!("Click this link to sign in: {}\n\nThis link expires in 1 hour.", magic_link),
+            "htmlContent": create_magic_link_html(magic_link)
         }))
         .send()
         .await?;
@@ -150,11 +160,12 @@ fn is_valid_email(email: &str) -> bool {
     email.contains('@') && email.contains('.') && email.len() > 5
 }
 
-// Token verifying
 pub async fn handle_verify_token(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<VerifyTokenRequest>,
 ) -> Result<Json<AuthResponse>, (StatusCode, Json<AuthError>)> {
+    info!("Authorizing user...");
+
     let token = request.token.trim();
     let db_pool = app_state.get_db_pool();
 
@@ -185,9 +196,21 @@ pub async fn handle_verify_token(
     };
 
     let email: String = magic_link_row.get("email");
-    let expires_at: i64 = magic_link_row.get("expires_at");
+    let expires_at: String = magic_link_row.get("expires_at");
 
-    let expires_time = chrono::DateTime::from_timestamp(expires_at, 0).unwrap();
+    let expires_time = match DateTime::parse_from_rfc3339(&expires_at) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(e) => {
+            error!("Failed to parse expires_at: {}", e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthError {
+                    error: "Invalid date format in database".to_string(),
+                }),
+            ));
+        }
+    };
+
     if Utc::now() > expires_time {
         return Err((
             StatusCode::UNAUTHORIZED,
@@ -226,7 +249,7 @@ pub async fn handle_verify_token(
         .bind(Uuid::new_v4().to_string())
         .bind(&user_id)
         .bind(&session_token)
-        .bind(session_expires.timestamp())
+        .bind(session_expires.to_rfc3339())
         .execute(db_pool)
         .await
         .map_err(|e| {
@@ -254,38 +277,66 @@ async fn create_or_get_user(
 ) -> Result<String, (StatusCode, Json<AuthError>)> {
     let query = "SELECT id FROM auth_users WHERE email = ?";
 
-    if let Ok(Some(row)) = sqlx::query(query).bind(email).fetch_optional(db_pool).await {
-        return Ok(row.get("id"));
+    match sqlx::query(query).bind(email).fetch_optional(db_pool).await {
+        Ok(Some(row)) => {
+            return Ok(row.get("id"));
+        }
+        Ok(None) => {}
+        Err(e) => {
+            error!("Database error while looking up user: {}", e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthError {
+                    error: "Database error occurred".to_string(),
+                }),
+            ));
+        }
     }
 
     let user_id = Uuid::new_v4().to_string();
     let insert_query = "INSERT INTO auth_users (id, email) VALUES (?, ?)";
 
-    sqlx::query(insert_query)
+    match sqlx::query(insert_query)
         .bind(&user_id)
         .bind(email)
         .execute(db_pool)
         .await
-        .map_err(|e| {
-            error!("Failed to create user: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(AuthError {
-                    error: "Failed to create user".to_string(),
-                }),
-            )
-        })?;
-
-    info!("Created new user: {}", email);
-    Ok(user_id)
+    {
+        Ok(_) => {
+            info!("Created new user: {}", email);
+            Ok(user_id)
+        }
+        Err(e) => {
+            if e.to_string().contains("UNIQUE constraint") {
+                match sqlx::query(query).bind(email).fetch_optional(db_pool).await {
+                    Ok(Some(row)) => Ok(row.get("id")),
+                    _ => {
+                        error!("Failed to create user due to race condition: {}", e);
+                        Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(AuthError {
+                                error: "Failed to create user".to_string(),
+                            }),
+                        ))
+                    }
+                }
+            } else {
+                error!("Failed to create user: {}", e);
+                Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(AuthError {
+                        error: "Failed to create user".to_string(),
+                    }),
+                ))
+            }
+        }
+    }
 }
 
-// Checking session
 pub async fn handle_check_session(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     headers: HeaderMap,
 ) -> Result<Json<SessionCheckResponse>, (StatusCode, Json<AuthError>)> {
-    info!("Debugging handling check_session");
     let db_pool = app_state.get_db_pool();
 
     let session_token = match extract_session_token(&headers) {
@@ -301,10 +352,9 @@ pub async fn handle_check_session(
     };
 
     match verify_session_token(db_pool, &session_token).await {
-        Ok((user_email, expires_at)) => Ok(Json(SessionCheckResponse {
+        Ok((user_email, _user_id)) => Ok(Json(SessionCheckResponse {
             valid: true,
             user_email,
-            expires_at,
         })),
         Err(error_msg) => Err((
             StatusCode::UNAUTHORIZED,
@@ -326,9 +376,9 @@ fn extract_session_token(headers: &HeaderMap) -> Option<String> {
 async fn verify_session_token(
     db_pool: &Pool<Sqlite>,
     session_token: &str,
-) -> Result<(String, i64), String> {
+) -> Result<(String, String), String> {
     let query = "
-        SELECT u.email, s.expires_at
+        SELECT u.email, s.user_id, s.expires_at
         FROM auth_sessions s
         JOIN auth_users u ON s.user_id = u.id
         WHERE s.token = ?
@@ -348,9 +398,17 @@ async fn verify_session_token(
     };
 
     let email: String = row.get("email");
-    let expires_at: i64 = row.get("expires_at");
+    let user_id: String = row.get("user_id");
+    let expires_at: String = row.get("expires_at");
 
-    let expires_time = chrono::DateTime::from_timestamp(expires_at, 0).unwrap();
+    let expires_time = match DateTime::parse_from_rfc3339(&expires_at) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(e) => {
+            error!("Failed to parse expires_at: {}", e);
+            return Err("Invalid date format in database".to_string());
+        }
+    };
+
     if Utc::now() > expires_time {
         let delete_query = "DELETE FROM auth_sessions WHERE token = ?";
         let _ = sqlx::query(delete_query)
@@ -361,10 +419,9 @@ async fn verify_session_token(
         return Err("Session has expired".to_string());
     }
 
-    Ok((email, expires_at))
+    Ok((email, user_id))
 }
 
-// Auth middleware
 pub async fn auth_middleware(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     mut req: Request<Body>,
@@ -382,8 +439,8 @@ pub async fn auth_middleware(
     };
 
     match verify_session_token(db_pool, &session_token).await {
-        Ok((user_email, _)) => {
-            req.extensions_mut().insert(user_email);
+        Ok((_user_email, user_id)) => {
+            req.extensions_mut().insert(user_id);
 
             let response = next.run(req).await;
             Ok(response)

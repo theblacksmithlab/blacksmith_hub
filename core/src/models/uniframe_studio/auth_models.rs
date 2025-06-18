@@ -21,7 +21,7 @@ pub struct AuthResponse {
 pub struct SessionCheckResponse {
     pub valid: bool,
     pub user_email: String,
-    pub expires_at: i64,
+    // pub expires_at: i64,
 }
 
 #[derive(Serialize)]
