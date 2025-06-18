@@ -177,10 +177,20 @@ pub async fn get_user_jobs(
 
 pub async fn submit_review(
     Path(job_id): Path<String>,
-    Extension(dubbing_service): Extension<Arc<DubbingPipelineService>>,
-) -> Result<Json<ReviewUploadResponse>, StatusCode> {
-    match dubbing_service.get_review_upload_url(&job_id).await {
+    State(state): State<Arc<UniframeStudioAppState>>
+) -> Result<Json<ReviewUploadResponse>, (StatusCode, Json<ApiError>)> {
+    match state
+        .dubbing_pipeline_service
+        .get_review_upload_url(&job_id)
+        .await
+    {
         Ok(upload_url) => Ok(Json(ReviewUploadResponse { upload_url })),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiError {
+                code: "REVIEW_UPLOAD_FAILED".to_string(),
+                message: format!("Failed to get review upload URL: {}", e),
+            }),
+        )),
     }
 }
