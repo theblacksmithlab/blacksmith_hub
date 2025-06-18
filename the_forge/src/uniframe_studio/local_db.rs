@@ -72,6 +72,7 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             job_id TEXT PRIMARY KEY,
             user_id TEXT,
             status TEXT NOT NULL DEFAULT 'preparing',
+            step INTEGER,
             step_description TEXT NOT NULL DEFAULT 'Preparing pipeline...',
             progress_percentage INTEGER,
             created_at TEXT DEFAULT (datetime('now')),
@@ -83,6 +84,7 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             original_video_s3_url TEXT,
             system_file_name TEXT,
             original_file_name TEXT,
+            review_required_url TEXT,
             FOREIGN KEY (user_id) REFERENCES auth_users(id)
         );
     ";

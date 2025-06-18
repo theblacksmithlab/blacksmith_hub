@@ -41,16 +41,27 @@ pub struct DubbingPipelineStatus {
     pub job_id: String,
     pub status: String,
     pub step_description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub progress_percentage: Option<i32>,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub result_urls: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub processing_steps: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub stage: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub current_step_index: Option<i32>,
     pub original_file_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_required_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub step: Option<i32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -86,6 +97,8 @@ pub struct DubbingJobStatus {
     pub error_message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub processing_steps: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_required_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -109,6 +122,7 @@ pub struct DubbingPipeline {
     pub job_id: String,
     pub user_id: Option<String>,
     pub status: String,
+    pub step: Option<i32>,
     pub step_description: String,
     pub progress_percentage: Option<i32>,
     pub created_at: i64,
@@ -150,4 +164,9 @@ pub struct UserJob {
     pub original_file_name: String,
     pub status: String,
     pub created_at: String,
+}
+
+#[derive(Serialize)]
+pub struct ReviewUploadResponse {
+    pub upload_url: String,
 }

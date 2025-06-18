@@ -1,9 +1,7 @@
 use crate::uniframe_studio::auth_handlers::{
     auth_middleware, handle_check_session, handle_send_magic_link, handle_verify_token,
 };
-use crate::uniframe_studio::handlers::{
-    get_dubbing_pipeline_status, get_user_jobs, prepare_dubbing_pipeline, start_dubbing_pipeline,
-};
+use crate::uniframe_studio::handlers::{get_dubbing_pipeline_status, get_user_jobs, prepare_dubbing_pipeline, start_dubbing_pipeline, submit_review};
 use crate::uniframe_studio::local_db::setup_uniframe_studio_db;
 use anyhow::Result;
 use async_openai::Client as LLM_Client;
@@ -75,6 +73,10 @@ fn get_uniframe_studio_router(uniframe_studio_app_state: Arc<UniframeStudioAppSt
         .route(
             "/api/uniframe/user/jobs",
             get(get_user_jobs).options(|| async { StatusCode::OK }),
+        )
+        .route(
+            "/api/uniframe/dubbing/{job_id}/submit_review",
+            get(submit_review).options(|| async { StatusCode::OK }),
         )
         .layer(axum::middleware::from_fn_with_state(
             uniframe_studio_app_state.clone(),

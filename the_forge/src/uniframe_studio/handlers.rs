@@ -8,6 +8,8 @@ use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
 use std::sync::Arc;
 use tracing::{error, info};
+use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
+use core::utils::uniframe_studio::dubbing_pipeline::DubbingPipelineService;
 
 pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
@@ -171,4 +173,14 @@ pub async fn get_user_jobs(
         .collect();
 
     Ok(Json(jobs))
+}
+
+pub async fn submit_review(
+    Path(job_id): Path<String>,
+    Extension(dubbing_service): Extension<Arc<DubbingPipelineService>>,
+) -> Result<Json<ReviewUploadResponse>, StatusCode> {
+    match dubbing_service.get_review_upload_url(&job_id).await {
+        Ok(upload_url) => Ok(Json(ReviewUploadResponse { upload_url })),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
 }
