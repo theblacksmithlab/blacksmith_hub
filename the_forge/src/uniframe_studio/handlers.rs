@@ -7,9 +7,8 @@ use core::models::uniframe_studio::uniframe_studio::{
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
 use std::sync::Arc;
-use tracing::{error, info, instrument};
+use tracing::{error, info};
 
-#[instrument(skip(state, request))]
 pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
     Extension(user_id): Extension<String>,
@@ -43,7 +42,6 @@ pub async fn prepare_dubbing_pipeline(
     }
 }
 
-#[instrument(skip(state, request), fields(pipeline_id))]
 pub async fn start_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
     Extension(user_id): Extension<String>,

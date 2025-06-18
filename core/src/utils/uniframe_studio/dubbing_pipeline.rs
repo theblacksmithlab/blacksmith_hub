@@ -166,8 +166,6 @@ impl DubbingPipelineService {
         let job_id = request.job_id.clone();
         let now = Utc::now();
 
-        info!("Keywords: {:?}", request.transcription_keywords);
-
         Self::update_pipeline_status(
             &self.db_pool,
             &job_id,
@@ -222,8 +220,6 @@ impl DubbingPipelineService {
             }
             None => None,
         };
-        
-        info!("{:?}", validated_transcription_keywords);
 
         let gpu_processing_instance_init = async {
             info!("Checking GPU processing instance status...");
