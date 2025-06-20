@@ -6,7 +6,7 @@ use crate::models::uniframe_studio::uniframe_studio::{
     DubbingPipelineStatus, PipelineStage, StepInfo,
 };
 use crate::state::uniframe_studio::app_state::UniframeStudioAppState;
-use crate::utils::uniframe_studio::uniframe_studio::validate_transcription_keywords;
+use crate::utils::uniframe_studio::uniframe_studio::{get_adaptive_interval, validate_transcription_keywords};
 use anyhow::{Context, Result};
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::Client as S3Client;
@@ -441,16 +441,17 @@ impl DubbingPipelineService {
         s3_client: Arc<S3Client>,
         db_pool: Pool<Sqlite>,
     ) {
-        let max_checks = 120;
-        let interval = Duration::from_secs(30);
+        let max_checks = 600;
         let mut result: Option<Result<DubbingJobResult>> = None;
 
         for check_number in 1..=max_checks {
+            let interval = get_adaptive_interval(check_number);
+            
             info!(
                 "Monitoring job status, check {}/{}",
                 check_number, max_checks
             );
-
+            
             match dubbing_client.get_job_status(&job_id).await {
                 Ok(status) => {
                     let step_description = status
@@ -641,7 +642,7 @@ impl DubbingPipelineService {
             job_id
         );
     }
-
+    
     async fn process_result_urls(
         s3_client: Arc<S3Client>,
         result_urls: HashMap<String, String>,
