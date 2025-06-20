@@ -6,7 +6,7 @@ use crate::models::uniframe_studio::uniframe_studio::{
     DubbingPipelineStatus, PipelineStage, StepInfo,
 };
 use crate::state::uniframe_studio::app_state::UniframeStudioAppState;
-use crate::utils::uniframe_studio::uniframe_studio::validate_transcription_keywords;
+use crate::utils::uniframe_studio::uniframe_studio::{get_adaptive_interval, validate_transcription_keywords};
 use anyhow::{Context, Result};
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::Client as S3Client;
@@ -175,6 +175,8 @@ impl DubbingPipelineService {
             None,
             None,
             None,
+            None,
+            None,
         )
         .await;
 
@@ -254,6 +256,8 @@ impl DubbingPipelineService {
                     None,
                     None,
                     None,
+                    None,
+                    None,
                 )
                 .await;
 
@@ -265,6 +269,8 @@ impl DubbingPipelineService {
                     "initializing",
                     "Warming up GPUs...",
                     Some(1),
+                    None,
+                    None,
                     None,
                     None,
                     None,
@@ -283,6 +289,8 @@ impl DubbingPipelineService {
                     "initializing",
                     "Checking technical readiness...",
                     Some(1),
+                    None,
+                    None,
                     None,
                     None,
                     None,
@@ -347,6 +355,8 @@ impl DubbingPipelineService {
                 None,
                 Some(&format!("Failed to prepare GPU service: {}", e)),
                 None,
+                None,
+                None,
             )
             .await;
             return;
@@ -360,6 +370,8 @@ impl DubbingPipelineService {
             "initializing",
             "Launching processing pipeline...",
             Some(1),
+            None,
+            None,
             None,
             None,
             None,
@@ -394,6 +406,8 @@ impl DubbingPipelineService {
                     None,
                     job_status.error_message.as_deref(),
                     job_status.processing_steps,
+                    None,
+                    job_status.step,
                 )
                 .await;
 
@@ -413,6 +427,8 @@ impl DubbingPipelineService {
                     None,
                     Some(&format!("Failed to submit job: {}", e)),
                     None,
+                    None,
+                    None,
                 )
                 .await;
             }
@@ -425,16 +441,17 @@ impl DubbingPipelineService {
         s3_client: Arc<S3Client>,
         db_pool: Pool<Sqlite>,
     ) {
-        let max_checks = 120;
-        let interval = Duration::from_secs(30);
+        let max_checks = 600;
         let mut result: Option<Result<DubbingJobResult>> = None;
 
         for check_number in 1..=max_checks {
+            let interval = get_adaptive_interval(check_number);
+            
             info!(
                 "Monitoring job status, check {}/{}",
                 check_number, max_checks
             );
-
+            
             match dubbing_client.get_job_status(&job_id).await {
                 Ok(status) => {
                     let step_description = status
@@ -442,6 +459,12 @@ impl DubbingPipelineService {
                         .clone()
                         .unwrap_or_else(|| format!("Processing step {}", status.step.unwrap_or(0)));
 
+                    let presigned_review_url = if let Some(s3_uri) = &status.review_required_url {
+                        Self::generate_single_presigned_url(&s3_client, s3_uri).await.ok()
+                    } else {
+                        None
+                    };
+                    
                     Self::update_pipeline_status(
                         &db_pool,
                         &job_id,
@@ -451,6 +474,8 @@ impl DubbingPipelineService {
                         None,
                         status.error_message.as_deref(),
                         status.processing_steps,
+                        presigned_review_url,
+                        status.step,
                     )
                     .await;
 
@@ -464,6 +489,8 @@ impl DubbingPipelineService {
                                 "preparing_results",
                                 "Retrieving result urls...",
                                 Some(99),
+                                None,
+                                None,
                                 None,
                                 None,
                                 None,
@@ -481,6 +508,8 @@ impl DubbingPipelineService {
                                 Some(0),
                                 None,
                                 status.error_message.as_deref(),
+                                None,
+                                None,
                                 None,
                             )
                             .await;
@@ -500,6 +529,8 @@ impl DubbingPipelineService {
                             Some(0),
                             None,
                             Some(&format!("Failed to get dubbing job status: {}", e)),
+                            None,
+                            None,
                             None,
                         )
                         .await;
@@ -533,6 +564,8 @@ impl DubbingPipelineService {
                                 Some(urls),
                                 None,
                                 None,
+                                None,
+                                None,
                             )
                             .await;
                         }
@@ -546,6 +579,8 @@ impl DubbingPipelineService {
                                 Some(0),
                                 None,
                                 Some(&format!("Failed to process result URLs: {}", e)),
+                                None,
+                                None,
                                 None,
                             )
                             .await;
@@ -562,6 +597,8 @@ impl DubbingPipelineService {
                         None,
                         Some("Job completed but no result URLs provided"),
                         None,
+                        None,
+                        None,
                     )
                     .await;
                 }
@@ -577,6 +614,8 @@ impl DubbingPipelineService {
                     None,
                     Some(&format!("Failed to get dubbing job results: {}", e)),
                     None,
+                    None,
+                    None,
                 )
                 .await;
             }
@@ -591,6 +630,8 @@ impl DubbingPipelineService {
                     None,
                     Some("Maximum waiting time exceeded"),
                     None,
+                    None,
+                    None,
                 )
                 .await;
             }
@@ -601,7 +642,7 @@ impl DubbingPipelineService {
             job_id
         );
     }
-
+    
     async fn process_result_urls(
         s3_client: Arc<S3Client>,
         result_urls: HashMap<String, String>,
@@ -642,6 +683,62 @@ impl DubbingPipelineService {
         Ok(processed_urls)
     }
 
+    async fn generate_single_presigned_url(
+        s3_client: &S3Client,
+        s3_url: &str,
+    ) -> Result<String> {
+        if !s3_url.starts_with("s3://") {
+            return Ok(s3_url.to_string());
+        }
+
+        let s3_path = s3_url
+            .strip_prefix("s3://")
+            .ok_or_else(|| anyhow::anyhow!("Invalid S3 URL format"))?;
+
+        let parts: Vec<&str> = s3_path.splitn(2, '/').collect();
+        if parts.len() != 2 {
+            return Err(anyhow::anyhow!("Invalid S3 URL format: missing key"));
+        }
+
+        let bucket = parts[0];
+        let object_key = parts[1];
+
+        let presigned_url = s3_client
+            .get_object()
+            .bucket(bucket)
+            .key(object_key)
+            .presigned(
+                PresigningConfig::builder()
+                    .expires_in(Duration::from_secs(900))
+                    .build()?,
+            )
+            .await?;
+
+        Ok(presigned_url.uri().to_string())
+    }
+
+    pub async fn get_review_upload_url(
+        &self,
+        job_id: &str,
+    ) -> Result<String> {
+        let s3_key = format!("jobs/{}/review_required/transcription_corrected.json", job_id);
+
+        let presigned_request = self
+            .s3_client
+            .put_object()
+            .bucket(std::env::var("S3_BUCKET").unwrap_or("default-bucket".to_string()))
+            .key(&s3_key)
+            .content_type("application/json")
+            .presigned(
+                PresigningConfig::builder()
+                    .expires_in(Duration::from_secs(3600))
+                    .build()?,
+            )
+            .await?;
+
+        Ok(presigned_request.uri().to_string())
+    }
+    
     async fn update_pipeline_status(
         db_pool: &Pool<Sqlite>,
         job_id: &str,
@@ -651,6 +748,8 @@ impl DubbingPipelineService {
         result_urls: Option<HashMap<String, String>>,
         error_message: Option<&str>,
         processing_steps: Option<Vec<String>>,
+        review_required_url: Option<String>,
+        step: Option<i32>,
     ) {
         let now = Utc::now();
         let completed_at = if status == "completed" || status == "failed" {
@@ -680,18 +779,21 @@ impl DubbingPipelineService {
         let query = "
         UPDATE dubbing_pipelines SET 
             status = ?,
+            step = ?,
             step_description = ?,
             progress_percentage = ?,
             result_urls = ?,
             error_message = ?,
             processing_steps = ?,
             completed_at = ?,
-            updated_at = ?
+            updated_at = ?,
+            review_required_url = ?
         WHERE job_id = ?
     ";
 
         if let Err(e) = sqlx::query(query)
             .bind(status)
+            .bind(step)
             .bind(step_description)
             .bind(progress_percentage)
             .bind(result_urls_json)
@@ -699,6 +801,7 @@ impl DubbingPipelineService {
             .bind(processing_steps_json)
             .bind(completed_at)
             .bind(now.to_rfc3339())
+            .bind(review_required_url)
             .bind(job_id)
             .execute(db_pool)
             .await
@@ -712,7 +815,8 @@ impl DubbingPipelineService {
         SELECT 
             job_id, status, step_description, progress_percentage,
             created_at, updated_at, completed_at, result_urls,
-            error_message, processing_steps, system_file_name, original_file_name
+            error_message, processing_steps, system_file_name, original_file_name, step,
+            review_required_url
         FROM dubbing_pipelines 
         WHERE job_id = ?
     ";
@@ -752,6 +856,8 @@ impl DubbingPipelineService {
             stage: Some(stage),
             current_step_index,
             original_file_name: row.get("original_file_name"),
+            step: row.get("step"),
+            review_required_url: row.get("review_required_url"),
         };
 
         Ok(status)

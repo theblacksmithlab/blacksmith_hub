@@ -8,6 +8,7 @@ use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
 use std::sync::Arc;
 use tracing::{error, info};
+use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
 
 pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
@@ -171,4 +172,24 @@ pub async fn get_user_jobs(
         .collect();
 
     Ok(Json(jobs))
+}
+
+pub async fn submit_review(
+    Path(job_id): Path<String>,
+    State(state): State<Arc<UniframeStudioAppState>>
+) -> Result<Json<ReviewUploadResponse>, (StatusCode, Json<ApiError>)> {
+    match state
+        .dubbing_pipeline_service
+        .get_review_upload_url(&job_id)
+        .await
+    {
+        Ok(upload_url) => Ok(Json(ReviewUploadResponse { upload_url })),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiError {
+                code: "REVIEW_UPLOAD_FAILED".to_string(),
+                message: format!("Failed to get review upload URL: {}", e),
+            }),
+        )),
+    }
 }

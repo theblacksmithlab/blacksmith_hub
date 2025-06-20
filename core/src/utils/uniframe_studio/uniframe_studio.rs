@@ -6,6 +6,7 @@ use crate::state::uniframe_studio::app_state::UniframeStudioAppState;
 use crate::utils::common::get_system_role_or_fallback;
 use serde_json::Value;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{error, warn};
 
 pub async fn validate_transcription_keywords(
@@ -64,4 +65,16 @@ pub async fn validate_transcription_keywords(
     };
 
     keywords_str
+}
+
+pub fn get_adaptive_interval(check_number: u32) -> Duration {
+    match check_number {
+        1..=20 => Duration::from_secs(3),
+
+        21..=50 => Duration::from_secs(6),
+
+        51..=100 => Duration::from_secs(12),
+
+        _ => Duration::from_secs(25),
+    }
 }
