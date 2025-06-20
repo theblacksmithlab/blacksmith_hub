@@ -9,7 +9,6 @@ use http::StatusCode;
 use std::sync::Arc;
 use tracing::{error, info};
 use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
-use core::utils::uniframe_studio::dubbing_pipeline::DubbingPipelineService;
 
 pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
