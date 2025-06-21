@@ -7,30 +7,33 @@ pub struct UserBalance {
     pub balance_usd: f64,
     pub active_dubbing_jobs: i32,
     pub active_lipsync_jobs: i32,
+    pub max_concurrent_dubbing_jobs: i32,
+    pub max_concurrent_lipsync_jobs: i32,
     pub updated_at: String,
 }
 
 impl UserBalance {
     pub async fn get_or_create(pool: &SqlitePool, user_id: &str) -> Result<Self, sqlx::Error> {
         match sqlx::query_as::<_, UserBalance>(
-            "SELECT user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, updated_at 
-         FROM user_balances WHERE user_id = ?"
+            "SELECT user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, max_concurrent_dubbing_jobs, max_concurrent_lipsync_jobs, updated_at 
+         FROM user_balances WHERE user_id = ?",
         )
-            .bind(user_id)
-            .fetch_optional(pool)
-            .await? {
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await?
+        {
             Some(balance) => Ok(balance),
             None => {
                 sqlx::query(
-                    "INSERT INTO user_balances (user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs) 
+                    "INSERT INTO user_balances (user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, max_concurrent_dubbing_jobs, max_concurrent_lipsync_jobs) 
                  VALUES (?, 100.0, 0, 0)"
                 )
                     .bind(user_id)
                     .execute(pool)
                     .await?;
-                
+
                 sqlx::query_as::<_, UserBalance>(
-                    "SELECT user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, updated_at 
+                    "SELECT user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, max_concurrent_dubbing_jobs, max_concurrent_lipsync_jobs, updated_at 
                  FROM user_balances WHERE user_id = ?"
                 )
                     .bind(user_id)
@@ -56,21 +59,20 @@ impl UserBalance {
         pool: &SqlitePool,
         amount: f64,
         job_type: ProcessingType,
-        description: &str
+        description: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-
         let mut tx = pool.begin().await?;
 
         // Charge from balance
         sqlx::query(
             "UPDATE user_balances 
              SET balance_usd = balance_usd - ?, updated_at = datetime('now') 
-             WHERE user_id = ?"
+             WHERE user_id = ?",
         )
-            .bind(amount)
-            .bind(&self.user_id)
-            .execute(&mut *tx)
-            .await?;
+        .bind(amount)
+        .bind(&self.user_id)
+        .execute(&mut *tx)
+        .await?;
 
         // Увеличиваем счетчик активных задач
         let field = match job_type {
@@ -79,23 +81,24 @@ impl UserBalance {
         };
 
         sqlx::query(&format!(
-            "UPDATE user_balances SET {} = {} + 1 WHERE user_id = ?", field, field
+            "UPDATE user_balances SET {} = {} + 1 WHERE user_id = ?",
+            field, field
         ))
-            .bind(&self.user_id)
-            .execute(&mut *tx)
-            .await?;
+        .bind(&self.user_id)
+        .execute(&mut *tx)
+        .await?;
 
         // Создаем транзакцию
         sqlx::query(
             "INSERT INTO transactions (id, user_id, type, amount_usd, status, description) 
-             VALUES (?, ?, 'charge', ?, 'completed', ?)"
+             VALUES (?, ?, 'charge', ?, 'completed', ?)",
         )
-            .bind(uuid::Uuid::new_v4().to_string())
-            .bind(&self.user_id)
-            .bind(amount)
-            .bind(description)
-            .execute(&mut *tx)
-            .await?;
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(&self.user_id)
+        .bind(amount)
+        .bind(description)
+        .execute(&mut *tx)
+        .await?;
 
         tx.commit().await?;
 
@@ -109,7 +112,11 @@ impl UserBalance {
         Ok(())
     }
 
-    pub async fn complete_job(&mut self, pool: &SqlitePool, job_type: ProcessingType) -> Result<(), sqlx::Error> {
+    pub async fn complete_job(
+        &mut self,
+        pool: &SqlitePool,
+        job_type: ProcessingType,
+    ) -> Result<(), sqlx::Error> {
         let field = match job_type {
             ProcessingType::Dubbing => "active_dubbing_jobs",
             ProcessingType::LipSync => "active_lipsync_jobs",
@@ -129,42 +136,47 @@ impl UserBalance {
                 if self.active_dubbing_jobs > 0 {
                     self.active_dubbing_jobs -= 1;
                 }
-            },
+            }
             ProcessingType::LipSync => {
                 if self.active_lipsync_jobs > 0 {
                     self.active_lipsync_jobs -= 1;
                 }
-            },
+            }
         }
 
         Ok(())
     }
 
-    pub async fn add_funds(&mut self, pool: &SqlitePool, amount: f64, description: &str) -> Result<(), sqlx::Error> {
+    pub async fn add_funds(
+        &mut self,
+        pool: &SqlitePool,
+        amount: f64,
+        description: &str,
+    ) -> Result<(), sqlx::Error> {
         let mut tx = pool.begin().await?;
 
         // Пополняем баланс
         sqlx::query(
             "UPDATE user_balances 
              SET balance_usd = balance_usd + ?, updated_at = datetime('now') 
-             WHERE user_id = ?"
+             WHERE user_id = ?",
         )
-            .bind(amount)
-            .bind(&self.user_id)
-            .execute(&mut *tx)
-            .await?;
+        .bind(amount)
+        .bind(&self.user_id)
+        .execute(&mut *tx)
+        .await?;
 
         // Создаем транзакцию
         sqlx::query(
             "INSERT INTO transactions (id, user_id, type, amount_usd, status, description) 
-             VALUES (?, ?, 'deposit', ?, 'completed', ?)"
+             VALUES (?, ?, 'deposit', ?, 'completed', ?)",
         )
-            .bind(uuid::Uuid::new_v4().to_string())
-            .bind(&self.user_id)
-            .bind(amount)
-            .bind(description)
-            .execute(&mut *tx)
-            .await?;
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(&self.user_id)
+        .bind(amount)
+        .bind(description)
+        .execute(&mut *tx)
+        .await?;
 
         tx.commit().await?;
 

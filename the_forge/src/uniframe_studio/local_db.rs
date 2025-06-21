@@ -116,6 +116,8 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             updated_at TEXT DEFAULT (datetime('now')),
             active_dubbing_jobs INTEGER NOT NULL DEFAULT 0,
             active_lipsync_jobs INTEGER NOT NULL DEFAULT 0,
+            max_concurrent_dubbing_jobs INTEGER NOT NULL DEFAULT 1,
+            max_concurrent_lipsync_jobs INTEGER NOT NULL DEFAULT 1,
             FOREIGN KEY (user_id) REFERENCES auth_users(id)
         );
 

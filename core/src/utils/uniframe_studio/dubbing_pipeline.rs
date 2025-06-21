@@ -1,4 +1,5 @@
 use crate::gpu_client::immers_cloud_client::ImmersCloudClient;
+use crate::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
 use crate::models::uniframe_studio::dubbing_client::DubbingClient;
 use crate::models::uniframe_studio::uniframe_studio::{
     DubbingJobRequest, DubbingJobResult, DubbingPipelinePrepareRequest,
@@ -6,7 +7,9 @@ use crate::models::uniframe_studio::uniframe_studio::{
     DubbingPipelineStatus, PipelineStage, StepInfo,
 };
 use crate::state::uniframe_studio::app_state::UniframeStudioAppState;
-use crate::utils::uniframe_studio::uniframe_studio::{get_adaptive_interval, validate_transcription_keywords};
+use crate::utils::uniframe_studio::uniframe_studio::{
+    get_adaptive_interval, validate_transcription_keywords,
+};
 use anyhow::{Context, Result};
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::Client as S3Client;
@@ -17,7 +20,6 @@ use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info};
 use uuid::Uuid;
-use crate::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
 
 pub struct DubbingPipelineService {
     dubbing_client: DubbingClient,
@@ -93,7 +95,7 @@ impl DubbingPipelineService {
 
         (stage.to_string(), current_step_index)
     }
-    
+
     pub async fn prepare_pipeline(
         &self,
         request: DubbingPipelinePrepareRequest,
@@ -101,11 +103,14 @@ impl DubbingPipelineService {
     ) -> Result<DubbingPipelinePrepareResponse> {
         let job_id = Uuid::new_v4().to_string();
         let now = Utc::now();
-        
+
         let estimated_cost = ProcessingType::Dubbing.calculate_cost(request.video_duration_seconds);
 
-        info!("Generated job_id: {}, estimated cost: ${}", job_id, estimated_cost);
-        
+        info!(
+            "Generated job_id: {}, estimated cost: ${}",
+            job_id, estimated_cost
+        );
+
         let s3_key = format!("uploads/{}/input/{}", job_id, request.system_file_name);
         let video_s3_url = format!(
             "s3://{}/{}",
@@ -133,20 +138,20 @@ impl DubbingPipelineService {
             video_duration_seconds, estimated_cost_usd, created_at, updated_at) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
-            .bind(&job_id)
-            .bind(&user_id)
-            .bind("preparing")
-            .bind("Preparing pipeline...")
-            .bind(0i32)
-            .bind(&video_s3_url)
-            .bind(&request.system_file_name)
-            .bind(&request.original_file_name)
-            .bind(request.video_duration_seconds as i32)
-            .bind(estimated_cost)
-            .bind(now.to_rfc3339())
-            .bind(now.to_rfc3339())
-            .execute(&self.db_pool)
-            .await?;
+        .bind(&job_id)
+        .bind(&user_id)
+        .bind("preparing")
+        .bind("Preparing pipeline...")
+        .bind(0i32)
+        .bind(&video_s3_url)
+        .bind(&request.system_file_name)
+        .bind(&request.original_file_name)
+        .bind(request.video_duration_seconds as i32)
+        .bind(estimated_cost)
+        .bind(now.to_rfc3339())
+        .bind(now.to_rfc3339())
+        .execute(&self.db_pool)
+        .await?;
 
         let response = DubbingPipelinePrepareResponse {
             job_id: job_id.clone(),
@@ -208,7 +213,7 @@ impl DubbingPipelineService {
                 s3_client,
                 db_pool,
                 app_state,
-                user_id_from_db
+                user_id_from_db,
             )
             .await;
         });
@@ -423,8 +428,14 @@ impl DubbingPipelineService {
 
                 info!("Starting dubbing pipeline monitoring process...");
 
-                Self::run_dubbing_pipeline_process(job_id, dubbing_client, s3_client, db_pool, user_id_from_db)
-                    .await;
+                Self::run_dubbing_pipeline_process(
+                    job_id,
+                    dubbing_client,
+                    s3_client,
+                    db_pool,
+                    user_id_from_db,
+                )
+                .await;
             }
             Err(e) => {
                 error!("Failed to submit job to processing service: {}", e);
@@ -442,8 +453,12 @@ impl DubbingPipelineService {
                 )
                 .await;
 
-                if let Ok(mut user_balance) = UserBalance::get_or_create(&db_pool, &user_id_from_db).await {
-                    let _ = user_balance.complete_job(&db_pool, ProcessingType::Dubbing).await;
+                if let Ok(mut user_balance) =
+                    UserBalance::get_or_create(&db_pool, &user_id_from_db).await
+                {
+                    let _ = user_balance
+                        .complete_job(&db_pool, ProcessingType::Dubbing)
+                        .await;
                 }
             }
         }
@@ -461,12 +476,12 @@ impl DubbingPipelineService {
 
         for check_number in 1..=max_checks {
             let interval = get_adaptive_interval(check_number);
-            
+
             info!(
                 "Monitoring job status, check {}/{}",
                 check_number, max_checks
             );
-            
+
             match dubbing_client.get_job_status(&job_id).await {
                 Ok(status) => {
                     let step_description = status
@@ -475,11 +490,13 @@ impl DubbingPipelineService {
                         .unwrap_or_else(|| format!("Processing step {}", status.step.unwrap_or(0)));
 
                     let presigned_review_url = if let Some(s3_uri) = &status.review_required_url {
-                        Self::generate_single_presigned_url(&s3_client, s3_uri).await.ok()
+                        Self::generate_single_presigned_url(&s3_client, s3_uri)
+                            .await
+                            .ok()
                     } else {
                         None
                     };
-                    
+
                     Self::update_pipeline_status(
                         &db_pool,
                         &job_id,
@@ -659,18 +676,30 @@ impl DubbingPipelineService {
 
         match UserBalance::get_or_create(&db_pool, &user_id_from_db).await {
             Ok(mut user_balance) => {
-                if let Err(e) = user_balance.complete_job(&db_pool, ProcessingType::Dubbing).await {
-                    error!("Failed to release dubbing job slot for user {}: {}", user_id_from_db, e);
+                if let Err(e) = user_balance
+                    .complete_job(&db_pool, ProcessingType::Dubbing)
+                    .await
+                {
+                    error!(
+                        "Failed to release dubbing job slot for user {}: {}",
+                        user_id_from_db, e
+                    );
                 } else {
-                    info!("Successfully released dubbing job slot for user {}", user_id_from_db);
+                    info!(
+                        "Successfully released dubbing job slot for user {}",
+                        user_id_from_db
+                    );
                 }
             }
             Err(e) => {
-                error!("Failed to get user balance to release job slot for user {}: {}", user_id_from_db, e);
+                error!(
+                    "Failed to get user balance to release job slot for user {}: {}",
+                    user_id_from_db, e
+                );
             }
         }
     }
-    
+
     async fn process_result_urls(
         s3_client: Arc<S3Client>,
         result_urls: HashMap<String, String>,
@@ -711,10 +740,7 @@ impl DubbingPipelineService {
         Ok(processed_urls)
     }
 
-    async fn generate_single_presigned_url(
-        s3_client: &S3Client,
-        s3_url: &str,
-    ) -> Result<String> {
+    async fn generate_single_presigned_url(s3_client: &S3Client, s3_url: &str) -> Result<String> {
         if !s3_url.starts_with("s3://") {
             return Ok(s3_url.to_string());
         }
@@ -745,11 +771,11 @@ impl DubbingPipelineService {
         Ok(presigned_url.uri().to_string())
     }
 
-    pub async fn get_review_upload_url(
-        &self,
-        job_id: &str,
-    ) -> Result<String> {
-        let s3_key = format!("jobs/{}/review_required/transcription_corrected.json", job_id);
+    pub async fn get_review_upload_url(&self, job_id: &str) -> Result<String> {
+        let s3_key = format!(
+            "jobs/{}/review_required/transcription_corrected.json",
+            job_id
+        );
 
         let presigned_request = self
             .s3_client
@@ -766,7 +792,7 @@ impl DubbingPipelineService {
 
         Ok(presigned_request.uri().to_string())
     }
-    
+
     async fn update_pipeline_status(
         db_pool: &Pool<Sqlite>,
         job_id: &str,

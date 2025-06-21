@@ -1,16 +1,16 @@
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
+use core::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
+use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
 use core::models::uniframe_studio::uniframe_studio::{
     ApiError, DubbingPipelinePrepareRequest, DubbingPipelinePrepareResponse,
     DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus, UserJob,
 };
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
-use std::sync::Arc;
 use sqlx::Row;
+use std::sync::Arc;
 use tracing::{error, info};
-use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
-use core::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
 
 pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
@@ -74,34 +74,39 @@ pub async fn start_dubbing_pipeline(
 
     // TODO: Implement user's subscription tier detection
     let user_is_premium = is_premium_user(Some(&user_id)).await;
-    
+
     //
     let pipeline_info = match sqlx::query(
-        "SELECT user_id, estimated_cost_usd FROM dubbing_pipelines WHERE job_id = ?"
+        "SELECT user_id, estimated_cost_usd FROM dubbing_pipelines WHERE job_id = ?",
     )
-        .bind(&request.job_id)
-        .fetch_optional(&state.local_db_pool)
-        .await {
+    .bind(&request.job_id)
+    .fetch_optional(&state.local_db_pool)
+    .await
+    {
         Ok(Some(row)) => row,
-        Ok(None) => return Err((
-            StatusCode::NOT_FOUND,
-            Json(ApiError {
-                code: "PIPELINE_NOT_FOUND".to_string(),
-                message: "Pipeline not found".to_string(),
-            }),
-        )),
-        Err(_) => return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiError {
-                code: "DATABASE_ERROR".to_string(),
-                message: "Database error".to_string(),
-            }),
-        )),
+        Ok(None) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(ApiError {
+                    code: "PIPELINE_NOT_FOUND".to_string(),
+                    message: "Pipeline not found".to_string(),
+                }),
+            ))
+        }
+        Err(_) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiError {
+                    code: "DATABASE_ERROR".to_string(),
+                    message: "Database error".to_string(),
+                }),
+            ))
+        }
     };
 
     let user_id_from_db: String = pipeline_info.get("user_id");
     let estimated_cost: f64 = pipeline_info.get("estimated_cost_usd");
-    
+
     // Check in the real workflow, may be redundant
     if user_id != user_id_from_db {
         return Err((
@@ -112,18 +117,21 @@ pub async fn start_dubbing_pipeline(
             }),
         ));
     }
-    
+
     // Проверяем баланс
-    let mut user_balance = match UserBalance::get_or_create(&state.local_db_pool, &user_id_from_db).await {
-        Ok(balance) => balance,
-        Err(_) => return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiError {
-                code: "BALANCE_ERROR".to_string(),
-                message: "Failed to get user balance".to_string(),
-            }),
-        )),
-    };
+    let mut user_balance =
+        match UserBalance::get_or_create(&state.local_db_pool, &user_id_from_db).await {
+            Ok(balance) => balance,
+            Err(_) => {
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ApiError {
+                        code: "BALANCE_ERROR".to_string(),
+                        message: "Failed to get user balance".to_string(),
+                    }),
+                ))
+            }
+        };
 
     // Проверяем достаточность средств
     if !user_balance.has_sufficient_balance(estimated_cost) {
@@ -148,12 +156,15 @@ pub async fn start_dubbing_pipeline(
     }
 
     // Списываем средства
-    if let Err(_) = user_balance.charge_and_reserve_job_slot(
-        &state.local_db_pool,
-        estimated_cost,
-        ProcessingType::Dubbing,
-        &format!("Dubbing job {}", request.job_id)
-    ).await {
+    if let Err(_) = user_balance
+        .charge_and_reserve_job_slot(
+            &state.local_db_pool,
+            estimated_cost,
+            ProcessingType::Dubbing,
+            &format!("Dubbing job {}", request.job_id),
+        )
+        .await
+    {
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiError {
@@ -163,7 +174,7 @@ pub async fn start_dubbing_pipeline(
         ));
     }
     //
-    
+
     match state
         .dubbing_pipeline_service
         .start_pipeline(request, user_is_premium, state.clone(), user_id_from_db)
@@ -267,7 +278,7 @@ pub async fn get_user_jobs(
 
 pub async fn submit_review(
     Path(job_id): Path<String>,
-    State(state): State<Arc<UniframeStudioAppState>>
+    State(state): State<Arc<UniframeStudioAppState>>,
 ) -> Result<Json<ReviewUploadResponse>, (StatusCode, Json<ApiError>)> {
     match state
         .dubbing_pipeline_service
@@ -290,12 +301,15 @@ pub async fn get_user_balance(
     Extension(user_id): Extension<String>,
 ) -> Result<Json<UserBalance>, (StatusCode, String)> {
     let db_pool = app_state.get_db_pool();
-    
+
     let balance = UserBalance::get_or_create(&db_pool, &user_id)
         .await
         .map_err(|e| {
             eprintln!("Database error getting user balance: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to get user balance".to_string())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to get user balance".to_string(),
+            )
         })?;
 
     Ok(Json(balance))
