@@ -6,6 +6,7 @@ pub struct DubbingPipelinePrepareRequest {
     pub system_file_name: String,
     pub original_file_name: String,
     pub content_type: String,
+    pub video_duration_seconds: u32,
 }
 
 #[derive(Debug, Serialize)]
@@ -14,6 +15,8 @@ pub struct DubbingPipelinePrepareResponse {
     pub upload_url: String,
     pub video_s3_url: String,
     pub expires_in: u64,
+    pub estimated_cost_usd: f64,
+    pub video_duration_seconds: u32,
 }
 
 #[derive(Debug, Deserialize)]
