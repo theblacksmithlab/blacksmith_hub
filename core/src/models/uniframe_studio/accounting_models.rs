@@ -196,8 +196,8 @@ pub enum ProcessingType {
 }
 
 impl ProcessingType {
-    pub fn calculate_cost(&self, duration_seconds: u32) -> f64 {
-        let duration_minutes = (duration_seconds as f64 / 60.0).ceil();
+    pub fn calculate_cost(&self, duration_seconds: f64) -> f64 {
+        let duration_minutes = (duration_seconds / 60.0).ceil();
         match self {
             ProcessingType::Dubbing => 2.0 + (duration_minutes * 2.0), // $2 per start + $2/min
             ProcessingType::LipSync => 3.0 + (duration_minutes * 2.0), // $3 per start + $2/min
