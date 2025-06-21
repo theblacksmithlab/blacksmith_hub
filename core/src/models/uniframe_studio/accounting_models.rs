@@ -15,7 +15,7 @@ pub struct UserBalance {
 impl UserBalance {
     pub async fn get_or_create(pool: &SqlitePool, user_id: &str) -> Result<Self, sqlx::Error> {
         match sqlx::query_as::<_, UserBalance>(
-            "SELECT user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, max_concurrent_dubbing_jobs, max_concurrent_lipsync_jobs, updated_at 
+            "SELECT user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, max_concurrent_dubbing_jobs, max_concurrent_lipsync_jobs, updated_at
          FROM user_balances WHERE user_id = ?",
         )
         .bind(user_id)
@@ -25,15 +25,15 @@ impl UserBalance {
             Some(balance) => Ok(balance),
             None => {
                 sqlx::query(
-                    "INSERT INTO user_balances (user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, max_concurrent_dubbing_jobs, max_concurrent_lipsync_jobs) 
-                 VALUES (?, 100.0, 0, 0)"
+                    "INSERT INTO user_balances (user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, max_concurrent_dubbing_jobs, max_concurrent_lipsync_jobs)
+                 VALUES (?, 100.0, 0, 0, 1, 1)"
                 )
                     .bind(user_id)
                     .execute(pool)
                     .await?;
 
                 sqlx::query_as::<_, UserBalance>(
-                    "SELECT user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, max_concurrent_dubbing_jobs, max_concurrent_lipsync_jobs, updated_at 
+                    "SELECT user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, max_concurrent_dubbing_jobs, max_concurrent_lipsync_jobs, updated_at
                  FROM user_balances WHERE user_id = ?"
                 )
                     .bind(user_id)
