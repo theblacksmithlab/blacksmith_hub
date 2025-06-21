@@ -26,7 +26,7 @@ impl UserBalance {
             None => {
                 sqlx::query(
                     "INSERT INTO user_balances (user_id, balance_usd, active_dubbing_jobs, active_lipsync_jobs, max_concurrent_dubbing_jobs, max_concurrent_lipsync_jobs)
-                 VALUES (?, 100.0, 0, 0, 0, 0)"
+                 VALUES (?, 100.0, 0, 0, 1, 1)"
                 )
                     .bind(user_id)
                     .execute(pool)
