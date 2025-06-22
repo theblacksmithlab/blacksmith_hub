@@ -3,7 +3,7 @@ use crate::uniframe_studio::auth_handlers::{
 };
 use crate::uniframe_studio::handlers::{
     get_dubbing_pipeline_status, get_user_balance, get_user_jobs, prepare_dubbing_pipeline,
-    start_dubbing_pipeline, submit_review,
+    refund_failed_job, start_dubbing_pipeline, submit_review,
 };
 use crate::uniframe_studio::local_db::setup_uniframe_studio_db;
 use anyhow::Result;
@@ -84,6 +84,10 @@ fn get_uniframe_studio_router(uniframe_studio_app_state: Arc<UniframeStudioAppSt
         .route(
             "/api/uniframe/user/balance",
             get(get_user_balance).options(|| async { StatusCode::OK }),
+        )
+        .route(
+            "/api/uniframe/user/refund/{jobId}",
+            post(refund_failed_job).options(|| async { StatusCode::OK }),
         )
         .layer(axum::middleware::from_fn_with_state(
             uniframe_studio_app_state.clone(),

@@ -75,7 +75,6 @@ pub async fn start_dubbing_pipeline(
     // TODO: Implement user's subscription tier detection
     let user_is_premium = is_premium_user(Some(&user_id)).await;
 
-    //
     let pipeline_info = match sqlx::query(
         "SELECT user_id, estimated_cost_usd FROM dubbing_pipelines WHERE job_id = ?",
     )
@@ -314,4 +313,56 @@ pub async fn get_user_balance(
         })?;
 
     Ok(Json(balance))
+}
+
+pub async fn refund_failed_job(
+    Path(job_id): Path<String>,
+    State(app_state): State<Arc<UniframeStudioAppState>>,
+    Extension(user_id): Extension<String>,
+) -> Result<StatusCode, StatusCode> {
+    let db_pool = app_state.get_db_pool();
+
+    let pipeline_row = sqlx::query(
+        "SELECT user_id, status, refund_status, estimated_cost_usd FROM dubbing_pipelines WHERE job_id = ?"
+    )
+        .bind(&job_id)
+        .fetch_one(db_pool)
+        .await
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+
+    let pipeline_user_id: String = pipeline_row.get("user_id");
+    let status: String = pipeline_row.get("status");
+    let refund_status: Option<String> = pipeline_row.get("refund_status");
+    let estimated_cost: Option<f64> = pipeline_row.get("estimated_cost_usd");
+
+    if pipeline_user_id != user_id {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    if let Some(ref_status) = refund_status {
+        if ref_status == "refunded" {
+            return Ok(StatusCode::OK);
+        }
+    }
+
+    if status != "failed" {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    if let Some(cost) = estimated_cost {
+        sqlx::query("UPDATE user_balances SET balance = balance + ? WHERE user_id = ?")
+            .bind(cost)
+            .bind(&user_id)
+            .execute(db_pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
+
+    sqlx::query("UPDATE dubbing_pipelines SET refund_status = 'refunded' WHERE job_id = ?")
+        .bind(&job_id)
+        .execute(db_pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(StatusCode::OK)
 }

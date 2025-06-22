@@ -103,13 +103,8 @@ impl DubbingPipelineService {
     ) -> Result<DubbingPipelinePrepareResponse> {
         let job_id = Uuid::new_v4().to_string();
         let now = Utc::now();
-
-        let estimated_cost = ProcessingType::Dubbing.calculate_cost(request.video_duration_seconds);
-
-        info!(
-            "Generated job_id: {}, estimated cost: ${}",
-            job_id, estimated_cost
-        );
+        let video_duration = request.video_duration_seconds;
+        let estimated_cost = ProcessingType::Dubbing.calculate_cost(video_duration);
 
         let s3_key = format!("uploads/{}/input/{}", job_id, request.system_file_name);
         let video_s3_url = format!(
@@ -199,7 +194,6 @@ impl DubbingPipelineService {
             created_at: now.to_rfc3339(),
         };
 
-        let request_clone = request;
         let dubbing_client = self.dubbing_client.clone();
         let s3_client = self.s3_client.clone();
         let db_pool = self.db_pool.clone();
@@ -207,7 +201,7 @@ impl DubbingPipelineService {
         tokio::spawn(async move {
             Self::pipeline_processor(
                 job_id,
-                request_clone,
+                request,
                 is_premium,
                 dubbing_client,
                 s3_client,

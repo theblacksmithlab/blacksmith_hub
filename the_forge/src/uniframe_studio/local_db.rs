@@ -87,6 +87,7 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             review_required_url TEXT,
             video_duration_seconds INTEGER,
             estimated_cost_usd REAL,
+            refund_status TEXT DEFAULT 'none',
             FOREIGN KEY (user_id) REFERENCES auth_users(id)
         );
 
