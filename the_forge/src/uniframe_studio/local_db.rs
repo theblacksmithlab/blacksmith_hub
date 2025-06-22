@@ -112,7 +112,7 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
         
         CREATE TABLE IF NOT EXISTS user_balances (
             user_id TEXT PRIMARY KEY,
-            balance_usd REAL NOT NULL DEFAULT 100.0,
+            balance_usd REAL NOT NULL DEFAULT 100000.0,
             updated_at TEXT DEFAULT (datetime('now')),
             active_dubbing_jobs INTEGER NOT NULL DEFAULT 0,
             active_lipsync_jobs INTEGER NOT NULL DEFAULT 0,
