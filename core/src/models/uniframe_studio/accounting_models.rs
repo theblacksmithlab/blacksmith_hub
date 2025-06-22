@@ -130,7 +130,6 @@ impl UserBalance {
             .execute(pool)
             .await?;
 
-        // Обновляем локальное состояние
         match job_type {
             ProcessingType::Dubbing => {
                 if self.active_dubbing_jobs > 0 {
@@ -155,7 +154,6 @@ impl UserBalance {
     ) -> Result<(), sqlx::Error> {
         let mut tx = pool.begin().await?;
 
-        // Пополняем баланс
         sqlx::query(
             "UPDATE user_balances 
              SET balance_usd = balance_usd + ?, updated_at = datetime('now') 
@@ -166,7 +164,6 @@ impl UserBalance {
         .execute(&mut *tx)
         .await?;
 
-        // Создаем транзакцию
         sqlx::query(
             "INSERT INTO transactions (id, user_id, type, amount_usd, status, description) 
              VALUES (?, ?, 'deposit', ?, 'completed', ?)",
@@ -180,7 +177,6 @@ impl UserBalance {
 
         tx.commit().await?;
 
-        // Обновляем локальное состояние
         self.balance_usd += amount;
 
         Ok(())

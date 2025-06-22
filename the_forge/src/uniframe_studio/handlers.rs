@@ -349,14 +349,21 @@ pub async fn refund_failed_job(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    let mut user_balance = UserBalance::get_or_create(db_pool, &user_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     if let Some(cost) = estimated_cost {
-        sqlx::query("UPDATE user_balances SET balance = balance + ? WHERE user_id = ?")
-            .bind(cost)
-            .bind(&user_id)
-            .execute(db_pool)
+        user_balance
+            .add_funds(db_pool, cost, &format!("Refund for failed job: {}", job_id))
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
+
+    user_balance
+        .complete_job(db_pool, ProcessingType::Dubbing)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     sqlx::query("UPDATE dubbing_pipelines SET refund_status = 'refunded' WHERE job_id = ?")
         .bind(&job_id)
