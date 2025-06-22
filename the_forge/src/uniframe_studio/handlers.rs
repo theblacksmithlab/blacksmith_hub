@@ -118,7 +118,6 @@ pub async fn start_dubbing_pipeline(
         ));
     }
 
-    // Проверяем баланс
     let mut user_balance =
         match UserBalance::get_or_create(&state.local_db_pool, &user_id_from_db).await {
             Ok(balance) => balance,
@@ -133,7 +132,6 @@ pub async fn start_dubbing_pipeline(
             }
         };
 
-    // Проверяем достаточность средств
     if !user_balance.has_sufficient_balance(estimated_cost) {
         return Err((
             StatusCode::PAYMENT_REQUIRED,
@@ -144,7 +142,6 @@ pub async fn start_dubbing_pipeline(
         ));
     }
 
-    // Проверяем возможность запуска
     if !user_balance.can_start_job(ProcessingType::Dubbing) {
         return Err((
             StatusCode::CONFLICT,
@@ -155,29 +152,14 @@ pub async fn start_dubbing_pipeline(
         ));
     }
 
-    // Списываем средства
-    if let Err(_) = user_balance
-        .charge_and_reserve_job_slot(
-            &state.local_db_pool,
-            estimated_cost,
-            ProcessingType::Dubbing,
-            &format!("Dubbing job {}", request.job_id),
-        )
-        .await
-    {
-        return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiError {
-                code: "PAYMENT_FAILED".to_string(),
-                message: "Failed to process payment".to_string(),
-            }),
-        ));
-    }
-    //
-
     match state
         .dubbing_pipeline_service
-        .start_pipeline(request, user_is_premium, state.clone(), user_id_from_db)
+        .start_pipeline(
+            request.clone(),
+            user_is_premium,
+            state.clone(),
+            user_id_from_db,
+        )
         .await
     {
         Ok(response) => {
@@ -185,6 +167,25 @@ pub async fn start_dubbing_pipeline(
                 "Successfully started dubbing pipeline for job: {} initiated by user {}",
                 response.job_id, user_id
             );
+
+            if let Err(_) = user_balance
+                .charge_and_reserve_job_slot(
+                    &state.local_db_pool,
+                    estimated_cost,
+                    ProcessingType::Dubbing,
+                    &format!("Dubbing job {}", request.job_id),
+                )
+                .await
+            {
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ApiError {
+                        code: "PAYMENT_FAILED".to_string(),
+                        message: "Failed to process payment".to_string(),
+                    }),
+                ));
+            }
+
             Ok(Json(response))
         }
         Err(e) => {

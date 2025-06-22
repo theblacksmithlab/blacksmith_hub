@@ -19,7 +19,7 @@ pub struct DubbingPipelinePrepareResponse {
     pub video_duration_seconds: f64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DubbingPipelineRequest {
     pub job_id: String,
     pub video_url: String,
