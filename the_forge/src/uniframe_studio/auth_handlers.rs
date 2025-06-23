@@ -70,7 +70,7 @@ pub async fn handle_send_magic_link(
     let magic_link = format!(
         "{}?token={}",
         std::env::var("UNIFRAME_STUDIO_FRONTEND_URL")
-            .unwrap_or("http://localhost:5173".to_string()),
+            .unwrap_or("https://www.uniframe-studio.com/auth/verify".to_string()),
         token
     );
 
@@ -137,7 +137,7 @@ async fn send_magic_link_email(email: &str, magic_link: &str) -> anyhow::Result<
         .header("api-key", api_key)
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
-            "sender": {"email": "thecableguy303808909@gmail.com"},
+            "sender": {"email": "noreply@uniframe-studio.com"},
             "to": [{"email": email}],
             "subject": "Sign in to Uniframe Studio",
             "textContent": format!("Click this link to sign in: {}\n\nThis link expires in 1 hour.", magic_link),

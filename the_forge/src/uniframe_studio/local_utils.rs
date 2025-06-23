@@ -8,74 +8,98 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
                 .button:hover {{
-                    background-color: #2980b9 !important;
+                    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%) !important;
+                    transform: translateY(-1px);
+                    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4) !important;
+                }}
+                .button {{
+                    transition: all 0.2s ease !important;
                 }}
             </style>
         </head>
-        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 0;">
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%); min-height: 100vh;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%); padding: 40px 20px; min-height: 100vh;">
                 <tr>
                     <td align="center">
-                        <table width="600" cellpadding="0" cellspacing="0" style="background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <!-- Header -->
+                        <table width="600" cellpadding="0" cellspacing="0" style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); max-width: 600px;">
+                            
+                            <!-- Header with gradient -->
                             <tr>
-                                <td style="padding: 40px 40px 20px 40px; text-align: center;">
-                                    <h1 style="margin: 0; color: #1a1a1a; font-size: 24px; font-weight: 600;">
-                                        Uniframe Studio
+                                <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(0, 0, 0, 0.8) 50%, rgba(139, 92, 246, 0.3) 100%); border-radius: 16px 16px 0 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                                    <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 700; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);">
+                                        ✨ Uniframe Studio
                                     </h1>
+                                    <div style="width: 60px; height: 3px; background: linear-gradient(90deg, #3b82f6, #8b5cf6); margin: 16px auto 0; border-radius: 2px;"></div>
                                 </td>
                             </tr>
                             
                             <!-- Content -->
                             <tr>
-                                <td style="padding: 0 40px 40px 40px;">
-                                    <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px; line-height: 24px;">
-                                        Hi there!
+                                <td style="padding: 30px 40px 40px 40px; background: rgba(0, 0, 0, 0.6);">
+                                    <p style="margin: 0 0 20px 0; color: #e5e5e5; font-size: 18px; line-height: 28px; font-weight: 500;">
+                                        Welcome back! 👋
                                     </p>
-                                    <p style="margin: 0 0 30px 0; color: #4a4a4a; font-size: 16px; line-height: 24px;">
-                                        Click the button below to securely sign in to your Uniframe Studio account:
+                                    <p style="margin: 0 0 30px 0; color: rgba(255, 255, 255, 0.8); font-size: 16px; line-height: 24px;">
+                                        Ready to create something amazing? Click the button below to securely access your Uniframe Studio workspace:
                                     </p>
                                     
-                                    <!-- Button -->
+                                    <!-- Glowing Button -->
                                     <table width="100%" cellpadding="0" cellspacing="0">
                                         <tr>
                                             <td align="center" style="padding: 0 0 30px 0;">
                                                 <a href="{}" 
                                                    class="button"
                                                    style="display: inline-block; 
-                                                          padding: 14px 32px; 
-                                                          background-color: #3498db; 
+                                                          padding: 16px 32px; 
+                                                          background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
                                                           color: white; 
                                                           text-decoration: none; 
-                                                          border-radius: 6px; 
+                                                          border-radius: 12px; 
                                                           font-weight: 600;
-                                                          font-size: 16px;">
-                                                    Sign In to Uniframe Studio
+                                                          font-size: 16px;
+                                                          box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+                                                          border: 1px solid rgba(255, 255, 255, 0.2);">
+                                                    🚀 Enter Uniframe Studio
                                                 </a>
                                             </td>
                                         </tr>
                                     </table>
                                     
-                                    <p style="margin: 0 0 10px 0; color: #8a8a8a; font-size: 14px;">
-                                        If the button doesn't work, copy and paste this link into your browser:
-                                    </p>
-                                    <p style="margin: 0 0 30px 0; word-break: break-all;">
-                                        <a href="{}" style="color: #3498db; font-size: 14px;">{}</a>
-                                    </p>
+                                    <!-- Fallback link in dark theme -->
+                                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; margin: 20px 0;">
+                                        <p style="margin: 0 0 10px 0; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
+                                            Button not working? Copy this magic link:
+                                        </p>
+                                        <p style="margin: 0; word-break: break-all; background: rgba(0, 0, 0, 0.3); padding: 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                                            <a href="{}" style="color: #60a5fa; font-size: 14px; text-decoration: none;">{}</a>
+                                        </p>
+                                    </div>
                                     
-                                    <!-- Footer -->
-                                    <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                                    <!-- Security footer -->
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px; margin-top: 20px;">
                                         <tr>
-                                            <td>
-                                                <p style="margin: 0; color: #8a8a8a; font-size: 13px; line-height: 20px;">
-                                                    🔒 This link expires in 1 hour for your security.
+                                            <td style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px;">
+                                                <p style="margin: 0 0 8px 0; color: #10b981; font-size: 14px; line-height: 20px; font-weight: 600;">
+                                                    🔒 Secure Authentication
                                                 </p>
-                                                <p style="margin: 10px 0 0 0; color: #8a8a8a; font-size: 13px; line-height: 20px;">
-                                                    If you didn't request this email, you can safely ignore it.
+                                                <p style="margin: 0 0 8px 0; color: rgba(255, 255, 255, 0.7); font-size: 13px; line-height: 18px;">
+                                                    This magic link expires in <strong style="color: #fbbf24;">1 hour</strong> for your security.
+                                                </p>
+                                                <p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 13px; line-height: 18px;">
+                                                    Didn't request this? You can safely ignore this email.
                                                 </p>
                                             </td>
                                         </tr>
                                     </table>
+                                </td>
+                            </tr>
+                            
+                            <!-- Footer -->
+                            <tr>
+                                <td style="padding: 20px 40px; text-align: center; background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(0, 0, 0, 0.8) 50%, rgba(59, 130, 246, 0.2) 100%); border-radius: 0 0 16px 16px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                                    <p style="margin: 0; color: rgba(255, 255, 255, 0.5); font-size: 12px;">
+                                        Uniframe Studio - Create. Innovate. Inspire.
+                                    </p>
                                 </td>
                             </tr>
                         </table>
