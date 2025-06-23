@@ -17,15 +17,15 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
                 }}
             </style>
         </head>
-        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%); min-height: 100vh;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%); padding: 40px 20px; min-height: 100vh;">
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%); padding: 15px 20px;">
                 <tr>
                     <td align="center">
                         <table width="600" cellpadding="0" cellspacing="0" style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); max-width: 600px;">
                             
                             <!-- Header with gradient -->
                             <tr>
-                                <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(0, 0, 0, 0.8) 50%, rgba(139, 92, 246, 0.3) 100%); border-radius: 16px 16px 0 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                                <td style="padding: 30px 40px 15px 40px; text-align: center; background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(0, 0, 0, 0.8) 50%, rgba(139, 92, 246, 0.3) 100%); border-radius: 16px 16px 0 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
                                     <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 700; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);">
                                         ✨ Uniframe Studio
                                     </h1>
@@ -35,18 +35,18 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
                             
                             <!-- Content -->
                             <tr>
-                                <td style="padding: 30px 40px 40px 40px; background: rgba(0, 0, 0, 0.6);">
-                                    <p style="margin: 0 0 20px 0; color: #e5e5e5; font-size: 18px; line-height: 28px; font-weight: 500;">
+                                <td style="padding: 25px 40px 30px 40px; background: rgba(0, 0, 0, 0.6);">
+                                    <p style="margin: 0 0 15px 0; color: #e5e5e5; font-size: 18px; line-height: 26px; font-weight: 500;">
                                         Welcome back! 👋
                                     </p>
-                                    <p style="margin: 0 0 30px 0; color: rgba(255, 255, 255, 0.8); font-size: 16px; line-height: 24px;">
+                                    <p style="margin: 0 0 25px 0; color: rgba(255, 255, 255, 0.8); font-size: 16px; line-height: 24px;">
                                         Ready to create something amazing? Click the button below to securely access your Uniframe Studio workspace:
                                     </p>
                                     
                                     <!-- Glowing Button -->
                                     <table width="100%" cellpadding="0" cellspacing="0">
                                         <tr>
-                                            <td align="center" style="padding: 0 0 30px 0;">
+                                            <td align="center" style="padding: 0 0 25px 0;">
                                                 <a href="{}" 
                                                    class="button"
                                                    style="display: inline-block; 
@@ -59,33 +59,33 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
                                                           font-size: 16px;
                                                           box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
                                                           border: 1px solid rgba(255, 255, 255, 0.2);">
-                                                    🚀 Enter Uniframe Studio
+                                                    Sign in
                                                 </a>
                                             </td>
                                         </tr>
                                     </table>
                                     
                                     <!-- Fallback link in dark theme -->
-                                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; margin: 20px 0;">
-                                        <p style="margin: 0 0 10px 0; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
+                                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px; margin: 16px 0;">
+                                        <p style="margin: 0 0 8px 0; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
                                             Button not working? Copy this magic link:
                                         </p>
-                                        <p style="margin: 0; word-break: break-all; background: rgba(0, 0, 0, 0.3); padding: 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                                        <p style="margin: 0; word-break: break-all; background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1);">
                                             <a href="{}" style="color: #60a5fa; font-size: 14px; text-decoration: none;">{}</a>
                                         </p>
                                     </div>
                                     
                                     <!-- Security footer -->
-                                    <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 20px; margin-top: 20px;">
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 16px; margin-top: 16px;">
                                         <tr>
-                                            <td style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px;">
-                                                <p style="margin: 0 0 8px 0; color: #10b981; font-size: 14px; line-height: 20px; font-weight: 600;">
+                                            <td style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 14px;">
+                                                <p style="margin: 0 0 6px 0; color: #10b981; font-size: 14px; line-height: 18px; font-weight: 600;">
                                                     🔒 Secure Authentication
                                                 </p>
-                                                <p style="margin: 0 0 8px 0; color: rgba(255, 255, 255, 0.7); font-size: 13px; line-height: 18px;">
+                                                <p style="margin: 0 0 6px 0; color: rgba(255, 255, 255, 0.7); font-size: 13px; line-height: 16px;">
                                                     This magic link expires in <strong style="color: #fbbf24;">1 hour</strong> for your security.
                                                 </p>
-                                                <p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 13px; line-height: 18px;">
+                                                <p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 13px; line-height: 16px;">
                                                     Didn't request this? You can safely ignore this email.
                                                 </p>
                                             </td>
@@ -96,9 +96,9 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
                             
                             <!-- Footer -->
                             <tr>
-                                <td style="padding: 20px 40px; text-align: center; background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(0, 0, 0, 0.8) 50%, rgba(59, 130, 246, 0.2) 100%); border-radius: 0 0 16px 16px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                                <td style="padding: 16px 40px; text-align: center; background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(0, 0, 0, 0.8) 50%, rgba(59, 130, 246, 0.2) 100%); border-radius: 0 0 16px 16px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
                                     <p style="margin: 0; color: rgba(255, 255, 255, 0.5); font-size: 12px;">
-                                        Uniframe Studio - Create. Innovate. Inspire.
+                                        © 2025 Uniframe Studio - AI Video Processing Platform
                                     </p>
                                 </td>
                             </tr>
