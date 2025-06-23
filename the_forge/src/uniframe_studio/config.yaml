@@ -12,3 +12,6 @@ cors:
     - "http://localhost:5173"
     - "http://localhost:3000"
     - "https://blacksmith-lab.com"
+    - "https://www.uniframe-studio.com"
+    - "https://uniframe-studio.com"
+    - "https://uniframe-studio-web-ui.vercel.app"
