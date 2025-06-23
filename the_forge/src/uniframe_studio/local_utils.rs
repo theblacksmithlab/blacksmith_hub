@@ -21,7 +21,7 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
             <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%); padding: 15px 20px;">
                 <tr>
                     <td align="center">
-                        <table width="650" cellpadding="0" cellspacing="0" style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); max-width: 650px;">
+                        <table width="800" cellpadding="0" cellspacing="0" style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); max-width: 650px;">
                             
                             <!-- Header with gradient -->
                             <tr>
@@ -40,7 +40,7 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
                                         Welcome back! 👋
                                     </p>
                                     <p style="margin: 0 0 25px 0; color: rgba(255, 255, 255, 0.8); font-size: 16px; line-height: 24px; text-align: center;">
-                                        Ready to create something amazing? Click the button below to securely access your Uniframe Studio workspace:
+                                        Ready to create something amazing?<br>Click the button below to securely access your Uniframe Studio workspace:
                                     </p>
                                     
                                     <!-- Glowing Button -->
