@@ -21,7 +21,7 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
             <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%); padding: 15px 20px;">
                 <tr>
                     <td align="center">
-                        <table width="600" cellpadding="0" cellspacing="0" style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); max-width: 600px;">
+                        <table width="650" cellpadding="0" cellspacing="0" style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); max-width: 650px;">
                             
                             <!-- Header with gradient -->
                             <tr>
@@ -36,10 +36,10 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
                             <!-- Content -->
                             <tr>
                                 <td style="padding: 25px 40px 30px 40px; background: rgba(0, 0, 0, 0.6);">
-                                    <p style="margin: 0 0 15px 0; color: #e5e5e5; font-size: 18px; line-height: 26px; font-weight: 500;">
+                                    <p style="margin: 0 0 15px 0; color: #e5e5e5; font-size: 18px; line-height: 26px; font-weight: 500; text-align: center;">
                                         Welcome back! 👋
                                     </p>
-                                    <p style="margin: 0 0 25px 0; color: rgba(255, 255, 255, 0.8); font-size: 16px; line-height: 24px;">
+                                    <p style="margin: 0 0 25px 0; color: rgba(255, 255, 255, 0.8); font-size: 16px; line-height: 24px; text-align: center;">
                                         Ready to create something amazing? Click the button below to securely access your Uniframe Studio workspace:
                                     </p>
                                     
@@ -65,14 +65,14 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
                                         </tr>
                                     </table>
                                     
-                                    <!-- Fallback link in dark theme -->
-                                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px; margin: 16px 0;">
+                                    <!-- Fallback link with copy button -->
+                                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px; margin: 16px 0; text-align: center;">
                                         <p style="margin: 0 0 8px 0; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
                                             Button not working? Copy this magic link:
                                         </p>
-                                        <p style="margin: 0; word-break: break-all; background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1);">
-                                            <a href="{}" style="color: #60a5fa; font-size: 14px; text-decoration: none;">{}</a>
-                                        </p>
+                                        <div style="background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1); text-align: center;">
+                                            <a href="{}" style="color: #60a5fa; font-size: 14px; text-decoration: none; word-break: break-all;">{}</a>
+                                        </div>
                                     </div>
                                     
                                     <!-- Security footer -->
