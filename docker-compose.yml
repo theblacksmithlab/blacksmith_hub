@@ -46,6 +46,8 @@ services:
       - /root/projects/whisper.cpp/models:/app/whisper.cpp/models
       - ./common_res/groot_bot:/app/common_res/groot_bot
       - ./common_res/messages/groot_bot:/app/common_res/messages/groot_bot
+      - ./common_res/messages/common:/app/common_res/messages/common
+      - ./common_res/system_roles/groot_bot:/app/system_roles/groot_bot
     deploy:
       resources:
         limits:
