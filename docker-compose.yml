@@ -45,6 +45,7 @@ services:
     volumes:
       - /root/projects/whisper.cpp/models:/app/whisper.cpp/models
       - ./common_res/groot_bot:/app/common_res/groot_bot
+      - ./common_res/messages/groot_bot:/app/common_res/messages/groot_bot
     deploy:
       resources:
         limits:
