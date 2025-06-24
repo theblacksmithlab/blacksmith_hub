@@ -368,6 +368,11 @@ impl DubbingPipelineService {
                 None,
             )
             .await;
+
+            if let Err(e) = Self::shelve_gpu_instance().await {
+                error!("Failed to shelve GPU instance: {}", e);
+            }
+            
             return;
         }
 
@@ -447,6 +452,10 @@ impl DubbingPipelineService {
                 )
                 .await;
 
+                if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                    error!("Failed to shelve VDS after GPU init failure: {}", shelve_err);
+                }
+                
                 if let Ok(mut user_balance) =
                     UserBalance::get_or_create(&db_pool, &user_id_from_db).await
                 {
@@ -539,6 +548,11 @@ impl DubbingPipelineService {
                                 None,
                             )
                             .await;
+
+                            if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                                error!("Failed to shelve GPU instance after connection failure: {}", shelve_err);
+                            }
+                            
                             break;
                         }
                         break;
@@ -560,6 +574,11 @@ impl DubbingPipelineService {
                             None,
                         )
                         .await;
+
+                        if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                            error!("Failed to shelve GPU instance after job failure: {}", shelve_err);
+                        }
+                        
                         return;
                     }
                 }
@@ -610,6 +629,10 @@ impl DubbingPipelineService {
                                 None,
                             )
                             .await;
+
+                            if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                                error!("Failed to GPU instance after result processing failure: {}", shelve_err);
+                            }
                         }
                     }
                 } else {
@@ -627,6 +650,10 @@ impl DubbingPipelineService {
                         None,
                     )
                     .await;
+
+                    if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                        error!("Failed to shelve GPU instance after result processing failure: {}", shelve_err);
+                    }
                 }
             }
             Some(Err(e)) => {
@@ -644,6 +671,10 @@ impl DubbingPipelineService {
                     None,
                 )
                 .await;
+
+                if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                    error!("Failed to shelve VDS after result processing failure: {}", shelve_err);
+                }
             }
             None => {
                 error!("Maximum waiting time exceeded");
@@ -660,6 +691,10 @@ impl DubbingPipelineService {
                     None,
                 )
                 .await;
+
+                if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                    error!("Failed to shelve VDS after result processing failure: {}", shelve_err);
+                }
             }
         }
 
@@ -691,6 +726,11 @@ impl DubbingPipelineService {
                     user_id_from_db, e
                 );
             }
+        }
+
+        info!("Shelving GPU instance after job completion...");
+        if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+            error!("Failed to shelve GPU instance after job submission failure: {}", shelve_err);
         }
     }
 
@@ -909,5 +949,22 @@ impl DubbingPipelineService {
         };
 
         Ok(status)
+    }
+
+    async fn shelve_gpu_instance() -> Result<()> {
+        info!("Shelving GPU instance...");
+
+        let immers_client = ImmersCloudClient::new(
+            &std::env::var("IMMERS_USERNAME").context("IMMERS_USERNAME not set")?,
+            &std::env::var("IMMERS_PASSWORD").context("IMMERS_PASSWORD not set")?,
+            &std::env::var("IMMERS_PROJECT").context("IMMERS_PROJECT not set")?,
+            std::env::var("IMMERS_AI_SERVER_ID").context("IMMERS_AI_SERVER_ID not set")?,
+        )
+            .await
+            .context("Failed to initialize Immers.Cloud client")?;
+
+        immers_client.shelve_server().await?;
+        info!("GPU instance successfully shelved");
+        Ok(())
     }
 }
