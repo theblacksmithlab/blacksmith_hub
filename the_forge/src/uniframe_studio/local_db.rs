@@ -38,7 +38,7 @@ pub async fn setup_uniframe_studio_db() -> anyhow::Result<SqlitePool> {
         .await
         .context("Error creating tables in Uniframe Studio db")?;
 
-    info!("Uniframe Studio tables created successfully");
+    info!("Uniframe Studio tables are ready");
 
     Ok(pool)
 }

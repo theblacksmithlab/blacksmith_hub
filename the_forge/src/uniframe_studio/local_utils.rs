@@ -36,13 +36,18 @@ pub async fn verify_turnstile_token(
     Ok(verify_response.success)
 }
 
-pub async fn send_idea_email(idea_text: &str) -> anyhow::Result<()> {
+pub(crate) async fn send_idea_email(idea_text: &str) -> anyhow::Result<()> {
     let api_key = std::env::var("BREVO_API_KEY")?;
-    let admin_email =
-        std::env::var("ADMIN_EMAIL").unwrap_or_else(|_| "0xthecableguy@proton.me".to_string());
+    let admin_email = match std::env::var("ADMIN_EMAIL") {
+        Ok(email) => email,
+        Err(_) => {
+            error!("ADMIN_EMAIL not set - cannot send idea notifications");
+            return Ok(());
+        }
+    };
 
     let client = reqwest::Client::new();
-
+    
     let formatted_idea = idea_text
         .chars()
         .take(1000)
@@ -58,7 +63,7 @@ pub async fn send_idea_email(idea_text: &str) -> anyhow::Result<()> {
         Idea:\n{}\n\n\
         Timestamp: {}\n\n\
         ---\n\
-        Uniframe Studio User Idea Submission",
+        Uniframe Studio Ideas System",
         idea_text,
         chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
     );
@@ -130,6 +135,9 @@ pub async fn send_idea_email(idea_text: &str) -> anyhow::Result<()> {
     } else {
         let error_text = response.text().await?;
         error!("Failed to send idea email: {}", error_text);
-        Err(anyhow::anyhow!("Idea email sending failed: {}", error_text))
+        Err(anyhow::anyhow!(
+            "Idea email sending failed: {}",
+            error_text
+        ))
     }
 }
