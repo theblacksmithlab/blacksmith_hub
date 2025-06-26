@@ -6,6 +6,7 @@ pub struct DubbingPipelinePrepareRequest {
     pub system_file_name: String,
     pub original_file_name: String,
     pub content_type: String,
+    pub video_duration_seconds: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -14,9 +15,11 @@ pub struct DubbingPipelinePrepareResponse {
     pub upload_url: String,
     pub video_s3_url: String,
     pub expires_in: u64,
+    pub estimated_cost_usd: f64,
+    pub video_duration_seconds: f64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DubbingPipelineRequest {
     pub job_id: String,
     pub video_url: String,
@@ -169,4 +172,23 @@ pub struct UserJob {
 #[derive(Serialize)]
 pub struct ReviewUploadResponse {
     pub upload_url: String,
+}
+
+#[derive(Deserialize)]
+pub struct SubmitIdeaRequest {
+    pub idea: String,
+    pub captcha_token: String,
+}
+
+#[derive(Serialize)]
+pub struct SubmitIdeaResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+#[derive(Deserialize)]
+pub struct TurnstileVerifyResponse {
+    pub success: bool,
+    #[serde(rename = "error-codes")]
+    pub error_codes: Option<Vec<String>>,
 }

@@ -1,14 +1,20 @@
+use crate::uniframe_studio::local_utils::{
+    is_premium_user, send_idea_email, verify_turnstile_token,
+};
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
+use core::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
+use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
 use core::models::uniframe_studio::uniframe_studio::{
     ApiError, DubbingPipelinePrepareRequest, DubbingPipelinePrepareResponse,
-    DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus, UserJob,
+    DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus, SubmitIdeaRequest,
+    SubmitIdeaResponse, UserJob,
 };
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
+use sqlx::Row;
 use std::sync::Arc;
-use tracing::{error, info};
-use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
+use tracing::{error, info, warn};
 
 pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
@@ -73,9 +79,90 @@ pub async fn start_dubbing_pipeline(
     // TODO: Implement user's subscription tier detection
     let user_is_premium = is_premium_user(Some(&user_id)).await;
 
+    let pipeline_info = match sqlx::query(
+        "SELECT user_id, estimated_cost_usd FROM dubbing_pipelines WHERE job_id = ?",
+    )
+    .bind(&request.job_id)
+    .fetch_optional(&state.local_db_pool)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(ApiError {
+                    code: "PIPELINE_NOT_FOUND".to_string(),
+                    message: "Pipeline not found".to_string(),
+                }),
+            ))
+        }
+        Err(_) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiError {
+                    code: "DATABASE_ERROR".to_string(),
+                    message: "Database error".to_string(),
+                }),
+            ))
+        }
+    };
+
+    let user_id_from_db: String = pipeline_info.get("user_id");
+    let estimated_cost: f64 = pipeline_info.get("estimated_cost_usd");
+
+    // Check in the real workflow, may be redundant
+    if user_id != user_id_from_db {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ApiError {
+                code: "ACCESS_DENIED".to_string(),
+                message: "You don't own this pipeline".to_string(),
+            }),
+        ));
+    }
+
+    let mut user_balance =
+        match UserBalance::get_or_create(&state.local_db_pool, &user_id_from_db).await {
+            Ok(balance) => balance,
+            Err(_) => {
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ApiError {
+                        code: "BALANCE_ERROR".to_string(),
+                        message: "Failed to get user balance".to_string(),
+                    }),
+                ))
+            }
+        };
+
+    if !user_balance.has_sufficient_balance(estimated_cost) {
+        return Err((
+            StatusCode::PAYMENT_REQUIRED,
+            Json(ApiError {
+                code: "INSUFFICIENT_BALANCE".to_string(),
+                message: "Insufficient balance".to_string(),
+            }),
+        ));
+    }
+
+    if !user_balance.can_start_job(ProcessingType::Dubbing) {
+        return Err((
+            StatusCode::CONFLICT,
+            Json(ApiError {
+                code: "JOB_ALREADY_RUNNING".to_string(),
+                message: "Another dubbing job is already running".to_string(),
+            }),
+        ));
+    }
+
     match state
         .dubbing_pipeline_service
-        .start_pipeline(request, user_is_premium, state.clone())
+        .start_pipeline(
+            request.clone(),
+            user_is_premium,
+            state.clone(),
+            user_id_from_db,
+        )
         .await
     {
         Ok(response) => {
@@ -83,6 +170,25 @@ pub async fn start_dubbing_pipeline(
                 "Successfully started dubbing pipeline for job: {} initiated by user {}",
                 response.job_id, user_id
             );
+
+            if let Err(_) = user_balance
+                .charge_and_reserve_job_slot(
+                    &state.local_db_pool,
+                    estimated_cost,
+                    ProcessingType::Dubbing,
+                    &format!("Dubbing job {}", request.job_id),
+                )
+                .await
+            {
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ApiError {
+                        code: "PAYMENT_FAILED".to_string(),
+                        message: "Failed to process payment".to_string(),
+                    }),
+                ));
+            }
+
             Ok(Json(response))
         }
         Err(e) => {
@@ -130,11 +236,6 @@ pub async fn get_dubbing_pipeline_status(
     }
 }
 
-pub async fn is_premium_user(_user_id: Option<&str>) -> bool {
-    // TODO: Implement user's subscription tier detection fn
-    true
-}
-
 pub async fn get_user_jobs(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     Extension(user_id): Extension<String>,
@@ -176,7 +277,7 @@ pub async fn get_user_jobs(
 
 pub async fn submit_review(
     Path(job_id): Path<String>,
-    State(state): State<Arc<UniframeStudioAppState>>
+    State(state): State<Arc<UniframeStudioAppState>>,
 ) -> Result<Json<ReviewUploadResponse>, (StatusCode, Json<ApiError>)> {
     match state
         .dubbing_pipeline_service
@@ -192,4 +293,150 @@ pub async fn submit_review(
             }),
         )),
     }
+}
+
+pub async fn get_user_balance(
+    State(app_state): State<Arc<UniframeStudioAppState>>,
+    Extension(user_id): Extension<String>,
+) -> Result<Json<UserBalance>, (StatusCode, String)> {
+    let db_pool = app_state.get_db_pool();
+
+    let balance = UserBalance::get_or_create(&db_pool, &user_id)
+        .await
+        .map_err(|e| {
+            eprintln!("Database error getting user balance: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to get user balance".to_string(),
+            )
+        })?;
+
+    Ok(Json(balance))
+}
+
+pub async fn refund_failed_job(
+    Path(job_id): Path<String>,
+    State(app_state): State<Arc<UniframeStudioAppState>>,
+    Extension(user_id): Extension<String>,
+) -> Result<StatusCode, StatusCode> {
+    let db_pool = app_state.get_db_pool();
+
+    let pipeline_row = sqlx::query(
+        "SELECT user_id, status, refund_status, estimated_cost_usd FROM dubbing_pipelines WHERE job_id = ?"
+    )
+        .bind(&job_id)
+        .fetch_one(db_pool)
+        .await
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+
+    let pipeline_user_id: String = pipeline_row.get("user_id");
+    let status: String = pipeline_row.get("status");
+    let refund_status: Option<String> = pipeline_row.get("refund_status");
+    let estimated_cost: Option<f64> = pipeline_row.get("estimated_cost_usd");
+
+    if pipeline_user_id != user_id {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    if let Some(ref_status) = refund_status {
+        if ref_status == "refunded" {
+            return Ok(StatusCode::OK);
+        }
+    }
+
+    if status != "failed" {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let mut user_balance = UserBalance::get_or_create(db_pool, &user_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if let Some(cost) = estimated_cost {
+        user_balance
+            .add_funds(db_pool, cost, &format!("Refund for failed job: {}", job_id))
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
+
+    user_balance
+        .complete_job(db_pool, ProcessingType::Dubbing)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    sqlx::query("UPDATE dubbing_pipelines SET refund_status = 'refunded' WHERE job_id = ?")
+        .bind(&job_id)
+        .execute(db_pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(StatusCode::OK)
+}
+
+pub async fn handle_submit_idea(
+    State(_app_state): State<Arc<UniframeStudioAppState>>,
+    Json(request): Json<SubmitIdeaRequest>,
+) -> Result<Json<SubmitIdeaResponse>, (StatusCode, Json<SubmitIdeaResponse>)> {
+    if request.idea.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(SubmitIdeaResponse {
+                success: false,
+                message: "The message can't be empty".to_string(),
+            }),
+        ));
+    }
+
+    if request.idea.len() > 1000 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(SubmitIdeaResponse {
+                success: false,
+                message: "The message ios too long (max 1000 symbols)".to_string(),
+            }),
+        ));
+    }
+
+    match verify_turnstile_token(&request.captcha_token).await {
+        Ok(true) => {
+            info!("Turnstile verification successful");
+        }
+        Ok(false) => {
+            error!("Turnstile verification failed");
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(SubmitIdeaResponse {
+                    success: false,
+                    message: "Captcha verification failed".to_string(),
+                }),
+            ));
+        }
+        Err(e) => {
+            error!("Turnstile verification error: {}", e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(SubmitIdeaResponse {
+                    success: false,
+                    message: "Captcha verification error".to_string(),
+                }),
+            ));
+        }
+    }
+
+    info!(
+        "Idea received: {}",
+        request.idea.chars().take(50).collect::<String>()
+    );
+
+    if let Err(e) = send_idea_email(&request.idea).await {
+        error!("Failed to send idea email: {}", e);
+        warn!("Idea submission completed but email delivery failed");
+    } else {
+        info!("Idea email sent successfully");
+    }
+
+    Ok(Json(SubmitIdeaResponse {
+        success: true,
+        message: "Submission successful".to_string(),
+    }))
 }

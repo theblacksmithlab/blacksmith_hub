@@ -1,4 +1,5 @@
-use crate::uniframe_studio::local_utils::create_magic_link_html;
+use crate::uniframe_studio::create_magic_link_html::create_magic_link_html;
+use crate::uniframe_studio::local_utils::verify_turnstile_token;
 use axum::body::Body;
 use axum::extract::State;
 use axum::Json;
@@ -27,6 +28,30 @@ pub async fn handle_send_magic_link(
                 error: "Invalid email format".to_string(),
             }),
         ));
+    }
+
+    match verify_turnstile_token(&request.captcha_token).await {
+        Ok(true) => {
+            info!("Turnstile verification successful for email: {}", email);
+        }
+        Ok(false) => {
+            error!("Turnstile verification failed for email: {}", email);
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(AuthError {
+                    error: "Captcha verification failed".to_string(),
+                }),
+            ));
+        }
+        Err(e) => {
+            error!("Turnstile verification error for email {}: {}", email, e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(AuthError {
+                    error: "Captcha verification error".to_string(),
+                }),
+            ));
+        }
     }
 
     info!("Got auth-request from user with e-mail: {}", email);
@@ -70,7 +95,7 @@ pub async fn handle_send_magic_link(
     let magic_link = format!(
         "{}?token={}",
         std::env::var("UNIFRAME_STUDIO_FRONTEND_URL")
-            .unwrap_or("http://localhost:5173".to_string()),
+            .unwrap_or("https://www.uniframe-studio.com/auth/verify".to_string()),
         token
     );
 
@@ -137,9 +162,9 @@ async fn send_magic_link_email(email: &str, magic_link: &str) -> anyhow::Result<
         .header("api-key", api_key)
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
-            "sender": {"email": "thecableguy303808909@gmail.com"},
+            "sender": {"email": "noreply@uniframe-studio.com"},
             "to": [{"email": email}],
-            "subject": "Sign in to Uniframe Studio",
+            "subject": "Secure link to log in to Uniframe Studio",
             "textContent": format!("Click this link to sign in: {}\n\nThis link expires in 1 hour.", magic_link),
             "htmlContent": create_magic_link_html(magic_link)
         }))

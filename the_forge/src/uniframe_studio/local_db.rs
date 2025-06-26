@@ -38,7 +38,7 @@ pub async fn setup_uniframe_studio_db() -> anyhow::Result<SqlitePool> {
         .await
         .context("Error creating tables in Uniframe Studio db")?;
 
-    info!("Uniframe Studio tables created successfully");
+    info!("Uniframe Studio tables are ready");
 
     Ok(pool)
 }
@@ -85,8 +85,65 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             system_file_name TEXT,
             original_file_name TEXT,
             review_required_url TEXT,
+            video_duration_seconds INTEGER,
+            estimated_cost_usd REAL,
+            refund_status TEXT DEFAULT 'none',
             FOREIGN KEY (user_id) REFERENCES auth_users(id)
         );
+
+        CREATE TABLE IF NOT EXISTS lipsync_pipelines (
+            job_id TEXT PRIMARY KEY,
+            user_id TEXT,
+            status TEXT NOT NULL DEFAULT 'preparing',
+            step INTEGER,
+            step_description TEXT NOT NULL DEFAULT 'Preparing pipeline...',
+            progress_percentage INTEGER,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            completed_at TEXT,
+            result_urls TEXT,
+            error_message TEXT,
+            processing_steps TEXT,
+            original_video_s3_url TEXT,
+            system_file_name TEXT,
+            original_file_name TEXT,
+            review_required_url TEXT,
+            FOREIGN KEY (user_id) REFERENCES auth_users(id)
+        );
+        
+        CREATE TABLE IF NOT EXISTS user_balances (
+            user_id TEXT PRIMARY KEY,
+            balance_usd REAL NOT NULL DEFAULT 0.0,
+            updated_at TEXT DEFAULT (datetime('now')),
+            active_dubbing_jobs INTEGER NOT NULL DEFAULT 0,
+            active_lipsync_jobs INTEGER NOT NULL DEFAULT 0,
+            max_concurrent_dubbing_jobs INTEGER NOT NULL DEFAULT 1,
+            max_concurrent_lipsync_jobs INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (user_id) REFERENCES auth_users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS transactions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            type TEXT NOT NULL CHECK (type IN ('deposit', 'charge')),
+            amount_usd REAL NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed')),
+            description TEXT,
+            heleket_invoice_id TEXT,
+            crypto_tx_hash TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            completed_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES auth_users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS pricing_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            duration_min INTEGER NOT NULL,
+            duration_max INTEGER,
+            price_per_minute REAL NOT NULL,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
     ";
 
     pool.execute(query).await?;

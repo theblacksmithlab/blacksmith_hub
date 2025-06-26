@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize)]
 pub struct SendMagicLinkRequest {
     pub email: String,
+    pub captcha_token: String,
 }
 
 #[derive(Deserialize)]
@@ -21,7 +22,6 @@ pub struct AuthResponse {
 pub struct SessionCheckResponse {
     pub valid: bool,
     pub user_email: String,
-    // pub expires_at: i64,
 }
 
 #[derive(Serialize)]

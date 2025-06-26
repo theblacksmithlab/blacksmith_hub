@@ -66,8 +66,12 @@ pub async fn check_sender(
                 msg.thread_id,
                 formatted_bot_system_message_text,
                 format!(
-                    "Got message from NON-white-listed channel: {} ... message DELETED",
-                    violator_chat_title
+                    "Got message from NON-white-listed channel: {} with id: {}... message DELETED",
+                    violator_chat_title,
+                    msg.sender_chat
+                        .as_ref()
+                        .map(|chat| chat.id.to_string())
+                        .unwrap_or_else(|| "No id chat".to_string())
                 ),
                 app_name,
                 chat_title,

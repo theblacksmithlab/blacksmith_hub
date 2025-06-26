@@ -1,11 +1,5 @@
 FROM bot_foundry_base
 
-USER root
-
-COPY common_res/messages/common /app/common_res/messages/common
-COPY common_res/messages/groot_bot /app/common_res/messages/groot_bot
-COPY common_res/system_roles/groot_bot /app/common_res/system_roles/groot_bot
-
 USER 1001:1000
 
 ENV APP_NAME="groot_bot"

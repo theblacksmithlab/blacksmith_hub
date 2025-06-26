@@ -1,4 +1,5 @@
 use crate::gpu_client::immers_cloud_client::ImmersCloudClient;
+use crate::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
 use crate::models::uniframe_studio::dubbing_client::DubbingClient;
 use crate::models::uniframe_studio::uniframe_studio::{
     DubbingJobRequest, DubbingJobResult, DubbingPipelinePrepareRequest,
@@ -6,7 +7,9 @@ use crate::models::uniframe_studio::uniframe_studio::{
     DubbingPipelineStatus, PipelineStage, StepInfo,
 };
 use crate::state::uniframe_studio::app_state::UniframeStudioAppState;
-use crate::utils::uniframe_studio::uniframe_studio::{get_adaptive_interval, validate_transcription_keywords};
+use crate::utils::uniframe_studio::uniframe_studio::{
+    get_adaptive_interval, validate_transcription_keywords,
+};
 use anyhow::{Context, Result};
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::Client as S3Client;
@@ -92,7 +95,7 @@ impl DubbingPipelineService {
 
         (stage.to_string(), current_step_index)
     }
-    
+
     pub async fn prepare_pipeline(
         &self,
         request: DubbingPipelinePrepareRequest,
@@ -100,8 +103,8 @@ impl DubbingPipelineService {
     ) -> Result<DubbingPipelinePrepareResponse> {
         let job_id = Uuid::new_v4().to_string();
         let now = Utc::now();
-
-        info!("Generated job_id for dubbing pipeline: {}", job_id);
+        let video_duration = request.video_duration_seconds;
+        let estimated_cost = ProcessingType::Dubbing.calculate_cost(video_duration);
 
         let s3_key = format!("uploads/{}/input/{}", job_id, request.system_file_name);
         let video_s3_url = format!(
@@ -125,10 +128,10 @@ impl DubbingPipelineService {
 
         sqlx::query(
             "INSERT INTO dubbing_pipelines (
-                               job_id, user_id, status, step_description,
-                               progress_percentage, original_video_s3_url, system_file_name,
-                               original_file_name, created_at, updated_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            job_id, user_id, status, step_description, progress_percentage, 
+            original_video_s3_url, system_file_name, original_file_name, 
+            video_duration_seconds, estimated_cost_usd, created_at, updated_at) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&job_id)
         .bind(&user_id)
@@ -138,6 +141,8 @@ impl DubbingPipelineService {
         .bind(&video_s3_url)
         .bind(&request.system_file_name)
         .bind(&request.original_file_name)
+        .bind(request.video_duration_seconds as i32)
+        .bind(estimated_cost)
         .bind(now.to_rfc3339())
         .bind(now.to_rfc3339())
         .execute(&self.db_pool)
@@ -148,6 +153,8 @@ impl DubbingPipelineService {
             upload_url: upload_url.uri().to_string(),
             video_s3_url,
             expires_in: 3600,
+            estimated_cost_usd: estimated_cost,
+            video_duration_seconds: request.video_duration_seconds,
         };
 
         info!(
@@ -162,6 +169,7 @@ impl DubbingPipelineService {
         request: DubbingPipelineRequest,
         is_premium: bool,
         app_state: Arc<UniframeStudioAppState>,
+        user_id_from_db: String,
     ) -> Result<DubbingPipelineResponse> {
         let job_id = request.job_id.clone();
         let now = Utc::now();
@@ -186,7 +194,6 @@ impl DubbingPipelineService {
             created_at: now.to_rfc3339(),
         };
 
-        let request_clone = request;
         let dubbing_client = self.dubbing_client.clone();
         let s3_client = self.s3_client.clone();
         let db_pool = self.db_pool.clone();
@@ -194,12 +201,13 @@ impl DubbingPipelineService {
         tokio::spawn(async move {
             Self::pipeline_processor(
                 job_id,
-                request_clone,
+                request,
                 is_premium,
                 dubbing_client,
                 s3_client,
                 db_pool,
                 app_state,
+                user_id_from_db,
             )
             .await;
         });
@@ -215,6 +223,7 @@ impl DubbingPipelineService {
         s3_client: Arc<S3Client>,
         db_pool: Pool<Sqlite>,
         app_state: Arc<UniframeStudioAppState>,
+        user_id_from_db: String,
     ) {
         let validated_transcription_keywords = match request.transcription_keywords {
             Some(transcription_keywords) => {
@@ -359,6 +368,11 @@ impl DubbingPipelineService {
                 None,
             )
             .await;
+
+            if let Err(e) = Self::shelve_gpu_instance().await {
+                error!("Failed to shelve GPU instance: {}", e);
+            }
+
             return;
         }
 
@@ -413,8 +427,14 @@ impl DubbingPipelineService {
 
                 info!("Starting dubbing pipeline monitoring process...");
 
-                Self::run_dubbing_pipeline_process(job_id, dubbing_client, s3_client, db_pool)
-                    .await;
+                Self::run_dubbing_pipeline_process(
+                    job_id,
+                    dubbing_client,
+                    s3_client,
+                    db_pool,
+                    user_id_from_db,
+                )
+                .await;
             }
             Err(e) => {
                 error!("Failed to submit job to processing service: {}", e);
@@ -431,6 +451,21 @@ impl DubbingPipelineService {
                     None,
                 )
                 .await;
+
+                if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                    error!(
+                        "Failed to shelve VDS after GPU init failure: {}",
+                        shelve_err
+                    );
+                }
+
+                if let Ok(mut user_balance) =
+                    UserBalance::get_or_create(&db_pool, &user_id_from_db).await
+                {
+                    let _ = user_balance
+                        .complete_job(&db_pool, ProcessingType::Dubbing)
+                        .await;
+                }
             }
         }
     }
@@ -440,18 +475,19 @@ impl DubbingPipelineService {
         dubbing_client: DubbingClient,
         s3_client: Arc<S3Client>,
         db_pool: Pool<Sqlite>,
+        user_id_from_db: String,
     ) {
         let max_checks = 600;
         let mut result: Option<Result<DubbingJobResult>> = None;
 
         for check_number in 1..=max_checks {
             let interval = get_adaptive_interval(check_number);
-            
+
             info!(
                 "Monitoring job status, check {}/{}",
                 check_number, max_checks
             );
-            
+
             match dubbing_client.get_job_status(&job_id).await {
                 Ok(status) => {
                     let step_description = status
@@ -460,11 +496,13 @@ impl DubbingPipelineService {
                         .unwrap_or_else(|| format!("Processing step {}", status.step.unwrap_or(0)));
 
                     let presigned_review_url = if let Some(s3_uri) = &status.review_required_url {
-                        Self::generate_single_presigned_url(&s3_client, s3_uri).await.ok()
+                        Self::generate_single_presigned_url(&s3_client, s3_uri)
+                            .await
+                            .ok()
                     } else {
                         None
                     };
-                    
+
                     Self::update_pipeline_status(
                         &db_pool,
                         &job_id,
@@ -513,6 +551,14 @@ impl DubbingPipelineService {
                                 None,
                             )
                             .await;
+
+                            if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                                error!(
+                                    "Failed to shelve GPU instance after connection failure: {}",
+                                    shelve_err
+                                );
+                            }
+
                             break;
                         }
                         break;
@@ -534,6 +580,14 @@ impl DubbingPipelineService {
                             None,
                         )
                         .await;
+
+                        if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                            error!(
+                                "Failed to shelve GPU instance after job failure: {}",
+                                shelve_err
+                            );
+                        }
+
                         return;
                     }
                 }
@@ -584,6 +638,13 @@ impl DubbingPipelineService {
                                 None,
                             )
                             .await;
+
+                            if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                                error!(
+                                    "Failed to GPU instance after result processing failure: {}",
+                                    shelve_err
+                                );
+                            }
                         }
                     }
                 } else {
@@ -601,6 +662,13 @@ impl DubbingPipelineService {
                         None,
                     )
                     .await;
+
+                    if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                        error!(
+                            "Failed to shelve GPU instance after result processing failure: {}",
+                            shelve_err
+                        );
+                    }
                 }
             }
             Some(Err(e)) => {
@@ -618,6 +686,13 @@ impl DubbingPipelineService {
                     None,
                 )
                 .await;
+
+                if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                    error!(
+                        "Failed to shelve VDS after result processing failure: {}",
+                        shelve_err
+                    );
+                }
             }
             None => {
                 error!("Maximum waiting time exceeded");
@@ -634,6 +709,13 @@ impl DubbingPipelineService {
                     None,
                 )
                 .await;
+
+                if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                    error!(
+                        "Failed to shelve VDS after result processing failure: {}",
+                        shelve_err
+                    );
+                }
             }
         }
 
@@ -641,8 +723,41 @@ impl DubbingPipelineService {
             "Dubbing pipeline successfully completed for job: {}",
             job_id
         );
+
+        match UserBalance::get_or_create(&db_pool, &user_id_from_db).await {
+            Ok(mut user_balance) => {
+                if let Err(e) = user_balance
+                    .complete_job(&db_pool, ProcessingType::Dubbing)
+                    .await
+                {
+                    error!(
+                        "Failed to release dubbing job slot for user {}: {}",
+                        user_id_from_db, e
+                    );
+                } else {
+                    info!(
+                        "Successfully released dubbing job slot for user {}",
+                        user_id_from_db
+                    );
+                }
+            }
+            Err(e) => {
+                error!(
+                    "Failed to get user balance to release job slot for user {}: {}",
+                    user_id_from_db, e
+                );
+            }
+        }
+
+        info!("Shelving GPU instance after job completion...");
+        if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+            error!(
+                "Failed to shelve GPU instance after job submission failure: {}",
+                shelve_err
+            );
+        }
     }
-    
+
     async fn process_result_urls(
         s3_client: Arc<S3Client>,
         result_urls: HashMap<String, String>,
@@ -683,10 +798,7 @@ impl DubbingPipelineService {
         Ok(processed_urls)
     }
 
-    async fn generate_single_presigned_url(
-        s3_client: &S3Client,
-        s3_url: &str,
-    ) -> Result<String> {
+    async fn generate_single_presigned_url(s3_client: &S3Client, s3_url: &str) -> Result<String> {
         if !s3_url.starts_with("s3://") {
             return Ok(s3_url.to_string());
         }
@@ -717,11 +829,11 @@ impl DubbingPipelineService {
         Ok(presigned_url.uri().to_string())
     }
 
-    pub async fn get_review_upload_url(
-        &self,
-        job_id: &str,
-    ) -> Result<String> {
-        let s3_key = format!("jobs/{}/review_required/transcription_corrected.json", job_id);
+    pub async fn get_review_upload_url(&self, job_id: &str) -> Result<String> {
+        let s3_key = format!(
+            "jobs/{}/review_required/transcription_corrected.json",
+            job_id
+        );
 
         let presigned_request = self
             .s3_client
@@ -738,7 +850,7 @@ impl DubbingPipelineService {
 
         Ok(presigned_request.uri().to_string())
     }
-    
+
     async fn update_pipeline_status(
         db_pool: &Pool<Sqlite>,
         job_id: &str,
@@ -861,5 +973,22 @@ impl DubbingPipelineService {
         };
 
         Ok(status)
+    }
+
+    async fn shelve_gpu_instance() -> Result<()> {
+        info!("Shelving GPU instance...");
+
+        let immers_client = ImmersCloudClient::new(
+            &std::env::var("IMMERS_USERNAME").context("IMMERS_USERNAME not set")?,
+            &std::env::var("IMMERS_PASSWORD").context("IMMERS_PASSWORD not set")?,
+            &std::env::var("IMMERS_PROJECT").context("IMMERS_PROJECT not set")?,
+            std::env::var("IMMERS_AI_SERVER_ID").context("IMMERS_AI_SERVER_ID not set")?,
+        )
+        .await
+        .context("Failed to initialize Immers.Cloud client")?;
+
+        immers_client.shelve_server().await?;
+        info!("GPU instance successfully shelved");
+        Ok(())
     }
 }

@@ -1,90 +1,143 @@
-pub fn create_magic_link_html(magic_link: &str) -> String {
-    format!(
+use core::models::uniframe_studio::uniframe_studio::TurnstileVerifyResponse;
+use tracing::{error, info};
+
+pub async fn is_premium_user(_user_id: Option<&str>) -> bool {
+    // TODO: Implement user's subscription tier detection fn
+    true
+}
+
+pub async fn verify_turnstile_token(
+    token: &str,
+) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    let secret_key = std::env::var("TURNSTILE_SECRET_KEY")
+        .map_err(|_| "TURNSTILE_SECRET_KEY not found in environment")?;
+
+    let client = reqwest::Client::new();
+
+    let response = client
+        .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .form(&[("secret", secret_key.as_str()), ("response", token)])
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(format!("Turnstile API returned status: {}", response.status()).into());
+    }
+
+    let verify_response: TurnstileVerifyResponse = response.json().await?;
+
+    if !verify_response.success {
+        if let Some(errors) = verify_response.error_codes {
+            error!("Turnstile verification failed with errors: {:?}", errors);
+        }
+    }
+
+    Ok(verify_response.success)
+}
+
+pub(crate) async fn send_idea_email(idea_text: &str) -> anyhow::Result<()> {
+    let api_key = std::env::var("BREVO_API_KEY")?;
+    let admin_email = match std::env::var("ADMIN_EMAIL") {
+        Ok(email) => email,
+        Err(_) => {
+            error!("ADMIN_EMAIL not set - cannot send idea notifications");
+            return Ok(());
+        }
+    };
+
+    let client = reqwest::Client::new();
+    
+    let formatted_idea = idea_text
+        .chars()
+        .take(1000)
+        .collect::<String>()
+        .replace('\n', "<br>")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+
+    let subject = "💡 New Idea Submission - Uniframe Studio".to_string();
+
+    let text_content = format!(
+        "New idea submission received!\n\n\
+        Idea:\n{}\n\n\
+        Timestamp: {}\n\n\
+        ---\n\
+        Uniframe Studio Ideas System",
+        idea_text,
+        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
+    );
+
+    let html_content = format!(
         r#"
         <!DOCTYPE html>
         <html>
         <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                .button:hover {{
-                    background-color: #2980b9 !important;
-                }}
-            </style>
+            <meta charset="utf-8">
+            <title>New Idea Submission</title>
         </head>
-        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 0;">
-                <tr>
-                    <td align="center">
-                        <table width="600" cellpadding="0" cellspacing="0" style="background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <!-- Header -->
-                            <tr>
-                                <td style="padding: 40px 40px 20px 40px; text-align: center;">
-                                    <h1 style="margin: 0; color: #1a1a1a; font-size: 24px; font-weight: 600;">
-                                        Uniframe Studio
-                                    </h1>
-                                </td>
-                            </tr>
-                            
-                            <!-- Content -->
-                            <tr>
-                                <td style="padding: 0 40px 40px 40px;">
-                                    <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px; line-height: 24px;">
-                                        Hi there!
-                                    </p>
-                                    <p style="margin: 0 0 30px 0; color: #4a4a4a; font-size: 16px; line-height: 24px;">
-                                        Click the button below to securely sign in to your Uniframe Studio account:
-                                    </p>
-                                    
-                                    <!-- Button -->
-                                    <table width="100%" cellpadding="0" cellspacing="0">
-                                        <tr>
-                                            <td align="center" style="padding: 0 0 30px 0;">
-                                                <a href="{}" 
-                                                   class="button"
-                                                   style="display: inline-block; 
-                                                          padding: 14px 32px; 
-                                                          background-color: #3498db; 
-                                                          color: white; 
-                                                          text-decoration: none; 
-                                                          border-radius: 6px; 
-                                                          font-weight: 600;
-                                                          font-size: 16px;">
-                                                    Sign In to Uniframe Studio
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                    
-                                    <p style="margin: 0 0 10px 0; color: #8a8a8a; font-size: 14px;">
-                                        If the button doesn't work, copy and paste this link into your browser:
-                                    </p>
-                                    <p style="margin: 0 0 30px 0; word-break: break-all;">
-                                        <a href="{}" style="color: #3498db; font-size: 14px;">{}</a>
-                                    </p>
-                                    
-                                    <!-- Footer -->
-                                    <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
-                                        <tr>
-                                            <td>
-                                                <p style="margin: 0; color: #8a8a8a; font-size: 13px; line-height: 20px;">
-                                                    🔒 This link expires in 1 hour for your security.
-                                                </p>
-                                                <p style="margin: 10px 0 0 0; color: #8a8a8a; font-size: 13px; line-height: 20px;">
-                                                    If you didn't request this email, you can safely ignore it.
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 30px;">
+                <h1 style="color: white; margin: 0; font-size: 28px;">💡 New Idea Received!</h1>
+                <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">Uniframe Studio Ideas System</p>
+            </div>
+            
+            <div style="background: #f8f9fa; border-radius: 8px; padding: 25px; margin-bottom: 20px;">
+                <h2 style="color: #495057; margin-top: 0; font-size: 20px; border-bottom: 2px solid #dee2e6; padding-bottom: 10px;">💭 Idea Content</h2>
+                <div style="background: white; padding: 20px; border-radius: 6px; border-left: 4px solid #667eea; margin: 15px 0;">
+                    <p style="margin: 0; font-size: 16px; white-space: pre-wrap;">{}</p>
+                </div>
+            </div>
+
+            <div style="background: #e9ecef; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0; font-size: 16px;">📋 Submission Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Timestamp:</td>
+                        <td style="padding: 8px 0; color: #495057;">{}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Characters:</td>
+                        <td style="padding: 8px 0; color: #495057;">{} / 1000</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div style="text-align: center; padding: 20px; color: #6c757d; font-size: 14px; border-top: 1px solid #dee2e6;">
+                <p style="margin: 0;">This email was automatically generated by Uniframe Studio Ideas System</p>
+                <p style="margin: 5px 0 0 0;">🎬 Making video dubbing accessible to everyone</p>
+            </div>
         </body>
         </html>
-    "#,
-        magic_link, magic_link, magic_link
-    )
+        "#,
+        formatted_idea,
+        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
+        idea_text.len()
+    );
+
+    let response = client
+        .post("https://api.brevo.com/v3/smtp/email")
+        .header("api-key", api_key)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "sender": {"email": "noreply@uniframe-studio.com", "name": "Uniframe Studio Ideas"},
+            "to": [{"email": admin_email}],
+            "subject": subject,
+            "textContent": text_content,
+            "htmlContent": html_content
+        }))
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        info!("Idea email sent successfully to admin");
+        Ok(())
+    } else {
+        let error_text = response.text().await?;
+        error!("Failed to send idea email: {}", error_text);
+        Err(anyhow::anyhow!(
+            "Idea email sending failed: {}",
+            error_text
+        ))
+    }
 }
