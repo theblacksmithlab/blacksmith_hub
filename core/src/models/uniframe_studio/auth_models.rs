@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize)]
 pub struct SendMagicLinkRequest {
     pub email: String,
+    pub captcha_token: String,
 }
 
 #[derive(Deserialize)]

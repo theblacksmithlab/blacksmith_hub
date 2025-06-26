@@ -1,17 +1,20 @@
+use crate::uniframe_studio::local_utils::{
+    is_premium_user, send_idea_email, verify_turnstile_token,
+};
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
 use core::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
 use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
 use core::models::uniframe_studio::uniframe_studio::{
     ApiError, DubbingPipelinePrepareRequest, DubbingPipelinePrepareResponse,
-    DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus, UserJob,
-    SubmitIdeaRequest, SubmitIdeaResponse, TurnstileVerifyResponse
+    DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus, SubmitIdeaRequest,
+    SubmitIdeaResponse, UserJob,
 };
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
 use sqlx::Row;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
@@ -233,11 +236,6 @@ pub async fn get_dubbing_pipeline_status(
     }
 }
 
-pub async fn is_premium_user(_user_id: Option<&str>) -> bool {
-    // TODO: Implement user's subscription tier detection fn
-    true
-}
-
 pub async fn get_user_jobs(
     State(app_state): State<Arc<UniframeStudioAppState>>,
     Extension(user_id): Extension<String>,
@@ -379,13 +377,12 @@ pub async fn handle_submit_idea(
     State(_app_state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<SubmitIdeaRequest>,
 ) -> Result<Json<SubmitIdeaResponse>, (StatusCode, Json<SubmitIdeaResponse>)> {
-    
     if request.idea.trim().is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(SubmitIdeaResponse {
                 success: false,
-                message: "Идея не может быть пустой".to_string(),
+                message: "The message can't be empty".to_string(),
             }),
         ));
     }
@@ -395,11 +392,11 @@ pub async fn handle_submit_idea(
             StatusCode::BAD_REQUEST,
             Json(SubmitIdeaResponse {
                 success: false,
-                message: "Идея слишком длинная (максимум 1000 символов)".to_string(),
+                message: "The message ios too long (max 1000 symbols)".to_string(),
             }),
         ));
     }
-    
+
     match verify_turnstile_token(&request.captcha_token).await {
         Ok(true) => {
             info!("Turnstile verification successful");
@@ -410,7 +407,7 @@ pub async fn handle_submit_idea(
                 StatusCode::BAD_REQUEST,
                 Json(SubmitIdeaResponse {
                     success: false,
-                    message: "Проверка капчи не пройдена".to_string(),
+                    message: "Captcha verification failed".to_string(),
                 }),
             ));
         }
@@ -420,49 +417,26 @@ pub async fn handle_submit_idea(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(SubmitIdeaResponse {
                     success: false,
-                    message: "Ошибка проверки капчи".to_string(),
+                    message: "Captcha verification error".to_string(),
                 }),
             ));
         }
     }
-    
-    info!("Idea received: {}", request.idea.chars().take(50).collect::<String>());
 
-    // TODO: Добавить отправку email позже
+    info!(
+        "Idea received: {}",
+        request.idea.chars().take(50).collect::<String>()
+    );
+
+    if let Err(e) = send_idea_email(&request.idea).await {
+        error!("Failed to send idea email: {}", e);
+        warn!("Idea submission completed but email delivery failed");
+    } else {
+        info!("Idea email sent successfully");
+    }
 
     Ok(Json(SubmitIdeaResponse {
         success: true,
-        message: "Идея успешно отправлена".to_string(),
+        message: "Submission successful".to_string(),
     }))
-}
-
-async fn verify_turnstile_token(token: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let secret_key = std::env::var("TURNSTILE_SECRET_KEY")
-        .map_err(|_| "TURNSTILE_SECRET_KEY not found in environment")?;
-
-    let client = reqwest::Client::new();
-
-    let response = client
-        .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .form(&[
-            ("secret", secret_key.as_str()),
-            ("response", token),
-        ])
-        .send()
-        .await?;
-
-    if !response.status().is_success() {
-        return Err(format!("Turnstile API returned status: {}", response.status()).into());
-    }
-
-    let verify_response: TurnstileVerifyResponse = response.json().await?;
-
-    if !verify_response.success {
-        if let Some(errors) = verify_response.error_codes {
-            error!("Turnstile verification failed with errors: {:?}", errors);
-        }
-    }
-
-    Ok(verify_response.success)
 }

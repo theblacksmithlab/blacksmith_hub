@@ -1,114 +1,135 @@
-pub fn create_magic_link_html(magic_link: &str) -> String {
-    format!(
+use core::models::uniframe_studio::uniframe_studio::TurnstileVerifyResponse;
+use tracing::{error, info};
+
+pub async fn is_premium_user(_user_id: Option<&str>) -> bool {
+    // TODO: Implement user's subscription tier detection fn
+    true
+}
+
+pub async fn verify_turnstile_token(
+    token: &str,
+) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    let secret_key = std::env::var("TURNSTILE_SECRET_KEY")
+        .map_err(|_| "TURNSTILE_SECRET_KEY not found in environment")?;
+
+    let client = reqwest::Client::new();
+
+    let response = client
+        .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .form(&[("secret", secret_key.as_str()), ("response", token)])
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(format!("Turnstile API returned status: {}", response.status()).into());
+    }
+
+    let verify_response: TurnstileVerifyResponse = response.json().await?;
+
+    if !verify_response.success {
+        if let Some(errors) = verify_response.error_codes {
+            error!("Turnstile verification failed with errors: {:?}", errors);
+        }
+    }
+
+    Ok(verify_response.success)
+}
+
+pub async fn send_idea_email(idea_text: &str) -> anyhow::Result<()> {
+    let api_key = std::env::var("BREVO_API_KEY")?;
+    let admin_email =
+        std::env::var("ADMIN_EMAIL").unwrap_or_else(|_| "0xthecableguy@proton.me".to_string());
+
+    let client = reqwest::Client::new();
+
+    let formatted_idea = idea_text
+        .chars()
+        .take(1000)
+        .collect::<String>()
+        .replace('\n', "<br>")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+
+    let subject = "💡 New Idea Submission - Uniframe Studio".to_string();
+
+    let text_content = format!(
+        "New idea submission received!\n\n\
+        Idea:\n{}\n\n\
+        Timestamp: {}\n\n\
+        ---\n\
+        Uniframe Studio User Idea Submission",
+        idea_text,
+        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
+    );
+
+    let html_content = format!(
         r#"
         <!DOCTYPE html>
         <html>
         <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                .button:hover {{
-                    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%) !important;
-                    transform: translateY(-1px);
-                    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4) !important;
-                }}
-                .button {{
-                    transition: all 0.2s ease !important;
-                }}
-            </style>
+            <meta charset="utf-8">
+            <title>New Idea Submission</title>
         </head>
-        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%); padding: 15px 20px;">
-                <tr>
-                    <td align="center">
-                        <table width="800" cellpadding="0" cellspacing="0" style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); max-width: 650px;">
-                            
-                            <!-- Header with gradient -->
-                            <tr>
-                                <td style="padding: 30px 40px 15px 40px; text-align: center; background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(0, 0, 0, 0.8) 50%, rgba(139, 92, 246, 0.3) 100%); border-radius: 16px 16px 0 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
-                                    <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 700; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);">
-                                        ✨ Uniframe Studio
-                                    </h1>
-                                    <div style="width: 60px; height: 3px; background: linear-gradient(90deg, #3b82f6, #8b5cf6); margin: 16px auto 0; border-radius: 2px;"></div>
-                                </td>
-                            </tr>
-                            
-                            <!-- Content -->
-                            <tr>
-                                <td style="padding: 25px 40px 30px 40px; background: rgba(0, 0, 0, 0.6);">
-                                    <p style="margin: 0 0 15px 0; color: #e5e5e5; font-size: 18px; line-height: 26px; font-weight: 500; text-align: center;">
-                                        Welcome back! 👋
-                                    </p>
-                                    <p style="margin: 0 0 25px 0; color: rgba(255, 255, 255, 0.8); font-size: 16px; line-height: 24px; text-align: center;">
-                                        Ready to create something amazing?<br>Click the button below to securely access your Uniframe Studio workspace:
-                                    </p>
-                                    
-                                    <!-- Glowing Button -->
-                                    <table width="100%" cellpadding="0" cellspacing="0">
-                                        <tr>
-                                            <td align="center" style="padding: 0 0 25px 0;">
-                                                <a href="{}" 
-                                                   class="button"
-                                                   style="display: inline-block; 
-                                                          padding: 16px 32px; 
-                                                          background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-                                                          color: white; 
-                                                          text-decoration: none; 
-                                                          border-radius: 12px; 
-                                                          font-weight: 600;
-                                                          font-size: 16px;
-                                                          box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
-                                                          border: 1px solid rgba(255, 255, 255, 0.2);">
-                                                    Sign in
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                    
-                                    <!-- Fallback link with copy button -->
-                                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px; margin: 16px 0; text-align: center;">
-                                        <p style="margin: 0 0 8px 0; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
-                                            Button not working? Copy this magic link:
-                                        </p>
-                                        <div style="background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1); text-align: center;">
-                                            <a href="{}" style="color: #60a5fa; font-size: 14px; text-decoration: none; word-break: break-all;">{}</a>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Security footer -->
-                                    <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 16px; margin-top: 16px;">
-                                        <tr>
-                                            <td style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 14px;">
-                                                <p style="margin: 0 0 6px 0; color: #10b981; font-size: 14px; line-height: 18px; font-weight: 600;">
-                                                    🔒 Secure Authentication
-                                                </p>
-                                                <p style="margin: 0 0 6px 0; color: rgba(255, 255, 255, 0.7); font-size: 13px; line-height: 16px;">
-                                                    This magic link expires in <strong style="color: #fbbf24;">1 hour</strong> for your security.
-                                                </p>
-                                                <p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 13px; line-height: 16px;">
-                                                    Didn't request this? You can safely ignore this email.
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </td>
-                            </tr>
-                            
-                            <!-- Footer -->
-                            <tr>
-                                <td style="padding: 16px 40px; text-align: center; background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(0, 0, 0, 0.8) 50%, rgba(59, 130, 246, 0.2) 100%); border-radius: 0 0 16px 16px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-                                    <p style="margin: 0; color: rgba(255, 255, 255, 0.5); font-size: 12px;">
-                                        © 2025 Uniframe Studio - AI Video Processing Platform
-                                    </p>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 30px;">
+                <h1 style="color: white; margin: 0; font-size: 28px;">💡 New Idea Received!</h1>
+                <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">Uniframe Studio Ideas System</p>
+            </div>
+            
+            <div style="background: #f8f9fa; border-radius: 8px; padding: 25px; margin-bottom: 20px;">
+                <h2 style="color: #495057; margin-top: 0; font-size: 20px; border-bottom: 2px solid #dee2e6; padding-bottom: 10px;">💭 Idea Content</h2>
+                <div style="background: white; padding: 20px; border-radius: 6px; border-left: 4px solid #667eea; margin: 15px 0;">
+                    <p style="margin: 0; font-size: 16px; white-space: pre-wrap;">{}</p>
+                </div>
+            </div>
+
+            <div style="background: #e9ecef; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #495057; margin-top: 0; font-size: 16px;">📋 Submission Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Timestamp:</td>
+                        <td style="padding: 8px 0; color: #495057;">{}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; color: #6c757d;">Characters:</td>
+                        <td style="padding: 8px 0; color: #495057;">{} / 1000</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div style="text-align: center; padding: 20px; color: #6c757d; font-size: 14px; border-top: 1px solid #dee2e6;">
+                <p style="margin: 0;">This email was automatically generated by Uniframe Studio Ideas System</p>
+                <p style="margin: 5px 0 0 0;">🎬 Making video dubbing accessible to everyone</p>
+            </div>
         </body>
         </html>
-    "#,
-        magic_link, magic_link, magic_link
-    )
+        "#,
+        formatted_idea,
+        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
+        idea_text.len()
+    );
+
+    let response = client
+        .post("https://api.brevo.com/v3/smtp/email")
+        .header("api-key", api_key)
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "sender": {"email": "noreply@uniframe-studio.com", "name": "Uniframe Studio Ideas"},
+            "to": [{"email": admin_email}],
+            "subject": subject,
+            "textContent": text_content,
+            "htmlContent": html_content
+        }))
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        info!("Idea email sent successfully to admin");
+        Ok(())
+    } else {
+        let error_text = response.text().await?;
+        error!("Failed to send idea email: {}", error_text);
+        Err(anyhow::anyhow!("Idea email sending failed: {}", error_text))
+    }
 }
