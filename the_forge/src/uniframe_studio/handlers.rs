@@ -5,6 +5,7 @@ use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
 use core::models::uniframe_studio::uniframe_studio::{
     ApiError, DubbingPipelinePrepareRequest, DubbingPipelinePrepareResponse,
     DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus, UserJob,
+    SubmitIdeaRequest, SubmitIdeaResponse, TurnstileVerifyResponse
 };
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
@@ -372,4 +373,96 @@ pub async fn refund_failed_job(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(StatusCode::OK)
+}
+
+pub async fn handle_submit_idea(
+    State(_app_state): State<Arc<UniframeStudioAppState>>,
+    Json(request): Json<SubmitIdeaRequest>,
+) -> Result<Json<SubmitIdeaResponse>, (StatusCode, Json<SubmitIdeaResponse>)> {
+    
+    if request.idea.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(SubmitIdeaResponse {
+                success: false,
+                message: "Идея не может быть пустой".to_string(),
+            }),
+        ));
+    }
+
+    if request.idea.len() > 1000 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(SubmitIdeaResponse {
+                success: false,
+                message: "Идея слишком длинная (максимум 1000 символов)".to_string(),
+            }),
+        ));
+    }
+    
+    match verify_turnstile_token(&request.captcha_token).await {
+        Ok(true) => {
+            info!("Turnstile verification successful");
+        }
+        Ok(false) => {
+            error!("Turnstile verification failed");
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(SubmitIdeaResponse {
+                    success: false,
+                    message: "Проверка капчи не пройдена".to_string(),
+                }),
+            ));
+        }
+        Err(e) => {
+            error!("Turnstile verification error: {}", e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(SubmitIdeaResponse {
+                    success: false,
+                    message: "Ошибка проверки капчи".to_string(),
+                }),
+            ));
+        }
+    }
+    
+    info!("Idea received: {}", request.idea.chars().take(50).collect::<String>());
+
+    // TODO: Добавить отправку email позже
+
+    Ok(Json(SubmitIdeaResponse {
+        success: true,
+        message: "Идея успешно отправлена".to_string(),
+    }))
+}
+
+async fn verify_turnstile_token(token: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    let secret_key = std::env::var("TURNSTILE_SECRET_KEY")
+        .map_err(|_| "TURNSTILE_SECRET_KEY not found in environment")?;
+
+    let client = reqwest::Client::new();
+
+    let response = client
+        .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .form(&[
+            ("secret", secret_key.as_str()),
+            ("response", token),
+        ])
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(format!("Turnstile API returned status: {}", response.status()).into());
+    }
+
+    let verify_response: TurnstileVerifyResponse = response.json().await?;
+
+    if !verify_response.success {
+        if let Some(errors) = verify_response.error_codes {
+            error!("Turnstile verification failed with errors: {:?}", errors);
+        }
+    }
+
+    Ok(verify_response.success)
 }

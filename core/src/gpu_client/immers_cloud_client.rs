@@ -68,7 +68,7 @@ impl ImmersCloudClient {
     }
 
     pub async fn shelve_server(&self) -> Result<()> {
-        info!("Shelving AI server: {}", self.server_id);
+        info!("Shelving GPU instance server: {}", self.server_id);
 
         let response = self
             .client
@@ -82,16 +82,16 @@ impl ImmersCloudClient {
             .await?;
 
         if response.status().is_success() {
-            info!("AI server shelved successfully");
+            info!("GPU instance shelved successfully");
             Ok(())
         } else {
-            error!("Failed to shelve server: {}", response.status());
-            Err(anyhow::anyhow!("Failed to shelve server"))
+            error!("Failed to shelve GPU instance: {}", response.status());
+            Err(anyhow::anyhow!("Failed to shelve GPU instance"))
         }
     }
 
     pub async fn unshelve_server(&self) -> Result<()> {
-        info!("Unshelving AI server: {}", self.server_id);
+        info!("Unshelving GPU instance: {}", self.server_id);
 
         let response = self
             .client
@@ -105,11 +105,11 @@ impl ImmersCloudClient {
             .await?;
 
         if response.status().is_success() {
-            info!("AI server unshelved successfully");
+            info!("GPU instance unshelved successfully");
             Ok(())
         } else {
-            error!("Failed to unshelve server: {}", response.status());
-            Err(anyhow::anyhow!("Failed to unshelve server"))
+            error!("Failed to unshelve GPU instance: {}", response.status());
+            Err(anyhow::anyhow!("Failed to unshelve GPU instance"))
         }
     }
 
@@ -138,16 +138,16 @@ impl ImmersCloudClient {
 
         loop {
             let status = self.get_service_status().await?;
-            info!("Server status: {}", status);
+            info!("GPU instance status: {}", status);
 
             if status == "ACTIVE" {
-                info!("Server is now active and ready");
+                info!("GPU instance is now active and ready");
                 return Ok(());
             }
 
             if start_time.elapsed().as_secs() > max_wait_seconds {
                 return Err(anyhow::anyhow!(
-                    "Timeout waiting for server to become active"
+                    "Timeout waiting for GPU instance to become active"
                 ));
             }
 

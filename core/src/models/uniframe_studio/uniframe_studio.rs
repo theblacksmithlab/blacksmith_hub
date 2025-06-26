@@ -173,3 +173,22 @@ pub struct UserJob {
 pub struct ReviewUploadResponse {
     pub upload_url: String,
 }
+
+#[derive(Deserialize)]
+pub struct SubmitIdeaRequest {
+    pub idea: String,
+    pub captcha_token: String,
+}
+
+#[derive(Serialize)]
+pub struct SubmitIdeaResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+#[derive(Deserialize)]
+pub struct TurnstileVerifyResponse {
+    pub success: bool,
+    #[serde(rename = "error-codes")]
+    pub error_codes: Option<Vec<String>>,
+}
