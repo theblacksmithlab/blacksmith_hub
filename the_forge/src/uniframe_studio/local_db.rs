@@ -8,7 +8,7 @@ use tracing::{info, warn};
 
 pub async fn setup_uniframe_studio_db() -> anyhow::Result<SqlitePool> {
     let auth_database_url = env::var("UNIFRAME_STUDIO_DATABASE_URL")
-        .context("Error: UNIFRAME_STUDIO_DATABASE_URL must be set")?;
+        .context("UNIFRAME_STUDIO_DATABASE_URL must be set")?;
 
     let db_path = "common_res/local_db/uniframe_studio.db";
 
@@ -26,7 +26,7 @@ pub async fn setup_uniframe_studio_db() -> anyhow::Result<SqlitePool> {
 
     let pool = SqlitePool::connect_with(
         SqliteConnectOptions::from_str(&auth_database_url)
-            .context("Error: invalid DATABASE_URL format")?
+            .context("Invalid DATABASE_URL format")?
             .create_if_missing(true),
     )
     .await

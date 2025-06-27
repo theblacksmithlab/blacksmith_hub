@@ -978,7 +978,7 @@ impl DubbingPipelineService {
     async fn shelve_gpu_instance() -> Result<()> {
         info!("Shelving GPU instance...");
 
-        let immers_client = ImmersCloudClient::new(
+        let immers_cloud_client = ImmersCloudClient::new(
             &std::env::var("IMMERS_USERNAME").context("IMMERS_USERNAME not set")?,
             &std::env::var("IMMERS_PASSWORD").context("IMMERS_PASSWORD not set")?,
             &std::env::var("IMMERS_PROJECT").context("IMMERS_PROJECT not set")?,
@@ -987,7 +987,7 @@ impl DubbingPipelineService {
         .await
         .context("Failed to initialize Immers.Cloud client")?;
 
-        immers_client.shelve_server().await?;
+        immers_cloud_client.shelve_server().await?;
         info!("GPU instance successfully shelved");
         Ok(())
     }

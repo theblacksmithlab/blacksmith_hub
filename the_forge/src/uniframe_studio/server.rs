@@ -6,7 +6,7 @@ use crate::uniframe_studio::handlers::{
     prepare_dubbing_pipeline, refund_failed_job, start_dubbing_pipeline, submit_review,
 };
 use crate::uniframe_studio::local_db::setup_uniframe_studio_db;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_openai::Client as LLM_Client;
 use axum::routing::{get, post};
 use axum::Router;
@@ -26,8 +26,8 @@ pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>)
 
     let llm_client = LLM_Client::new();
 
-    let dubbing_service_url =
-        std::env::var("DUBBING_SERVICE_URL").unwrap_or("http://localhost:8000".to_string());
+    let dubbing_service_url = std::env::var("DUBBING_SERVICE_URL")
+        .context("DUBBING_SERVICE_URL environment variable must be set")?;
 
     let uniframe_studio_db_pool = setup_uniframe_studio_db().await?;
 

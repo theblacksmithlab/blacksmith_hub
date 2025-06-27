@@ -1,5 +1,5 @@
 use crate::state::server_common::app_state::ServerAppState;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::http::{HeaderValue, Method, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::options;
@@ -40,8 +40,8 @@ pub async fn start_server(server_app_state: Arc<ServerAppState>, app: Router) ->
         "{}:{}",
         server_app_state.config.server.host, server_app_state.config.server.port
     )
-    .parse()
-    .expect("Invalid host or port configuration");
+        .parse()
+        .context("Invalid host or port configuration")?;
 
     info!("Starting server on {}...", addr);
 
