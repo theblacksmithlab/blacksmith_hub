@@ -18,26 +18,17 @@ use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 pub struct DubbingPipelineService {
-    dubbing_client: DubbingClient,
     s3_client: Arc<S3Client>,
     db_pool: SqlitePool,
 }
 
 impl DubbingPipelineService {
-    pub fn new(
-        dubbing_client: DubbingClient,
-        s3_client: Arc<S3Client>,
-        db_pool: SqlitePool,
-    ) -> Self {
-        Self {
-            dubbing_client,
-            s3_client,
-            db_pool,
-        }
+    pub fn new(s3_client: Arc<S3Client>, db_pool: SqlitePool) -> Self {
+        Self { s3_client, db_pool }
     }
 
     const BACKEND_INNER_STEPS: &'static [StepInfo] = &[
@@ -194,9 +185,67 @@ impl DubbingPipelineService {
             created_at: now.to_rfc3339(),
         };
 
-        let dubbing_client = self.dubbing_client.clone();
+        info!("Attempting to acquire GPU instance for job {}", job_id);
+
+        let gpu_instance = match app_state
+            .gpu_instance_manager
+            .acquire_instance(&job_id)
+            .await
+        {
+            Ok(Some(instance)) => {
+                info!(
+                    "Successfully acquired GPU instance {} for job {}",
+                    instance.server_id, job_id
+                );
+                instance
+            }
+            Ok(None) => {
+                error!("No GPU instances available for job {}", job_id);
+
+                Self::update_pipeline_status(
+                    &self.db_pool,
+                    &job_id,
+                    "failed",
+                    "Server is currently overloaded. Please try again later.",
+                    Some(0),
+                    None,
+                    Some("All GPU processing instances are currently busy. Please try again in a few minutes."),
+                    None,
+                    None,
+                    None,
+                )
+                    .await;
+
+                return Err(anyhow::anyhow!(
+                    "Server overloaded: All GPU instances are busy"
+                ));
+            }
+            Err(e) => {
+                error!("Failed to acquire GPU instance for job {}: {}", job_id, e);
+
+                Self::update_pipeline_status(
+                    &self.db_pool,
+                    &job_id,
+                    "failed",
+                    "Technical environment initialization failed",
+                    Some(0),
+                    None,
+                    Some(&format!("Failed to acquire GPU instance: {}", e)),
+                    None,
+                    None,
+                    None,
+                )
+                .await;
+
+                return Err(e);
+            }
+        };
+
+        let dubbing_client = DubbingClient::new(gpu_instance.service_url.clone());
         let s3_client = self.s3_client.clone();
         let db_pool = self.db_pool.clone();
+
+        let server_id = gpu_instance.server_id.clone();
 
         tokio::spawn(async move {
             Self::pipeline_processor(
@@ -208,6 +257,7 @@ impl DubbingPipelineService {
                 db_pool,
                 app_state,
                 user_id_from_db,
+                server_id,
             )
             .await;
         });
@@ -224,11 +274,12 @@ impl DubbingPipelineService {
         db_pool: Pool<Sqlite>,
         app_state: Arc<UniframeStudioAppState>,
         user_id_from_db: String,
+        server_id: String,
     ) {
         let validated_transcription_keywords = match request.transcription_keywords {
-            Some(transcription_keywords) => {
-                Some(validate_transcription_keywords(transcription_keywords, app_state).await)
-            }
+            Some(transcription_keywords) => Some(
+                validate_transcription_keywords(transcription_keywords, app_state.clone()).await,
+            ),
             None => None,
         };
 
@@ -239,7 +290,7 @@ impl DubbingPipelineService {
                 &std::env::var("IMMERS_USERNAME").context("IMMERS_USERNAME not set")?,
                 &std::env::var("IMMERS_PASSWORD").context("IMMERS_PASSWORD not set")?,
                 &std::env::var("IMMERS_PROJECT").context("IMMERS_PROJECT not set")?,
-                std::env::var("IMMERS_AI_SERVER_ID").context("IMMERS_AI_SERVER_ID not set")?,
+                server_id.clone(),
             )
             .await
             .context("Failed to initialize Immers.Cloud client")?;
@@ -251,9 +302,7 @@ impl DubbingPipelineService {
                 gpu_processing_instance_status
             );
 
-            if gpu_processing_instance_status == "SHELVED_OFFLOADED"
-                || gpu_processing_instance_status == "SHELVED"
-            {
+            if gpu_processing_instance_status == "SHELVED_OFFLOADED" {
                 info!("GPU processing instance is sleeping, initiating wake-up process...");
 
                 Self::update_pipeline_status(
@@ -286,10 +335,11 @@ impl DubbingPipelineService {
                 )
                 .await;
 
-                immers_cloud_client.wait_for_instance_active(600).await?;
+                immers_cloud_client.wait_for_instance_active(180).await?;
 
                 info!(
-                    "GPU processing service is now active, waiting for it's components to start..."
+                    "GPU processing service {} is now active, waiting for components to start...",
+                    server_id
                 );
 
                 Self::update_pipeline_status(
@@ -306,7 +356,9 @@ impl DubbingPipelineService {
                 )
                 .await;
 
+                debug!("Timeout start");
                 tokio::time::sleep(Duration::from_secs(90)).await;
+                debug!("Timeout end");
 
                 let max_attempts = 30;
                 for attempt in 1..=max_attempts {
@@ -334,17 +386,19 @@ impl DubbingPipelineService {
 
                 info!("GPU processing instance and it's components prepared successfully!");
             } else if gpu_processing_instance_status == "ACTIVE" {
-                info!("GPU processing service is already active!");
+                info!("GPU processing service {} is already active!", server_id);
 
                 if let Err(e) = dubbing_client.health_check().await {
                     return Err(anyhow::anyhow!(
-                        "GPU processing instance is not responding: {}",
+                        "GPU processing instance {} is not responding: {}",
+                        server_id,
                         e
                     ));
                 }
             } else {
                 return Err(anyhow::anyhow!(
-                    "GPU processing service is in unexpected state: {}",
+                    "GPU processing service {} is in unexpected state: {}",
+                    server_id,
                     gpu_processing_instance_status
                 ));
             }
@@ -354,7 +408,7 @@ impl DubbingPipelineService {
         .await;
 
         if let Err(e) = gpu_processing_instance_init {
-            error!("Failed to prepare GPU instance: {}", e);
+            error!("Failed to prepare GPU instance {}: {}", server_id, e);
             Self::update_pipeline_status(
                 &db_pool,
                 &job_id,
@@ -362,21 +416,42 @@ impl DubbingPipelineService {
                 "Technical environment initialization failed",
                 Some(0),
                 None,
-                Some(&format!("Failed to prepare GPU service: {}", e)),
+                Some(&format!(
+                    "Failed to prepare GPU service {}: {}",
+                    server_id, e
+                )),
                 None,
                 None,
                 None,
             )
             .await;
 
-            if let Err(e) = Self::shelve_gpu_instance().await {
-                error!("Failed to shelve GPU instance: {}", e);
+            if let Err(release_err) = app_state
+                .gpu_instance_manager
+                .release_instance(&server_id, &job_id)
+                .await
+            {
+                error!(
+                    "Failed to release GPU instance {} after init failure: {}",
+                    server_id, release_err
+                );
             }
 
             return;
         }
 
-        info!("GPU instance ready, submitting job to dubbing_client...");
+        if let Err(e) = app_state
+            .gpu_instance_manager
+            .mark_instance_busy(&server_id, &job_id)
+            .await
+        {
+            error!("Failed to mark GPU instance {} as busy: {}", server_id, e);
+        }
+
+        info!(
+            "GPU instance {} ready, submitting job to dubbing_client...",
+            server_id
+        );
 
         Self::update_pipeline_status(
             &db_pool,
@@ -433,11 +508,16 @@ impl DubbingPipelineService {
                     s3_client,
                     db_pool,
                     user_id_from_db,
+                    app_state.clone(),
+                    server_id.clone(),
                 )
                 .await;
             }
             Err(e) => {
-                error!("Failed to submit job to processing service: {}", e);
+                error!(
+                    "Failed to submit job {} to processing service on instance {}: {}",
+                    job_id, server_id, e
+                );
                 Self::update_pipeline_status(
                     &db_pool,
                     &job_id,
@@ -452,10 +532,14 @@ impl DubbingPipelineService {
                 )
                 .await;
 
-                if let Err(shelve_err) = Self::shelve_gpu_instance().await {
+                if let Err(release_err) = app_state
+                    .gpu_instance_manager
+                    .release_instance(&server_id, &job_id)
+                    .await
+                {
                     error!(
-                        "Failed to shelve VDS after GPU init failure: {}",
-                        shelve_err
+                        "Failed to release GPU instance {} after job submission failure: {}",
+                        server_id, release_err
                     );
                 }
 
@@ -476,6 +560,8 @@ impl DubbingPipelineService {
         s3_client: Arc<S3Client>,
         db_pool: Pool<Sqlite>,
         user_id_from_db: String,
+        app_state: Arc<UniframeStudioAppState>,
+        server_id: String,
     ) {
         let max_checks = 600;
         let mut result: Option<Result<DubbingJobResult>> = None;
@@ -484,8 +570,8 @@ impl DubbingPipelineService {
             let interval = get_adaptive_interval(check_number);
 
             info!(
-                "Monitoring job status, check {}/{}",
-                check_number, max_checks
+                "Monitoring job status, check {}/{} on instance {}",
+                check_number, max_checks, server_id
             );
 
             match dubbing_client.get_job_status(&job_id).await {
@@ -552,14 +638,16 @@ impl DubbingPipelineService {
                             )
                             .await;
 
-                            if let Err(shelve_err) = Self::shelve_gpu_instance().await {
-                                error!(
-                                    "Failed to shelve GPU instance after connection failure: {}",
-                                    shelve_err
-                                );
-                            }
-
-                            break;
+                            cleanup_and_release_instance(
+                                app_state.clone(),
+                                db_pool.clone(),
+                                server_id.clone(),
+                                job_id.clone(),
+                                user_id_from_db.clone(),
+                                "failed during processing",
+                            )
+                            .await;
+                            return;
                         }
                         break;
                     }
@@ -581,13 +669,15 @@ impl DubbingPipelineService {
                         )
                         .await;
 
-                        if let Err(shelve_err) = Self::shelve_gpu_instance().await {
-                            error!(
-                                "Failed to shelve GPU instance after job failure: {}",
-                                shelve_err
-                            );
-                        }
-
+                        cleanup_and_release_instance(
+                            app_state.clone(),
+                            db_pool.clone(),
+                            server_id.clone(),
+                            job_id.clone(),
+                            user_id_from_db.clone(),
+                            "communication failure",
+                        )
+                        .await;
                         return;
                     }
                 }
@@ -598,7 +688,10 @@ impl DubbingPipelineService {
 
         match result {
             Some(Ok(job_result)) => {
-                info!("Processing successful dubbing job result...");
+                info!(
+                    "Processing successful dubbing job result from instance {}...",
+                    server_id
+                );
 
                 if let Some(result_urls) = job_result.result_urls {
                     let processed_urls = Self::process_result_urls(s3_client, result_urls).await;
@@ -606,8 +699,8 @@ impl DubbingPipelineService {
                     match processed_urls {
                         Ok(urls) => {
                             info!(
-                                "Pipeline completed successfully with {} result URLs",
-                                urls.len()
+                            "Pipeline completed successfully with {} result URLs on instance {}",
+                                urls.len(), server_id
                             );
                             Self::update_pipeline_status(
                                 &db_pool,
@@ -620,6 +713,16 @@ impl DubbingPipelineService {
                                 None,
                                 None,
                                 None,
+                            )
+                            .await;
+
+                            cleanup_and_release_instance(
+                                app_state.clone(),
+                                db_pool.clone(),
+                                server_id.clone(),
+                                job_id.clone(),
+                                user_id_from_db.clone(),
+                                "completed successfully",
                             )
                             .await;
                         }
@@ -639,12 +742,15 @@ impl DubbingPipelineService {
                             )
                             .await;
 
-                            if let Err(shelve_err) = Self::shelve_gpu_instance().await {
-                                error!(
-                                    "Failed to GPU instance after result processing failure: {}",
-                                    shelve_err
-                                );
-                            }
+                            cleanup_and_release_instance(
+                                app_state.clone(),
+                                db_pool.clone(),
+                                server_id.clone(),
+                                job_id.clone(),
+                                user_id_from_db.clone(),
+                                "result processing failure",
+                            )
+                            .await;
                         }
                     }
                 } else {
@@ -663,12 +769,15 @@ impl DubbingPipelineService {
                     )
                     .await;
 
-                    if let Err(shelve_err) = Self::shelve_gpu_instance().await {
-                        error!(
-                            "Failed to shelve GPU instance after result processing failure: {}",
-                            shelve_err
-                        );
-                    }
+                    cleanup_and_release_instance(
+                        app_state.clone(),
+                        db_pool.clone(),
+                        server_id.clone(),
+                        job_id.clone(),
+                        user_id_from_db.clone(),
+                        "no result URLs provided",
+                    )
+                    .await;
                 }
             }
             Some(Err(e)) => {
@@ -687,12 +796,15 @@ impl DubbingPipelineService {
                 )
                 .await;
 
-                if let Err(shelve_err) = Self::shelve_gpu_instance().await {
-                    error!(
-                        "Failed to shelve VDS after result processing failure: {}",
-                        shelve_err
-                    );
-                }
+                cleanup_and_release_instance(
+                    app_state.clone(),
+                    db_pool.clone(),
+                    server_id.clone(),
+                    job_id.clone(),
+                    user_id_from_db.clone(),
+                    "failed to get results",
+                )
+                .await;
             }
             None => {
                 error!("Maximum waiting time exceeded");
@@ -710,12 +822,15 @@ impl DubbingPipelineService {
                 )
                 .await;
 
-                if let Err(shelve_err) = Self::shelve_gpu_instance().await {
-                    error!(
-                        "Failed to shelve VDS after result processing failure: {}",
-                        shelve_err
-                    );
-                }
+                cleanup_and_release_instance(
+                    app_state.clone(),
+                    db_pool.clone(),
+                    server_id.clone(),
+                    job_id.clone(),
+                    user_id_from_db.clone(),
+                    "timeout",
+                )
+                .await;
             }
         }
 
@@ -723,39 +838,6 @@ impl DubbingPipelineService {
             "Dubbing pipeline successfully completed for job: {}",
             job_id
         );
-
-        match UserBalance::get_or_create(&db_pool, &user_id_from_db).await {
-            Ok(mut user_balance) => {
-                if let Err(e) = user_balance
-                    .complete_job(&db_pool, ProcessingType::Dubbing)
-                    .await
-                {
-                    error!(
-                        "Failed to release dubbing job slot for user {}: {}",
-                        user_id_from_db, e
-                    );
-                } else {
-                    info!(
-                        "Successfully released dubbing job slot for user {}",
-                        user_id_from_db
-                    );
-                }
-            }
-            Err(e) => {
-                error!(
-                    "Failed to get user balance to release job slot for user {}: {}",
-                    user_id_from_db, e
-                );
-            }
-        }
-
-        info!("Shelving GPU instance after job completion...");
-        if let Err(shelve_err) = Self::shelve_gpu_instance().await {
-            error!(
-                "Failed to shelve GPU instance after job submission failure: {}",
-                shelve_err
-            );
-        }
     }
 
     async fn process_result_urls(
@@ -974,21 +1056,54 @@ impl DubbingPipelineService {
 
         Ok(status)
     }
+}
 
-    async fn shelve_gpu_instance() -> Result<()> {
-        info!("Shelving GPU instance...");
+async fn cleanup_and_release_instance(
+    app_state: Arc<UniframeStudioAppState>,
+    db_pool: Pool<Sqlite>,
+    server_id: String,
+    job_id: String,
+    user_id_from_db: String,
+    reason: &str,
+) {
+    info!(
+        "Job {} {}, releasing GPU instance {}",
+        job_id, reason, server_id
+    );
 
-        let immers_cloud_client = ImmersCloudClient::new(
-            &std::env::var("IMMERS_USERNAME").context("IMMERS_USERNAME not set")?,
-            &std::env::var("IMMERS_PASSWORD").context("IMMERS_PASSWORD not set")?,
-            &std::env::var("IMMERS_PROJECT").context("IMMERS_PROJECT not set")?,
-            std::env::var("IMMERS_AI_SERVER_ID").context("IMMERS_AI_SERVER_ID not set")?,
-        )
+    if let Err(e) = app_state
+        .gpu_instance_manager
+        .release_instance(&server_id, &job_id)
         .await
-        .context("Failed to initialize Immers.Cloud client")?;
+    {
+        error!(
+            "Failed to release GPU instance {} after job {} {}: {}",
+            server_id, job_id, reason, e
+        );
+    }
 
-        immers_cloud_client.shelve_server().await?;
-        info!("GPU instance successfully shelved");
-        Ok(())
+    match UserBalance::get_or_create(&db_pool, &user_id_from_db).await {
+        Ok(mut user_balance) => {
+            if let Err(e) = user_balance
+                .complete_job(&db_pool, ProcessingType::Dubbing)
+                .await
+            {
+                error!(
+                    "Failed to release dubbing job slot for user {}: {}",
+                    user_id_from_db, e
+                );
+            } else {
+                info!(
+                    "Successfully released dubbing job slot for user {}",
+                    user_id_from_db
+                );
+            }
+        }
+        Err(e) => {
+            error!(
+                "Failed to get user balance to release job slot for user {}: {}",
+                user_id_from_db, e
+            );
+        }
     }
 }

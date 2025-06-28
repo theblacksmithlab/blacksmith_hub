@@ -40,8 +40,8 @@ pub async fn start_server(server_app_state: Arc<ServerAppState>, app: Router) ->
         "{}:{}",
         server_app_state.config.server.host, server_app_state.config.server.port
     )
-        .parse()
-        .context("Invalid host or port configuration")?;
+    .parse()
+    .context("Invalid host or port configuration")?;
 
     info!("Starting server on {}...", addr);
 

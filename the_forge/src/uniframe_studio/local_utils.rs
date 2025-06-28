@@ -47,7 +47,7 @@ pub(crate) async fn send_idea_email(idea_text: &str) -> anyhow::Result<()> {
     };
 
     let client = reqwest::Client::new();
-    
+
     let formatted_idea = idea_text
         .chars()
         .take(1000)
@@ -135,9 +135,6 @@ pub(crate) async fn send_idea_email(idea_text: &str) -> anyhow::Result<()> {
     } else {
         let error_text = response.text().await?;
         error!("Failed to send idea email: {}", error_text);
-        Err(anyhow::anyhow!(
-            "Idea email sending failed: {}",
-            error_text
-        ))
+        Err(anyhow::anyhow!("Idea email sending failed: {}", error_text))
     }
 }
