@@ -1,10 +1,7 @@
 use crate::uniframe_studio::auth_handlers::{
     auth_middleware, handle_check_session, handle_send_magic_link, handle_verify_token,
 };
-use crate::uniframe_studio::handlers::{
-    get_dubbing_pipeline_status, get_user_balance, get_user_jobs, handle_submit_idea,
-    prepare_dubbing_pipeline, refund_failed_job, start_dubbing_pipeline, submit_review,
-};
+use crate::uniframe_studio::handlers::{create_payment_invoice, get_dubbing_pipeline_status, get_user_balance, get_user_jobs, handle_submit_idea, prepare_dubbing_pipeline, refund_failed_job, start_dubbing_pipeline, submit_review};
 use crate::uniframe_studio::local_db::setup_uniframe_studio_db;
 use anyhow::{Context, Result};
 use async_openai::Client as LLM_Client;
@@ -65,6 +62,10 @@ fn get_uniframe_studio_router(uniframe_studio_app_state: Arc<UniframeStudioAppSt
             "/api/uniframe/submit-idea",
             post(handle_submit_idea).options(|| async { StatusCode::OK }),
         );
+        // .route(
+        //     "/api/uniframe/payment/webhook",
+        //     post(handle_payment_webhook).options(|| async { StatusCode::OK }),
+        // );
 
     let protected_routes = Router::new()
         .route(
@@ -94,6 +95,10 @@ fn get_uniframe_studio_router(uniframe_studio_app_state: Arc<UniframeStudioAppSt
         .route(
             "/api/uniframe/user/refund/{jobId}",
             post(refund_failed_job).options(|| async { StatusCode::OK }),
+        )
+        .route(
+            "/api/uniframe/payment/topup",
+            post(create_payment_invoice).options(|| async { StatusCode::OK }),
         )
         .layer(axum::middleware::from_fn_with_state(
             uniframe_studio_app_state.clone(),

@@ -4,6 +4,7 @@ use crate::uniframe_studio::local_utils::{
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
 use core::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
+use core::models::uniframe_studio::payment_models::{TopUpRequest, TopUpResponse};
 use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
 use core::models::uniframe_studio::uniframe_studio::{
     ApiError, DubbingPipelinePrepareRequest, DubbingPipelinePrepareResponse,
@@ -15,6 +16,7 @@ use http::StatusCode;
 use sqlx::Row;
 use std::sync::Arc;
 use tracing::{error, info, warn};
+use::core::utils::uniframe_studio::heleket_client::{HeleketClient, HeleketConfig};
 
 pub async fn prepare_dubbing_pipeline(
     State(state): State<Arc<UniframeStudioAppState>>,
@@ -438,5 +440,40 @@ pub async fn handle_submit_idea(
     Ok(Json(SubmitIdeaResponse {
         success: true,
         message: "Submission successful".to_string(),
+    }))
+}
+
+pub async fn create_payment_invoice(
+    State(app_state): State<Arc<UniframeStudioAppState>>,
+    Extension(user_id): Extension<String>,
+    Json(request): Json<TopUpRequest>,
+) -> Result<Json<TopUpResponse>, (StatusCode, String)> {
+    if request.amount_usd <= 0.0 {
+        return Err((StatusCode::BAD_REQUEST, "Amount must be greater than 0".to_string()));
+    }
+
+    if request.amount_usd < 1.0 {
+        return Err((StatusCode::BAD_REQUEST, "Minimum top-up amount is $1.00".to_string()));
+    }
+
+    if request.amount_usd > 1000.0 {
+        return Err((StatusCode::BAD_REQUEST, "Maximum top-up amount is $1,000.00".to_string()));
+    }
+    
+    let config = HeleketConfig::default();
+    let client = HeleketClient::new(config);
+    
+    let invoice = client
+        .create_invoice(request.amount_usd, &user_id)
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to create Heleket invoice: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create payment invoice".to_string())
+        })?;
+
+    Ok(Json(TopUpResponse {
+        payment_url: invoice.url,
+        order_id: invoice.order_id,
+        amount_usd: request.amount_usd,
     }))
 }
