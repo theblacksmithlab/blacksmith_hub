@@ -26,17 +26,19 @@ pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>)
 
     let llm_client = LLM_Client::new();
 
-    let dubbing_service_url = std::env::var("DUBBING_SERVICE_URL")
-        .context("DUBBING_SERVICE_URL environment variable must be set")?;
-
     let uniframe_studio_db_pool = setup_uniframe_studio_db().await?;
 
     let uniframe_studio_app_state = Arc::new(UniframeStudioAppState::new(
         s3_client,
-        dubbing_service_url,
         uniframe_studio_db_pool,
         llm_client,
-    ));
+    )?);
+
+    info!("Initializing GPU instances...");
+    uniframe_studio_app_state
+        .initialize_gpu_instances()
+        .await
+        .context("Failed to initialize GPU instances")?;
 
     let router = get_uniframe_studio_router(uniframe_studio_app_state);
 

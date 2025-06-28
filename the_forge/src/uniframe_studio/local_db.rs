@@ -144,6 +144,15 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             created_at TEXT DEFAULT (datetime('now'))
         );
 
+        CREATE TABLE IF NOT EXISTS gpu_instances (
+            server_id TEXT PRIMARY KEY,
+            service_url TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'waking_up', 'busy', 'error')),
+            current_job_id TEXT,
+            last_updated TEXT DEFAULT (datetime('now')),
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
     ";
 
     pool.execute(query).await?;

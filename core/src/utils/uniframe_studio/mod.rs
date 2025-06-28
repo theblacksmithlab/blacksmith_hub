@@ -1,2 +1,3 @@
 pub mod dubbing_pipeline;
-mod uniframe_studio;
+pub mod gpu_instance_manager;
+pub mod uniframe_studio;
