@@ -38,7 +38,7 @@ pub struct CreateInvoiceRequest {
     pub amount: String,
     pub currency: String,
     pub order_id: String,
-    pub url_callback: String,
+    // pub url_callback: String,
     pub url_success: String,
     pub url_return: String,
 }
@@ -87,7 +87,7 @@ impl HeleketClient {
             amount: amount_usd.to_string(),
             currency: "USD".to_string(),
             order_id: order_id.clone(),
-            url_callback: self.config.webhook_url.clone(),
+            // url_callback: self.config.webhook_url.clone(),
             url_success: self.config.success_url.clone(),
             url_return: self.config.cancel_url.clone(),
         };
@@ -110,7 +110,7 @@ impl HeleketClient {
         println!("Request body: {}", body);
         println!("Merchant ID: {}", self.config.merchant_id);
         println!("Signature: {}", signature);
-        
+
         if response_data.state != 0 {
             let error_msg = if let Some(message) = response_data.clone().message {
                 format!("Heleket API error: {}", message)
