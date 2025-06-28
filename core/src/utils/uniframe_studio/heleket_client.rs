@@ -101,12 +101,16 @@ impl HeleketClient {
             .header("Content-Type", "application/json")
             .header("merchant", &self.config.merchant_id)
             .header("sign", &signature)
-            .body(body)
+            .body(body.clone())
             .send()
             .await?;
 
         let response_data: CreateInvoiceResponse = response.json().await?;
 
+        println!("Request body: {}", body);
+        println!("Merchant ID: {}", self.config.merchant_id);
+        println!("Signature: {}", signature);
+        
         if response_data.state != 0 {
             let error_msg = if let Some(message) = response_data.clone().message {
                 format!("Heleket API error: {}", message)
