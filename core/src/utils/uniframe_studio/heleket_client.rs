@@ -39,8 +39,8 @@ pub struct CreateInvoiceRequest {
     pub currency: String,
     pub order_id: String,
     // pub url_callback: String,
-    pub url_success: String,
-    pub url_return: String,
+    // pub url_success: String,
+    // pub url_return: String,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -88,8 +88,8 @@ impl HeleketClient {
             currency: "USD".to_string(),
             order_id: order_id.clone(),
             // url_callback: self.config.webhook_url.clone(),
-            url_success: self.config.success_url.clone(),
-            url_return: self.config.cancel_url.clone(),
+            // url_success: self.config.success_url.clone(),
+            // url_return: self.config.cancel_url.clone(),
         };
 
         let body = serde_json::to_string(&request)?;
