@@ -43,13 +43,15 @@ pub struct CreateInvoiceRequest {
     pub url_return: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct CreateInvoiceResponse {
     pub state: i32,
     pub result: Option<InvoiceResult>,
+    pub message: Option<String>,
+    pub errors: Option<serde_json::Value>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct InvoiceResult {
     pub uuid: String,
     pub order_id: String,
@@ -106,7 +108,16 @@ impl HeleketClient {
         let response_data: CreateInvoiceResponse = response.json().await?;
 
         if response_data.state != 0 {
-            return Err(anyhow!("Heleket API error: state = {}", response_data.state));
+            let error_msg = if let Some(message) = response_data.clone().message {
+                format!("Heleket API error: {}", message)
+            } else if let Some(errors) = response_data.clone().errors {
+                format!("Heleket API validation errors: {}", errors)
+            } else {
+                format!("Heleket API error: state = {}", response_data.state)
+            };
+
+            eprintln!("Heleket response: {:?}", response_data);
+            return Err(anyhow!(error_msg));
         }
 
         response_data.result.ok_or_else(|| anyhow!("No result in response"))
