@@ -21,7 +21,7 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
             <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%); padding: 15px 20px;">
                 <tr>
                     <td align="center">
-                        <table width="800" cellpadding="0" cellspacing="0" style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); max-width: 650px;">
+                        <table width="1200" cellpadding="0" cellspacing="0" style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); max-width: 650px;">
                             
                             <!-- Header with gradient -->
                             <tr>
@@ -76,7 +76,7 @@ pub fn create_magic_link_html(magic_link: &str) -> String {
                                     </div>
                                     
                                     <!-- Security footer -->
-                                    <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 16px; margin-top: 16px;">
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 16px; margin-top: 16px; text-align: center;">
                                         <tr>
                                             <td style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 14px;">
                                                 <p style="margin: 0 0 6px 0; color: #10b981; font-size: 14px; line-height: 18px; font-weight: 600;">

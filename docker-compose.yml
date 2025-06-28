@@ -82,8 +82,6 @@ services:
       - .env
     ports:
       - "127.0.0.1:8080:8080"
-    environment:
-      - DUBBING_SERVICE_URL=http://176.99.133.213:8000
     deploy:
       resources:
         limits:

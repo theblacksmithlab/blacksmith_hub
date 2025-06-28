@@ -18,7 +18,7 @@ use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 pub struct DubbingPipelineService {
@@ -335,7 +335,7 @@ impl DubbingPipelineService {
                 )
                 .await;
 
-                immers_cloud_client.wait_for_instance_active(600).await?;
+                immers_cloud_client.wait_for_instance_active(180).await?;
 
                 info!(
                     "GPU processing service {} is now active, waiting for components to start...",
@@ -356,7 +356,9 @@ impl DubbingPipelineService {
                 )
                 .await;
 
+                debug!("Timeout start");
                 tokio::time::sleep(Duration::from_secs(90)).await;
+                debug!("Timeout end");
 
                 let max_attempts = 30;
                 for attempt in 1..=max_attempts {
@@ -1054,23 +1056,6 @@ impl DubbingPipelineService {
 
         Ok(status)
     }
-
-    async fn shelve_gpu_instance() -> Result<()> {
-        info!("Shelving GPU instance...");
-
-        let immers_cloud_client = ImmersCloudClient::new(
-            &std::env::var("IMMERS_USERNAME").context("IMMERS_USERNAME not set")?,
-            &std::env::var("IMMERS_PASSWORD").context("IMMERS_PASSWORD not set")?,
-            &std::env::var("IMMERS_PROJECT").context("IMMERS_PROJECT not set")?,
-            std::env::var("IMMERS_AI_SERVER_ID").context("IMMERS_AI_SERVER_ID not set")?,
-        )
-        .await
-        .context("Failed to initialize Immers.Cloud client")?;
-
-        immers_cloud_client.shelve_server().await?;
-        info!("GPU instance successfully shelved");
-        Ok(())
-    }
 }
 
 async fn cleanup_and_release_instance(
@@ -1086,7 +1071,6 @@ async fn cleanup_and_release_instance(
         job_id, reason, server_id
     );
 
-    // Release GPU instance
     if let Err(e) = app_state
         .gpu_instance_manager
         .release_instance(&server_id, &job_id)
@@ -1098,7 +1082,6 @@ async fn cleanup_and_release_instance(
         );
     }
 
-    // Release user balance slot
     match UserBalance::get_or_create(&db_pool, &user_id_from_db).await {
         Ok(mut user_balance) => {
             if let Err(e) = user_balance
