@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
-use reqwest::Client;
 use anyhow::{anyhow, Result};
+use base64::{engine::general_purpose, Engine as _};
+use md5::{Digest, Md5};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use md5::{Md5, Digest};
-use base64::{Engine as _, engine::general_purpose};
 
 #[derive(Clone)]
 pub struct HeleketConfig {
@@ -20,15 +20,15 @@ impl Default for HeleketConfig {
         Self {
             merchant_id: std::env::var("HELEKET_MERCHANT_ID")
                 .expect("HELEKET_MERCHANT_ID must be set"),
-            api_key: std::env::var("HELEKET_API_KEY")
-                .expect("HELEKET_API_KEY must be set"),
+            api_key: std::env::var("HELEKET_API_KEY").expect("HELEKET_API_KEY must be set"),
             base_url: "https://api.heleket.com".to_string(),
             webhook_url: std::env::var("HELEKET_WEBHOOK_URL")
                 .expect("HELEKET_WEBHOOK_URL must be set"),
             success_url: std::env::var("HELEKET_SUCCESS_URL")
                 .unwrap_or_else(|_| "https://uniframe.studio/billing?payment=success".to_string()),
-            cancel_url: std::env::var("HELEKET_CANCEL_URL")
-                .unwrap_or_else(|_| "https://uniframe.studio/billing?payment=cancelled".to_string()),
+            cancel_url: std::env::var("HELEKET_CANCEL_URL").unwrap_or_else(|_| {
+                "https://uniframe.studio/billing?payment=cancelled".to_string()
+            }),
         }
     }
 }
@@ -57,6 +57,34 @@ pub struct InvoiceResult {
     pub order_id: String,
     pub amount: String,
     pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payment_amount: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payer_amount: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discount_percent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discount: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payer_currency: Option<String>,
+    pub currency: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub merchant_amount: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub txid: Option<String>,
+    pub payment_status: String,
+    pub expired_at: i64,
+    pub is_final: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additional_data: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 pub struct HeleketClient {
@@ -107,10 +135,6 @@ impl HeleketClient {
 
         let response_data: CreateInvoiceResponse = response.json().await?;
 
-        println!("Request body: {}", body);
-        println!("Merchant ID: {}", self.config.merchant_id);
-        println!("Signature: {}", signature);
-        
         if response_data.state != 0 {
             let error_msg = if let Some(message) = response_data.clone().message {
                 format!("Heleket API error: {}", message)
@@ -124,6 +148,8 @@ impl HeleketClient {
             return Err(anyhow!(error_msg));
         }
 
-        response_data.result.ok_or_else(|| anyhow!("No result in response"))
+        response_data
+            .result
+            .ok_or_else(|| anyhow!("No result in response"))
     }
 }

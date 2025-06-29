@@ -63,7 +63,6 @@ impl UserBalance {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut tx = pool.begin().await?;
 
-        // Charge from balance
         sqlx::query(
             "UPDATE user_balances 
              SET balance_usd = balance_usd - ?, updated_at = datetime('now') 
@@ -74,7 +73,6 @@ impl UserBalance {
         .execute(&mut *tx)
         .await?;
 
-        // Увеличиваем счетчик активных задач
         let field = match job_type {
             ProcessingType::Dubbing => "active_dubbing_jobs",
             ProcessingType::LipSync => "active_lipsync_jobs",
@@ -88,7 +86,6 @@ impl UserBalance {
         .execute(&mut *tx)
         .await?;
 
-        // Создаем транзакцию
         sqlx::query(
             "INSERT INTO transactions (id, user_id, type, amount_usd, status, description) 
              VALUES (?, ?, 'charge', ?, 'completed', ?)",

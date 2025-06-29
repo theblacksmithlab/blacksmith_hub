@@ -2,7 +2,6 @@ use core::models::uniframe_studio::uniframe_studio::TurnstileVerifyResponse;
 use tracing::{error, info};
 
 pub async fn is_premium_user(_user_id: Option<&str>) -> bool {
-    // TODO: Implement user's subscription tier detection fn
     true
 }
 

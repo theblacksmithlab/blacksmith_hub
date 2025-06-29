@@ -23,5 +23,7 @@ rustls.workspace = true
 sqlx.workspace = true
 chrono.workspace = true
 reqwest.workspace = true
+md-5.workspace = true
+serde.workspace = true
 
 core = { path = "../core" }
