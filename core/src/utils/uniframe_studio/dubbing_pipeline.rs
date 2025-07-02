@@ -158,7 +158,6 @@ impl DubbingPipelineService {
     pub async fn start_pipeline(
         &self,
         request: DubbingPipelineRequest,
-        is_premium: bool,
         app_state: Arc<UniframeStudioAppState>,
         user_id: String,
     ) -> Result<DubbingPipelineResponse> {
@@ -251,7 +250,6 @@ impl DubbingPipelineService {
             Self::pipeline_processor(
                 job_id,
                 request,
-                is_premium,
                 dubbing_client,
                 s3_client,
                 db_pool,
@@ -268,7 +266,6 @@ impl DubbingPipelineService {
     async fn pipeline_processor(
         job_id: String,
         request: DubbingPipelineRequest,
-        is_premium: bool,
         dubbing_client: DubbingClient,
         s3_client: Arc<S3Client>,
         db_pool: Pool<Sqlite>,
@@ -474,7 +471,6 @@ impl DubbingPipelineService {
             tts_provider: request.tts_provider,
             tts_voice: request.tts_voice,
             source_language: request.source_language,
-            is_premium,
             transcription_keywords: validated_transcription_keywords,
         };
 

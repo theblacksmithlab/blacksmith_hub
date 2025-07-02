@@ -1,6 +1,4 @@
-use crate::uniframe_studio::local_utils::{
-    is_premium_user, send_idea_email, verify_turnstile_token,
-};
+use crate::uniframe_studio::local_utils::{send_idea_email, verify_turnstile_token};
 use ::core::utils::uniframe_studio::heleket_client::{HeleketClient, HeleketConfig};
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
@@ -77,8 +75,6 @@ pub async fn start_dubbing_pipeline(
             }),
         ));
     }
-    
-    let user_is_premium = is_premium_user(Some(&user_id)).await;
 
     let pipeline_info = match sqlx::query(
         "SELECT user_id, estimated_cost_usd FROM dubbing_pipelines WHERE job_id = ?",
@@ -159,7 +155,6 @@ pub async fn start_dubbing_pipeline(
         .dubbing_pipeline_service
         .start_pipeline(
             request.clone(),
-            user_is_premium,
             state.clone(),
             user_id.clone(),
         )
