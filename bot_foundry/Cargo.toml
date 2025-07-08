@@ -20,5 +20,7 @@ unicode-segmentation.workspace = true
 emojis.workspace = true
 regex.workspace = true
 rustls.workspace = true
+reqwest.workspace = true
+sqlx.workspace = true
 
 core = { path = "../core" }

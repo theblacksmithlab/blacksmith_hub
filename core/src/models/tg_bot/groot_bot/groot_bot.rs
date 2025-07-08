@@ -293,9 +293,6 @@ pub enum GrootBotCommands {
     About,
     Resources,
     Manual,
-    Logs,
-    Ask,
-    Backup,
     Results,
     Groot,
 }

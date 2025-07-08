@@ -4,18 +4,17 @@ use crate::groot_bot::chat_moderation_utils::{
     save_message_counts_to_file, scam_emojis_check, scam_stories_check, update_user_message_count,
     via_bot_message_check,
 };
-use crate::groot_bot::groot_bot_utils::{
-    load_black_listed_users, load_paid_chats, load_white_listed_users,
-};
+use crate::groot_bot::groot_bot_utils::{is_message_from_linked_channel, load_black_listed_users, load_paid_chats, load_white_listed_users};
 use crate::groot_bot::resources_cmd_handler::resources_cmd_handler;
 use anyhow::Result;
 use core::state::tg_bot::app_state::BotAppState;
 use std::sync::Arc;
 use teloxide::prelude::Message;
 use teloxide::Bot;
-use tracing::info;
+use teloxide_core::prelude::{Request, Requester};
+use tracing::{error, info};
 
-pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>) -> Result<()> {
+pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>, is_paid_chat: bool) -> Result<()> {
     let user_id = msg.clone().from.unwrap().id.0;
     let username = msg
         .from
@@ -55,16 +54,45 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
                 )
                 .await;
             }
-            // if state.awaiting_ask_message {
-            //     return handle_ask(bot, msg, state, app_state.clone()).await;
-            // }
         }
     }
 
+    let mut is_admin = false;
+    let mut is_from_linked_channel = false;
+    
+    match bot.get_chat_administrators(msg.chat.id).send().await {
+        Ok(admins) => {
+            is_admin = msg
+                .from
+                .as_ref()
+                .map(|user| admins.iter().any(|admin| admin.user.id == user.id))
+                .unwrap_or(false);
+        }
+        Err(err) => {
+            error!("Error getting admins list from public chat: {:?}", err);
+        }
+    }
+    
+    if let Ok(true) = is_message_from_linked_channel(&bot, &msg).await {
+        is_from_linked_channel = true;
+        info!("Message from linked channel detected");
+    }
+    
+    if is_admin {
+        info!("Message from chat admin - skipping moderation");
+        return Ok(());
+    }
+
+    if is_from_linked_channel {
+        info!("Message from linked channel - skipping moderation");
+        return Ok(());
+    }
+    
     let app_name = &app_state.app_name;
     let chat_title = msg.chat.title().unwrap_or_else(|| "Unknown Chat");
     let _paid_chats = load_paid_chats(app_name);
-    let is_paid_chat = true; //paid_chats.contains(&msg.chat.id.0);
+    // let is_paid_chat = true;
+    // paid_chats.contains(&msg.chat.id.0);
     let white_listed_users = load_white_listed_users(app_name);
     let black_listed_users = load_black_listed_users(app_name);
     let message_to_check = if let Some(text) = msg.text() {
@@ -111,8 +139,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
     )
     .await
     {
-        // update_user_message_count(app_state.clone(), chat_title, msg.chat.id.0, user_id, &username).await;
-        // save_message_counts_to_file(app_state.clone()).await;
+        
         return Ok(());
     }
 

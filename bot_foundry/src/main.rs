@@ -79,15 +79,9 @@ async fn main() -> Result<()> {
     let llm_client = LLM_Client::new();
 
     let app_state = if app_name == AppName::GrootBot {
-        Arc::new(
-            BotAppState::with_groot_bot_options(llm_client, qdrant_client, app_name.clone()).await,
-        )
+        Arc::new(BotAppState::with_groot_bot_options(llm_client, qdrant_client, app_name.clone()).await?)
     } else {
-        Arc::new(BotAppState::new(
-            llm_client,
-            qdrant_client,
-            app_name.clone(),
-        ))
+        Arc::new(BotAppState::new(llm_client, qdrant_client, app_name.clone()).await?)
     };
 
     let handlers = match get_handlers(&app_name) {

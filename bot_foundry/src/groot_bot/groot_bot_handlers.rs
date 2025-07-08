@@ -1,22 +1,22 @@
 use crate::groot_bot::chat_moderation::chat_moderation;
 use crate::groot_bot::chat_moderation_utils::handle_groot_report;
-use crate::groot_bot::groot_bot_utils::{auto_delete_message, load_super_admins};
+use crate::groot_bot::groot_bot_utils::{auto_delete_message, is_message_from_linked_channel, load_super_admins};
 use anyhow::Result;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState, ShowType};
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
-use core::utils::tg_bot::groot_bot::build_resource_file_path;
 use std::env;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Request, Requester, Update};
-use teloxide::types::{InputFile, KeyboardButton, KeyboardMarkup, UpdateKind};
+use teloxide::types::{KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
 use tracing::{error, info};
+use crate::groot_bot::subscription::check_chat_payment;
+
 
 pub async fn groot_bot_command_handler(
     bot: Bot,
@@ -34,7 +34,18 @@ pub async fn groot_bot_command_handler(
         .username
         .unwrap_or("Anonymous User".to_string());
     let mut is_admin = false;
+    let mut is_from_linked_channel = false;
 
+    // // Checking subscription
+    // let is_paid_chat = if let Some(db_pool) = &app_state.db_pool {
+    //     check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+    // } else {
+    //     false
+    // };
+
+    let is_paid_chat = true;
+
+    // Getting public chat's administrators
     if !msg.chat.is_private() {
         match bot.get_chat_administrators(msg.chat.id).send().await {
             Ok(admins) => {
@@ -48,8 +59,14 @@ pub async fn groot_bot_command_handler(
                 error!("Error getting admins list from public chat: {:?}", err);
             }
         }
-    }
 
+        if let Ok(true) = is_message_from_linked_channel(&bot, &msg).await {
+            is_from_linked_channel = true;
+            info!("Command from linked channel detected");
+        }
+    }
+    
+    // Setting-up LORD_ADMIN_ID
     let lord_admin_id = match env::var("LORD_ADMIN_ID") {
         Ok(val) => match val.parse::<u64>() {
             Ok(id) => id,
@@ -78,7 +95,8 @@ pub async fn groot_bot_command_handler(
             return Ok(());
         }
     };
-
+    
+    // Execution area check
     if cmd != GrootBotCommands::Start && cmd != GrootBotCommands::Groot && !msg.chat.is_private() {
         info!(
             "User | {} | with id: {} tried to use {:?} command in public chat {}",
@@ -105,8 +123,90 @@ pub async fn groot_bot_command_handler(
         return Ok(());
     }
 
-    if (cmd == GrootBotCommands::Resources || cmd == GrootBotCommands::Logs)
-        && !super_admins.contains(&user_id)
+    if (cmd == GrootBotCommands::Start || cmd == GrootBotCommands::Groot) && msg.chat.is_private() {
+        info!(
+            "User | {} | with id: {} tried to use /{:?} command in private chat",
+            username, user_id, cmd
+        );
+
+        let bot_msg = match cmd {
+            GrootBotCommands::Start => {
+                get_message(AppsSystemMessages::GrootBot(
+                    GrootBotMessages::StartCmdUsedInPrivateChat,
+                )).await?
+            },
+            GrootBotCommands::Groot => {
+                get_message(AppsSystemMessages::GrootBot(
+                    GrootBotMessages::PublicCmdUsedInPrivateChat,
+                )).await?
+            },
+            _ => unreachable!(),
+        };
+
+        let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+            .await;
+
+        return Ok(());
+    }
+    
+    // Executor check
+    if cmd == GrootBotCommands::Start && !is_admin && !is_from_linked_channel && user_id != lord_admin_id {
+        info!(
+        "User | {} | with id: {} tried to use /{:?} command in public chat",
+        username, user_id, cmd
+    );
+
+        let bot_msg = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::CommonStartCmdReaction,
+        )).await?;
+
+        let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        ).await;
+
+        return Ok(());
+    }
+
+    if cmd == GrootBotCommands::Start
+        && !msg.chat.is_private()
+        && (is_admin || is_from_linked_channel || user_id == lord_admin_id) {
+
+        if msg.chat.username().is_none() {
+            info!(
+            "Admin | {} | with id: {} tried to use /{:?} command in chat without username",
+            username, user_id, cmd
+        );
+
+            let bot_msg = get_message(AppsSystemMessages::GrootBot(
+                GrootBotMessages::NoUsernameForChatAlert,
+            )).await?;
+
+            let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
+
+            auto_delete_message(
+                bot.clone(),
+                bot_system_message.chat.id,
+                bot_system_message.id,
+                Duration::from_secs(120),
+            ).await;
+
+            return Ok(());
+        }
+    }
+    
+    if cmd == GrootBotCommands::Resources && !super_admins.contains(&user_id)
     {
         info!(
             "Non-super-admin user | {} | with id: {} tried to use /{:?} command",
@@ -130,92 +230,24 @@ pub async fn groot_bot_command_handler(
         return Ok(());
     }
 
-    if cmd == GrootBotCommands::Ask {
-        if !super_admins.contains(&user_id) {
-            info!(
-                "Non-super-admin | {} | with id: {} tried to use /{:?} command",
-                username, user_id, cmd
-            );
-            let bot_msg = get_message(AppsSystemMessages::GrootBot(
-                GrootBotMessages::NoRightsForUseCmd,
-            ))
-            .await?;
-
-            let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
-
-            auto_delete_message(
-                bot.clone(),
-                bot_system_message.chat.id,
-                bot_system_message.id,
-                Duration::from_secs(120),
-            )
-            .await;
-
-            return Ok(());
-        }
-
-        // TODO: implement an interactive ai-system of usage instructions
-    }
-
-    if (cmd == GrootBotCommands::Start || cmd == GrootBotCommands::Groot) && msg.chat.is_private() {
-        info!(
-            "User | {} | with id: {} tried to use /{:?} command in private chat",
-            username, user_id, cmd
-        );
-
-        let bot_msg = get_message(AppsSystemMessages::GrootBot(
-            GrootBotMessages::PublicCmdUsedInPrivateChat,
-        ))
-        .await?;
-
-        let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
-
-        auto_delete_message(
-            bot.clone(),
-            bot_system_message.chat.id,
-            bot_system_message.id,
-            Duration::from_secs(120),
-        )
-        .await;
-
-        return Ok(());
-    }
-
-    if cmd == GrootBotCommands::Start && !is_admin && user_id != lord_admin_id {
-        info!(
-            "User | {} | with id: {} tried to use /{:?} command in public chat: ",
-            username, user_id, cmd
-        );
-
-        let bot_msg = get_message(AppsSystemMessages::GrootBot(
-            GrootBotMessages::StartCmdReaction,
-        ))
-        .await?;
-
-        let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
-
-        auto_delete_message(
-            bot.clone(),
-            bot_system_message.chat.id,
-            bot_system_message.id,
-            Duration::from_secs(120),
-        )
-        .await;
-
-        return Ok(());
-    }
-
     match cmd {
         GrootBotCommands::Start => {
             let bot_msg =
-                get_message(AppsSystemMessages::GrootBot(GrootBotMessages::StartMessage)).await?;
+                get_message(AppsSystemMessages::GrootBot(GrootBotMessages::StartCmdUsedInPublicChat)).await?;
             bot.send_message(msg.chat.id, bot_msg).await?;
+            
+            if !is_paid_chat {
+                let demo_msg = get_message(AppsSystemMessages::GrootBot(
+                    GrootBotMessages::DemoModeMessage,
+                )).await?;
+                bot.send_message(msg.chat.id, demo_msg).await?;
+            } else {
+                let chat_username = msg.chat.username().unwrap();
 
-            if let Some(chat_username) = msg.chat.username() {
                 info!(
-                    "Chat: {} with id: {} has username set. Fetching chat history...",
-                    chat_username, msg.chat.id
-                );
+            "Chat: {} with id: {} is paid. Fetching chat history...",
+            chat_username, msg.chat.id
+        );
 
                 let mut chat_stats = app_state.chat_message_stats.as_ref().unwrap().lock().await;
                 if let Err(err) = chat_stats
@@ -227,17 +259,10 @@ pub async fn groot_bot_command_handler(
                     .await
                 {
                     error!(
-                        "Error fetching chat history for a new chat: {} with id: {}: {}",
-                        chat_username, msg.chat.id, err
-                    );
+                "Error fetching chat history for a new chat: {} with id: {}: {}",
+                chat_username, msg.chat.id, err
+            );
                 }
-            } else {
-                let bot_msg = get_message(AppsSystemMessages::GrootBot(
-                    GrootBotMessages::NoUsernameForChatAlert,
-                ))
-                .await?;
-                bot.send_message(msg.chat.id, bot_msg).await?;
-                return Ok(());
             }
         }
         GrootBotCommands::About => {
@@ -280,62 +305,6 @@ pub async fn groot_bot_command_handler(
             ))
             .await?;
             bot.send_message(msg.chat.id, bot_msg).await?;
-        }
-        GrootBotCommands::Ask => {
-            let bot_msg = get_message(AppsSystemMessages::GrootBot(GrootBotMessages::Ask)).await?;
-            bot.send_message(msg.chat.id, bot_msg).await?;
-        }
-        GrootBotCommands::Backup => {
-            if user_id != lord_admin_id {
-                let bot_msg = get_message(AppsSystemMessages::GrootBot(
-                    GrootBotMessages::NoRightsForUseCmd,
-                ))
-                .await?;
-
-                bot.send_message(msg.chat.id, bot_msg).await?;
-            } else {
-                let files_to_send = [
-                    (
-                        build_resource_file_path(app_name, "white_listed_users.json"),
-                        "white_listed_users.json",
-                    ),
-                    (
-                        build_resource_file_path(app_name, "black_listed_users.json"),
-                        "black_listed_users.json",
-                    ),
-                    (
-                        build_resource_file_path(app_name, "message_counts.json"),
-                        "message_counts.json",
-                    ),
-                    (
-                        build_resource_file_path(app_name, "restricted_words.json"),
-                        "restricted_words.json",
-                    ),
-                    (
-                        build_resource_file_path(app_name, "chats_list.json"),
-                        "chats_list.json",
-                    ),
-                    (
-                        build_resource_file_path(app_name, "penalty_points.json"),
-                        "penalty_points.json",
-                    ),
-                ];
-
-                for (file_path, file_name) in files_to_send.iter() {
-                    let path = Path::new(file_path);
-                    if path.exists() {
-                        info!("Backup requested by LORD_ADMIN");
-                        bot.send_document(
-                            msg.chat.id,
-                            InputFile::file(path).file_name(file_name.to_string()),
-                        )
-                        .await?;
-                    } else {
-                        bot.send_message(msg.chat.id, format!("File {} not found", file_name))
-                            .await?;
-                    }
-                }
-            }
         }
         GrootBotCommands::Results => {
             let bot_msg = get_message(AppsSystemMessages::GrootBot(
@@ -414,9 +383,6 @@ pub async fn groot_bot_command_handler(
                 .await;
             }
         }
-        _ => {
-            bot.send_message(msg.chat.id, "Invalid cmd").await?;
-        }
     }
 
     Ok(())
@@ -439,7 +405,27 @@ pub async fn groot_bot_message_handler(
         _ => return Ok(()),
     };
 
-    chat_moderation(bot, msg, bot_app_state).await?;
+    if msg.chat.is_private() {
+        info!("Got private chat message - skipping moderation");
+
+        let bot_msg = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::NoNeedForCheckInPrivateChat,
+        ))
+            .await?;
+
+        bot.send_message(msg.chat.id, bot_msg).await?;
+        return Ok(());
+    }
+
+    let is_paid_chat = true;
+    
+    // let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
+    //     check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+    // } else {
+    //     false
+    // };
+    
+    chat_moderation(bot, msg, bot_app_state, is_paid_chat).await?;
 
     Ok(())
 }

@@ -419,3 +419,40 @@ pub async fn add_user_to_black_list(app_name: &AppName, user_id: u64) {
         }
     }
 }
+
+
+pub async fn is_message_from_linked_channel(
+    bot: &Bot,
+    msg: &Message
+) -> Result<bool> {
+    if let Some(sender_chat) = &msg.sender_chat {
+        if let Ok(Some(linked_channel_id)) = get_linked_channel_id(bot, msg.chat.id).await {
+            return Ok(sender_chat.id.0 == linked_channel_id);
+        }
+    }
+    Ok(false)
+}
+
+pub async fn get_linked_channel_id(bot: &Bot, chat_id: ChatId) -> Result<Option<i64>, reqwest::Error> {
+    let token = bot.token();
+    let url = format!("https://api.telegram.org/bot{}/getChat", token);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&url)
+        .query(&[("chat_id", chat_id.0.to_string())])
+        .send()
+        .await?;
+
+    let json: Value = response.json().await?;
+
+    if let Some(result) = json.get("result") {
+        if let Some(linked_id) = result.get("linked_chat_id") {
+            if let Some(id) = linked_id.as_i64() {
+                return Ok(Some(id));
+            }
+        }
+    }
+
+    Ok(None)
+}
