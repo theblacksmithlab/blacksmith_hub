@@ -1,4 +1,4 @@
-use crate::gpu_client::immers_cloud_client::ImmersCloudClient;
+use crate::gpu_instance_client::immers_cloud_client::ImmersCloudClient;
 use crate::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
 use crate::models::uniframe_studio::dubbing_client::DubbingClient;
 use crate::models::uniframe_studio::uniframe_studio::{
@@ -158,9 +158,8 @@ impl DubbingPipelineService {
     pub async fn start_pipeline(
         &self,
         request: DubbingPipelineRequest,
-        is_premium: bool,
         app_state: Arc<UniframeStudioAppState>,
-        user_id_from_db: String,
+        user_id: String,
     ) -> Result<DubbingPipelineResponse> {
         let job_id = request.job_id.clone();
         let now = Utc::now();
@@ -251,12 +250,11 @@ impl DubbingPipelineService {
             Self::pipeline_processor(
                 job_id,
                 request,
-                is_premium,
                 dubbing_client,
                 s3_client,
                 db_pool,
                 app_state,
-                user_id_from_db,
+                user_id,
                 server_id,
             )
             .await;
@@ -268,12 +266,11 @@ impl DubbingPipelineService {
     async fn pipeline_processor(
         job_id: String,
         request: DubbingPipelineRequest,
-        is_premium: bool,
         dubbing_client: DubbingClient,
         s3_client: Arc<S3Client>,
         db_pool: Pool<Sqlite>,
         app_state: Arc<UniframeStudioAppState>,
-        user_id_from_db: String,
+        user_id: String,
         server_id: String,
     ) {
         let validated_transcription_keywords = match request.transcription_keywords {
@@ -474,7 +471,6 @@ impl DubbingPipelineService {
             tts_provider: request.tts_provider,
             tts_voice: request.tts_voice,
             source_language: request.source_language,
-            is_premium,
             transcription_keywords: validated_transcription_keywords,
         };
 
@@ -507,7 +503,7 @@ impl DubbingPipelineService {
                     dubbing_client,
                     s3_client,
                     db_pool,
-                    user_id_from_db,
+                    user_id,
                     app_state.clone(),
                     server_id.clone(),
                 )
@@ -543,9 +539,7 @@ impl DubbingPipelineService {
                     );
                 }
 
-                if let Ok(mut user_balance) =
-                    UserBalance::get_or_create(&db_pool, &user_id_from_db).await
-                {
+                if let Ok(mut user_balance) = UserBalance::get_or_create(&db_pool, &user_id).await {
                     let _ = user_balance
                         .complete_job(&db_pool, ProcessingType::Dubbing)
                         .await;
@@ -559,7 +553,7 @@ impl DubbingPipelineService {
         dubbing_client: DubbingClient,
         s3_client: Arc<S3Client>,
         db_pool: Pool<Sqlite>,
-        user_id_from_db: String,
+        user_id: String,
         app_state: Arc<UniframeStudioAppState>,
         server_id: String,
     ) {
@@ -643,7 +637,7 @@ impl DubbingPipelineService {
                                 db_pool.clone(),
                                 server_id.clone(),
                                 job_id.clone(),
-                                user_id_from_db.clone(),
+                                user_id.clone(),
                                 "failed during processing",
                             )
                             .await;
@@ -674,7 +668,7 @@ impl DubbingPipelineService {
                             db_pool.clone(),
                             server_id.clone(),
                             job_id.clone(),
-                            user_id_from_db.clone(),
+                            user_id.clone(),
                             "communication failure",
                         )
                         .await;
@@ -721,7 +715,7 @@ impl DubbingPipelineService {
                                 db_pool.clone(),
                                 server_id.clone(),
                                 job_id.clone(),
-                                user_id_from_db.clone(),
+                                user_id.clone(),
                                 "completed successfully",
                             )
                             .await;
@@ -747,7 +741,7 @@ impl DubbingPipelineService {
                                 db_pool.clone(),
                                 server_id.clone(),
                                 job_id.clone(),
-                                user_id_from_db.clone(),
+                                user_id.clone(),
                                 "result processing failure",
                             )
                             .await;
@@ -774,7 +768,7 @@ impl DubbingPipelineService {
                         db_pool.clone(),
                         server_id.clone(),
                         job_id.clone(),
-                        user_id_from_db.clone(),
+                        user_id.clone(),
                         "no result URLs provided",
                     )
                     .await;
@@ -801,7 +795,7 @@ impl DubbingPipelineService {
                     db_pool.clone(),
                     server_id.clone(),
                     job_id.clone(),
-                    user_id_from_db.clone(),
+                    user_id.clone(),
                     "failed to get results",
                 )
                 .await;
@@ -827,7 +821,7 @@ impl DubbingPipelineService {
                     db_pool.clone(),
                     server_id.clone(),
                     job_id.clone(),
-                    user_id_from_db.clone(),
+                    user_id.clone(),
                     "timeout",
                 )
                 .await;
@@ -1063,7 +1057,7 @@ async fn cleanup_and_release_instance(
     db_pool: Pool<Sqlite>,
     server_id: String,
     job_id: String,
-    user_id_from_db: String,
+    user_id: String,
     reason: &str,
 ) {
     info!(
@@ -1082,7 +1076,7 @@ async fn cleanup_and_release_instance(
         );
     }
 
-    match UserBalance::get_or_create(&db_pool, &user_id_from_db).await {
+    match UserBalance::get_or_create(&db_pool, &user_id).await {
         Ok(mut user_balance) => {
             if let Err(e) = user_balance
                 .complete_job(&db_pool, ProcessingType::Dubbing)
@@ -1090,19 +1084,19 @@ async fn cleanup_and_release_instance(
             {
                 error!(
                     "Failed to release dubbing job slot for user {}: {}",
-                    user_id_from_db, e
+                    user_id, e
                 );
             } else {
                 info!(
                     "Successfully released dubbing job slot for user {}",
-                    user_id_from_db
+                    user_id
                 );
             }
         }
         Err(e) => {
             error!(
                 "Failed to get user balance to release job slot for user {}: {}",
-                user_id_from_db, e
+                user_id, e
             );
         }
     }

@@ -1,4 +1,4 @@
-use crate::gpu_client::immers_cloud_client::ImmersCloudClient;
+use crate::gpu_instance_client::immers_cloud_client::ImmersCloudClient;
 use anyhow::{Context, Result};
 use sqlx::{Pool, Row, Sqlite};
 use std::collections::HashMap;

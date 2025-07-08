@@ -152,7 +152,12 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
             last_updated TEXT DEFAULT (datetime('now')),
             created_at TEXT DEFAULT (datetime('now'))
         );
-
+        
+        CREATE TABLE IF NOT EXISTS processed_webhooks (
+            webhook_id TEXT PRIMARY KEY,
+            order_id TEXT NOT NULL,
+            processed_at TEXT DEFAULT (datetime('now'))
+        );
     ";
 
     pool.execute(query).await?;

@@ -1,9 +1,9 @@
-use crate::uniframe_studio::local_utils::{
-    is_premium_user, send_idea_email, verify_turnstile_token,
-};
+use crate::uniframe_studio::local_utils::{send_idea_email, verify_turnstile_token};
+use ::core::utils::uniframe_studio::heleket_client::{HeleketClient, HeleketConfig};
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
 use core::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
+use core::models::uniframe_studio::payment_models::{TopUpRequest, TopUpResponse};
 use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
 use core::models::uniframe_studio::uniframe_studio::{
     ApiError, DubbingPipelinePrepareRequest, DubbingPipelinePrepareResponse,
@@ -76,9 +76,6 @@ pub async fn start_dubbing_pipeline(
         ));
     }
 
-    // TODO: Implement user's subscription tier detection
-    let user_is_premium = is_premium_user(Some(&user_id)).await;
-
     let pipeline_info = match sqlx::query(
         "SELECT user_id, estimated_cost_usd FROM dubbing_pipelines WHERE job_id = ?",
     )
@@ -121,19 +118,18 @@ pub async fn start_dubbing_pipeline(
         ));
     }
 
-    let mut user_balance =
-        match UserBalance::get_or_create(&state.local_db_pool, &user_id_from_db).await {
-            Ok(balance) => balance,
-            Err(_) => {
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ApiError {
-                        code: "BALANCE_ERROR".to_string(),
-                        message: "Failed to get user balance".to_string(),
-                    }),
-                ))
-            }
-        };
+    let mut user_balance = match UserBalance::get_or_create(&state.local_db_pool, &user_id).await {
+        Ok(balance) => balance,
+        Err(_) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiError {
+                    code: "BALANCE_ERROR".to_string(),
+                    message: "Failed to get user balance".to_string(),
+                }),
+            ))
+        }
+    };
 
     if !user_balance.has_sufficient_balance(estimated_cost) {
         return Err((
@@ -159,9 +155,8 @@ pub async fn start_dubbing_pipeline(
         .dubbing_pipeline_service
         .start_pipeline(
             request.clone(),
-            user_is_premium,
             state.clone(),
-            user_id_from_db,
+            user_id.clone(),
         )
         .await
     {
@@ -374,7 +369,7 @@ pub async fn refund_failed_job(
 }
 
 pub async fn handle_submit_idea(
-    State(_app_state): State<Arc<UniframeStudioAppState>>,
+    // State(_app_state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<SubmitIdeaRequest>,
 ) -> Result<Json<SubmitIdeaResponse>, (StatusCode, Json<SubmitIdeaResponse>)> {
     if request.idea.trim().is_empty() {
@@ -438,5 +433,52 @@ pub async fn handle_submit_idea(
     Ok(Json(SubmitIdeaResponse {
         success: true,
         message: "Submission successful".to_string(),
+    }))
+}
+
+pub async fn create_payment_invoice(
+    // State(_app_state): State<Arc<UniframeStudioAppState>>,
+    Extension(user_id): Extension<String>,
+    Json(request): Json<TopUpRequest>,
+) -> Result<Json<TopUpResponse>, (StatusCode, String)> {
+    if request.amount_usd <= 0.0 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Amount must be greater than 0".to_string(),
+        ));
+    }
+
+    if request.amount_usd < 10.0 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Minimum top-up amount is $10.00".to_string(),
+        ));
+    }
+
+    if request.amount_usd > 1000.0 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Maximum top-up amount is $1,000.00".to_string(),
+        ));
+    }
+
+    let config = HeleketConfig::default();
+    let client = HeleketClient::new(config);
+
+    let invoice = client
+        .create_invoice(request.amount_usd, &user_id)
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to create Heleket invoice: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to create payment invoice".to_string(),
+            )
+        })?;
+
+    Ok(Json(TopUpResponse {
+        payment_url: invoice.url,
+        order_id: invoice.order_id,
+        amount_usd: request.amount_usd,
     }))
 }

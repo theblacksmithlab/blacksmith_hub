@@ -76,7 +76,6 @@ pub struct DubbingJobRequest {
     pub tts_voice: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_language: Option<String>,
-    pub is_premium: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcription_keywords: Option<String>,
 }
