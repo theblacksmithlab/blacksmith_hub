@@ -332,7 +332,7 @@ impl DubbingPipelineService {
                 )
                 .await;
 
-                immers_cloud_client.wait_for_instance_active(180).await?;
+                immers_cloud_client.wait_for_instance_active(300).await?;
 
                 info!(
                     "GPU processing service {} is now active, waiting for components to start...",
@@ -354,7 +354,7 @@ impl DubbingPipelineService {
                 .await;
 
                 debug!("Timeout start");
-                tokio::time::sleep(Duration::from_secs(90)).await;
+                tokio::time::sleep(Duration::from_secs(60)).await;
                 debug!("Timeout end");
 
                 let max_attempts = 30;
@@ -557,7 +557,7 @@ impl DubbingPipelineService {
         app_state: Arc<UniframeStudioAppState>,
         server_id: String,
     ) {
-        let max_checks = 600;
+        let max_checks = 1200;
         let mut result: Option<Result<DubbingJobResult>> = None;
 
         for check_number in 1..=max_checks {
