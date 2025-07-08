@@ -6,6 +6,8 @@ use crate::groot_bot::chat_moderation_utils::{
 };
 use crate::groot_bot::groot_bot_utils::{is_message_from_linked_channel, load_black_listed_users, load_paid_chats, load_white_listed_users};
 use crate::groot_bot::resources_cmd_handler::resources_cmd_handler;
+use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
+use core::utils::common::get_message;
 use anyhow::Result;
 use core::state::tg_bot::app_state::BotAppState;
 use std::sync::Arc;
@@ -57,6 +59,18 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         }
     }
 
+    if msg.chat.is_private() {
+        info!("Got private chat message - skipping moderation");
+
+        let bot_msg = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::NoNeedForCheckInPrivateChat,
+        ))
+            .await?;
+
+        bot.send_message(msg.chat.id, bot_msg).await?;
+        return Ok(());
+    }
+    
     let mut is_admin = false;
     let mut is_from_linked_channel = false;
     

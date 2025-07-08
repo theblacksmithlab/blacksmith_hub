@@ -405,17 +405,17 @@ pub async fn groot_bot_message_handler(
         _ => return Ok(()),
     };
 
-    if msg.chat.is_private() {
-        info!("Got private chat message - skipping moderation");
-
-        let bot_msg = get_message(AppsSystemMessages::GrootBot(
-            GrootBotMessages::NoNeedForCheckInPrivateChat,
-        ))
-            .await?;
-
-        bot.send_message(msg.chat.id, bot_msg).await?;
-        return Ok(());
-    }
+    // if msg.chat.is_private() {
+    //     info!("Got private chat message - skipping moderation");
+    // 
+    //     let bot_msg = get_message(AppsSystemMessages::GrootBot(
+    //         GrootBotMessages::NoNeedForCheckInPrivateChat,
+    //     ))
+    //         .await?;
+    // 
+    //     bot.send_message(msg.chat.id, bot_msg).await?;
+    //     return Ok(());
+    // }
 
     let is_paid_chat = true;
     
