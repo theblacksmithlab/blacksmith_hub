@@ -57,7 +57,7 @@ async fn create_bot_localdb_tables(pool: &SqlitePool, app_name: &AppName) -> Res
                     start_date TEXT NOT NULL,
                     end_date TEXT NOT NULL,
                     plan_type TEXT NOT NULL,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_chat_id ON subscriptions(chat_id);
