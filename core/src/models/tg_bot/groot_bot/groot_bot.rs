@@ -295,4 +295,5 @@ pub enum GrootBotCommands {
     Manual,
     Results,
     Groot,
+    Subscription,
 }

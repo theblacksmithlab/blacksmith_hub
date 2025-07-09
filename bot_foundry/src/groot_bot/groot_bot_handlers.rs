@@ -1,4 +1,3 @@
-use core::utils::tg_bot::groot_bot::subscription_payment::SubscriptionState;
 use crate::groot_bot::chat_moderation::chat_moderation;
 use crate::groot_bot::chat_moderation_utils::handle_groot_report;
 use anyhow::Result;
@@ -10,6 +9,7 @@ use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
     auto_delete_message, is_message_from_linked_channel, load_super_admins,
 };
+use core::utils::tg_bot::groot_bot::subscription_payment::handle_subscription_command;
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -18,7 +18,6 @@ use teloxide::prelude::{Message, Request, Requester, Update};
 use teloxide::types::{KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
 use tracing::{error, info};
-use crate::groot_bot::groot_bot_callback_query_handler::handle_forwarded_message;
 
 pub async fn groot_bot_command_handler(
     bot: Bot,
@@ -397,6 +396,14 @@ pub async fn groot_bot_command_handler(
                 .await;
             }
         }
+        GrootBotCommands::Subscription => {
+            info!(
+            "User | {} | with id: {} tried to use /{:?} command",
+            username, user_id, cmd,
+            );
+
+            handle_subscription_command(bot.clone(), msg.clone(), app_state.clone()).await?;
+        }
     }
 
     Ok(())
@@ -418,33 +425,6 @@ pub async fn groot_bot_message_handler(
         } => message,
         _ => return Ok(()),
     };
-
-    if msg.chat.is_private() {
-        if let Some(payment_states_mutex) = &bot_app_state.payment_states {
-            let payment_states = payment_states_mutex.lock().await;
-            if let Some(payment_process) = payment_states.get(&msg.from.as_ref().unwrap().id.0) {
-                if payment_process.state == SubscriptionState::AwaitingChatSelection {
-                    drop(payment_states);
-                    return handle_forwarded_message(bot, msg, bot_app_state).await;
-                }
-            }
-        }
-        
-        info!("Private chat message - skipping moderation");
-        return Ok(());
-    }
-    
-    // if msg.chat.is_private() {
-    //     info!("Got private chat message - skipping moderation");
-    //
-    //     let bot_msg = get_message(AppsSystemMessages::GrootBot(
-    //         GrootBotMessages::NoNeedForCheckInPrivateChat,
-    //     ))
-    //         .await?;
-    //
-    //     bot.send_message(msg.chat.id, bot_msg).await?;
-    //     return Ok(());
-    // }
 
     let is_paid_chat = true;
 
