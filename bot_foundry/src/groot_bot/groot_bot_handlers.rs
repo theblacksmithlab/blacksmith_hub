@@ -1,7 +1,9 @@
 use crate::groot_bot::chat_moderation::chat_moderation;
 use crate::groot_bot::chat_moderation_utils::handle_groot_report;
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use core::local_db::tg_bot::groot::subscription_management::check_chat_payment;
+use core::local_db::tg_bot::groot::subscription_management::get_subscription_info;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState, ShowType};
@@ -72,6 +74,19 @@ pub async fn groot_bot_command_handler(
         }
     }
 
+    // Getting info about chat owner
+    let is_chat_owner = if !msg.chat.is_private() {
+        match bot.get_chat_administrators(msg.chat.id).await {
+            Ok(admins) => admins.iter().any(|admin| {
+                admin.status() == teloxide::types::ChatMemberStatus::Owner
+                    && admin.user.id.0 == user_id
+            }),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+
     // Setting-up LORD_ADMIN_ID
     let lord_admin_id = match env::var("LORD_ADMIN_ID") {
         Ok(val) => match val.parse::<u64>() {
@@ -134,7 +149,11 @@ pub async fn groot_bot_command_handler(
         return Ok(());
     }
 
-    if (cmd == GrootBotCommands::Start || cmd == GrootBotCommands::Groot || cmd == GrootBotCommands::Status) && msg.chat.is_private() {
+    if (cmd == GrootBotCommands::Start
+        || cmd == GrootBotCommands::Groot
+        || cmd == GrootBotCommands::Status)
+        && msg.chat.is_private()
+    {
         info!(
             "User | {} | with id: {} tried to use /{:?} command in private chat",
             username, user_id, cmd
@@ -157,7 +176,7 @@ pub async fn groot_bot_command_handler(
                 get_message(AppsSystemMessages::GrootBot(
                     GrootBotMessages::PublicCmdUsedInPrivateChat,
                 ))
-                    .await?
+                .await?
             }
             _ => unreachable!(),
         };
@@ -236,6 +255,33 @@ pub async fn groot_bot_command_handler(
     if cmd == GrootBotCommands::Resources && !super_admins.contains(&user_id) {
         info!(
             "Non-super-admin user | {} | with id: {} tried to use /{:?} command",
+            username, user_id, cmd,
+        );
+        let bot_msg = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::NoRightsForUseCmd,
+        ))
+        .await?;
+
+        let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+        .await;
+
+        return Ok(());
+    }
+
+    if (cmd == GrootBotCommands::Subscription || cmd == GrootBotCommands::Status)
+        && !is_admin
+        && !is_from_linked_channel
+        && !is_chat_owner
+    {
+        info!(
+            "Non-admin user | {} | with id: {} tried to use /{:?} command",
             username, user_id, cmd,
         );
         let bot_msg = get_message(AppsSystemMessages::GrootBot(
@@ -426,7 +472,7 @@ pub async fn groot_bot_command_handler(
                 username, user_id, cmd,
             );
 
-            // handle_subscription_command(bot.clone(), msg.clone(), app_state.clone()).await?;
+            handle_status_command(bot.clone(), msg.clone(), app_state.clone()).await?;
         }
     }
 
@@ -468,10 +514,8 @@ pub async fn handle_subscription_command(
     msg: Message,
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
-    let user_id = msg.from.as_ref().unwrap().id.0;
-
     if msg.chat.is_private() {
-        let bot_msg = "Команда /subscription доступна только в публичных чатах, чтобы я понял, какой чат вы хотите защитить.\n\
+        let bot_msg = "Команда /subscription доступна только в публичных чатах, чтобы я понял, какой чат вы хотите защитить.\n\n\
         После вызова команды в целевом чате, мы продолжим общение тут и оформим подписку 👍";
 
         bot.send_message(msg.chat.id, bot_msg).await?;
@@ -479,31 +523,12 @@ pub async fn handle_subscription_command(
         return Ok(());
     }
 
-    let user_username = match msg.from.as_ref().unwrap().username {
-        Some(ref username) => username.clone(),
-        None => {
-            let bot_msg = "❌ Я не вижу ваш username. Установите его в настройках Telegram, чтобы я мог написать вам в ЛС";
-
-            let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
-
-            auto_delete_message(
-                bot.clone(),
-                bot_system_message.chat.id,
-                bot_system_message.id,
-                Duration::from_secs(60),
-            )
-            .await;
-
-            return Ok(());
-        }
-    };
-
     let target_chat_id = msg.chat.id.0;
     let target_chat_username = match msg.chat.username() {
         Some(username) => username.to_string(),
         None => {
-            let bot_system_message = bot.send_message(msg.chat.id, "❌ Чат должен иметь username (быть публичным), чтобы я могу защищать его от нечисти.\
-            Установите его в настройках и попробуйте вызвать команду /subscription снова\n")
+            let bot_system_message = bot.send_message(msg.chat.id, "❌ Чат должен иметь username (быть публичным), чтобы я мог защищать его от нечисти.\n\
+            Установите его в настройках и попробуйте вызвать команду /subscription снова")
                 .await?;
 
             auto_delete_message(
@@ -545,34 +570,262 @@ pub async fn handle_subscription_command(
         }
     }
 
-    if let Some(payment_states_mutex) = &app_state.payment_states {
-        let mut payment_states = payment_states_mutex.lock().await;
+    let is_from_linked_channel = is_message_from_linked_channel(&bot, &msg)
+        .await
+        .unwrap_or(false);
 
-        payment_states.insert(
-            user_id,
-            PaymentProcess {
-                state: SubscriptionState::AwaitingPlanSelection,
-                target_chat_id: Some(target_chat_id),
-                target_chat_username: Some(target_chat_username.clone()),
-                selected_plan: None,
-                payment_amount: None,
-                payment_id: None,
-                heleket_invoice_uuid: None,
-                heleket_order_id: None,
-            },
-        );
+    if is_from_linked_channel {
+        info!("Subscription command from linked channel - finding chat owner");
+
+        let chat_owner = match bot.get_chat_administrators(msg.chat.id).await {
+            Ok(admins) => admins
+                .into_iter()
+                .find(|admin| admin.status() == teloxide::types::ChatMemberStatus::Owner)
+                .map(|owner| owner.user.clone()),
+            Err(e) => {
+                error!("Failed to get chat administrators: {}", e);
+                bot.send_message(
+                    msg.chat.id,
+                    "❌ Не удалось получить информацию об администраторах чата.",
+                )
+                .await?;
+                return Ok(());
+            }
+        };
+
+        let owner = match chat_owner {
+            Some(owner) => owner,
+            None => {
+                bot.send_message(msg.chat.id, "❌ Не удалось найти владельца чата")
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let _owner_username = match &owner.username {
+            Some(username) => username.clone(),
+            None => {
+                bot.send_message(msg.chat.id, "❌ У владельца чата нет @username.\n\
+                Данные владельца чата необходимы, чтобы я мог связаться с ним для оформления подписки.")
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        if let Some(payment_states_mutex) = &app_state.payment_states {
+            let mut payment_states = payment_states_mutex.lock().await;
+
+            payment_states.insert(
+                owner.id.0,
+                PaymentProcess {
+                    state: SubscriptionState::AwaitingPlanSelection,
+                    target_chat_id: Some(target_chat_id),
+                    target_chat_username: Some(target_chat_username.clone()),
+                    selected_plan: None,
+                    payment_amount: None,
+                    payment_id: None,
+                    heleket_invoice_uuid: None,
+                    heleket_order_id: None,
+                },
+            );
+        }
+
+        let group_msg = "✅ Я отправил инструкцию по оформлению подписки владельцу чата в ЛС.";
+        let bot_system_message = bot.send_message(msg.chat.id, group_msg).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(60),
+        )
+        .await;
+
+        show_plan_selection(bot, ChatId(owner.id.0 as i64), &target_chat_username).await
+    } else {
+        info!("Subscription command from regular admin");
+
+        let user_id = msg.from.as_ref().unwrap().id.0;
+        let user_username = match &msg.from.as_ref().unwrap().username {
+            Some(username) => username.clone(),
+            None => {
+                let bot_system_message = bot.send_message(msg.chat.id,
+                                                          "❌ У вас нет @username. Установите его в настройках Telegram, чтобы я мог написать вам в ЛС для оформления подписки.")
+                    .await?;
+
+                auto_delete_message(
+                    bot.clone(),
+                    bot_system_message.chat.id,
+                    bot_system_message.id,
+                    Duration::from_secs(60),
+                )
+                .await;
+
+                return Ok(());
+            }
+        };
+
+        if let Some(payment_states_mutex) = &app_state.payment_states {
+            let mut payment_states = payment_states_mutex.lock().await;
+
+            payment_states.insert(
+                user_id,
+                PaymentProcess {
+                    state: SubscriptionState::AwaitingPlanSelection,
+                    target_chat_id: Some(target_chat_id),
+                    target_chat_username: Some(target_chat_username.clone()),
+                    selected_plan: None,
+                    payment_amount: None,
+                    payment_id: None,
+                    heleket_invoice_uuid: None,
+                    heleket_order_id: None,
+                },
+            );
+        }
+
+        let group_msg = format!("✅ @{}, проверьте ЛС для оплаты подписки", user_username);
+        let bot_system_message = bot.send_message(msg.chat.id, group_msg).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(30),
+        )
+        .await;
+
+        show_plan_selection(bot, ChatId(user_id as i64), &target_chat_username).await
+    }
+}
+
+pub async fn handle_status_command(
+    bot: Bot,
+    msg: Message,
+    app_state: Arc<BotAppState>,
+) -> Result<()> {
+    let chat_id = msg.chat.id.0;
+
+    if msg.chat.is_private() {
+        bot.send_message(msg.chat.id, "❌ Эта команда работает только в группах")
+            .await?;
+        return Ok(());
     }
 
-    let group_msg = format!("✅ @{}, проверьте ЛС для оплаты подписки", user_username);
-    let bot_system_message = bot.send_message(msg.chat.id, group_msg).await?;
+    let chat_username = match msg.chat.username() {
+        Some(username) => username,
+        None => {
+            bot.send_message(
+                msg.chat.id,
+                "❌ Чат должен иметь @username для проверки статуса подписки",
+            )
+            .await?;
+            return Ok(());
+        }
+    };
 
-    auto_delete_message(
-        bot.clone(),
-        bot_system_message.chat.id,
-        bot_system_message.id,
-        Duration::from_secs(60),
-    )
-    .await;
+    if let Some(db_pool) = &app_state.db_pool {
+        match get_subscription_info(db_pool, chat_id).await {
+            Ok(Some(subscription)) => {
+                let end_date = DateTime::parse_from_rfc3339(&subscription.end_date)
+                    .unwrap_or_else(|_| Utc::now().into())
+                    .with_timezone(&chrono::FixedOffset::east_opt(3 * 3600).unwrap())
+                    .format("%d.%m.%Y %H:%M UTC+3");
 
-    show_plan_selection(bot, ChatId(user_id as i64), &target_chat_username).await
+                let start_date = DateTime::parse_from_rfc3339(&subscription.start_date)
+                    .unwrap_or_else(|_| Utc::now().into())
+                    .with_timezone(&chrono::FixedOffset::east_opt(3 * 3600).unwrap())
+                    .format("%d.%m.%Y %H:%M UTC+3");
+
+                let paid_by = if let Some(username) = &subscription.paid_by_username {
+                    format!("@{}", username)
+                } else {
+                    format!("ID: {}", subscription.paid_by_user_id)
+                };
+
+                let plan_name = match subscription.plan_type.as_str() {
+                    "monthly" => "Месячная подписка",
+                    "yearly" => "Годовая подписка",
+                    _ => "Неизвестный план",
+                };
+
+                let now = Utc::now();
+                let end_date_utc = DateTime::parse_from_rfc3339(&subscription.end_date)
+                    .unwrap_or_else(|_| now.into())
+                    .with_timezone(&Utc);
+
+                let is_active = end_date_utc > now;
+                let status_emoji = if is_active { "✅" } else { "❌" };
+                let status_text = if is_active {
+                    "Активна"
+                } else {
+                    "Истекла"
+                };
+
+                let days_left = if is_active {
+                    let duration = end_date_utc.signed_duration_since(now);
+                    duration.num_days()
+                } else {
+                    0
+                };
+
+                let days_info = if is_active && days_left > 0 {
+                    format!("\n🗓️ **Осталось дней:** {}", days_left)
+                } else if is_active {
+                    "\n🗓️ **Истекает сегодня**".to_string()
+                } else {
+                    "".to_string()
+                };
+
+                let status_msg = format!(
+                    "{} Статус подписки\n\n\
+                    🏠 Чат: @{}\n\
+                    📊 Статус: {}\n\
+                    📋 Тарифный план: {}\n\
+                    📅 Начало: {}\n\
+                    ⏰ Окончание: {}{}\n\
+                    👤 Оплачено: {}\n\n\
+                    🛡️ Защита от спама: {}",
+                    status_emoji,
+                    chat_username,
+                    status_text,
+                    plan_name,
+                    start_date,
+                    end_date,
+                    days_info,
+                    paid_by,
+                    if is_active {
+                        "Включена"
+                    } else {
+                        "Отключена"
+                    }
+                );
+
+                bot.send_message(msg.chat.id, status_msg).await?;
+            }
+            Ok(None) => {
+                let no_subscription_msg = format!(
+                    "❌ Подписка не найдена\n\n\
+                    🏠 Чат: @{}\n\
+                    📊 Статус: Не активна\n\n\
+                    💡 Для активации подписки используйте: /subscription",
+                    chat_username
+                );
+
+                bot.send_message(msg.chat.id, no_subscription_msg).await?;
+            }
+            Err(e) => {
+                error!(
+                    "Error checking subscription status for chat {}: {}",
+                    chat_id, e
+                );
+                bot.send_message(msg.chat.id, "❌ Ошибка при проверке статуса подписки")
+                    .await?;
+            }
+        }
+    } else {
+        bot.send_message(msg.chat.id, "❌ База данных недоступна")
+            .await?;
+    }
+
+    Ok(())
 }

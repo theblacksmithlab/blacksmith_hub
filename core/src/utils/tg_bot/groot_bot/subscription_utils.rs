@@ -75,8 +75,8 @@ pub async fn show_plan_selection(
     let message_text = format!(
         "Приветствую ещё раз!\n\n\
         Я получил от Вас заявку на оплату подписки для чата: @{}\n\
-        Внимательно проверьте username чата, изменить его после оплаты подписки будет невозможно!\n\n
-        Выберите тарифный план:\n\n",
+        Внимательно проверьте username чата, изменить его после оплаты подписки будет невозможно!\n\n\
+        Выберите тарифный план:",
         chat_username
     );
 
@@ -148,19 +148,17 @@ pub async fn show_payment_link(
 ) -> Result<()> {
     let expired_at = DateTime::from_timestamp(invoice.expired_at, 0)
         .unwrap_or_else(|| Utc::now() + chrono::Duration::hours(1))
-        .format("%d\\.%m\\.%Y %H:%M");
+        .with_timezone(&chrono::FixedOffset::east_opt(3 * 3600).unwrap())
+        .format("%d.%m.%Y %H:%M UTC+3");
 
     let message_text = format!(
         "Оплата подписки\n\n\
         🎯 Чат: @{}\n\
         💰 Сумма: {} $\n\
-        🆔 Номер заказа: `{}`\n\n\
+        🆔 Идентификатор заказа: `{}`\n\n\
         ⏰ Время на оплату: до {}\n\n\
         👇 Нажмите кнопку для оплаты:",
-        chat_username,
-        amount,
-        invoice.order_id.replace("_", "\\_"),
-        expired_at
+        chat_username, amount, invoice.order_id, expired_at
     );
 
     let payment_url =
