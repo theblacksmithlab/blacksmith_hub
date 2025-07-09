@@ -44,6 +44,7 @@ pub async fn groot_bot_command_handler(
     //     false
     // };
 
+    // TEMP
     let is_paid_chat = true;
 
     // Getting public chat's administrators

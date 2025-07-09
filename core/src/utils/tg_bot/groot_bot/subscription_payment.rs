@@ -108,13 +108,13 @@ async fn show_subscription_start_message(bot: Bot, chat_id: ChatId) -> Result<()
     let message_text = "💰 **Подписка на GrootBot**\n\n\
         🛡️ **Что вы получите:**\n\
         • Полная защита от спама и скама\n\
-        • AI-модерация сообщений\n\
+        • AI\\-модерация сообщений\n\
         • Блокировка подозрительных ссылок\n\
         • Защита от фишинга\n\
         • Поддержка 24/7\n\n\
         💳 **Тарифы:**\n\
-        📅 1 месяц - **500₽**\n\
-        📅 1 год - **5000₽** (скидка 17%)\n\n\
+        📅 1 месяц \\- **500₽**\n\
+        📅 1 год \\- **5000₽** \\(скидка 17%\\)\n\n\
         🔒 **Безопасная оплата криптовалютой**\n\
         ⚡ **Активация мгновенная**".to_string();
 
@@ -127,7 +127,7 @@ async fn show_subscription_start_message(bot: Bot, chat_id: ChatId) -> Result<()
     ]);
 
     bot.send_message(chat_id, message_text)
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+        // .parse_mode(teloxide::types::ParseMode::MarkdownV2)
         .reply_markup(keyboard)
         .await?;
 
@@ -145,7 +145,7 @@ pub async fn show_chat_selection_message(bot: Bot, chat_id: ChatId) -> Result<()
     )]]);
 
     bot.send_message(chat_id, message_text)
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+        // .parse_mode(teloxide::types::ParseMode::MarkdownV2)
         .reply_markup(keyboard)
         .await?;
 
@@ -179,7 +179,7 @@ pub async fn show_plan_selection(bot: Bot, chat_id: ChatId, chat_username: &str)
     let keyboard = InlineKeyboardMarkup::new(keyboard_rows);
 
     bot.send_message(chat_id, message_text)
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+        // .parse_mode(teloxide::types::ParseMode::MarkdownV2)
         .reply_markup(keyboard)
         .await?;
 
@@ -215,9 +215,53 @@ pub async fn show_payment_confirmation(
     ]);
 
     bot.send_message(chat_id, message_text)
-        .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+        // .parse_mode(teloxide::types::ParseMode::MarkdownV2)
         .reply_markup(keyboard)
         .await?;
 
     Ok(())
+}
+
+pub async fn show_payment_processing(
+    bot: Bot,
+    chat_id: ChatId,
+    target_chat_id: i64,
+    target_chat_username: &str,
+    selected_plan: &str,
+    payment_amount: u32,
+) -> Result<()> {
+    let plan = get_plan_by_id(selected_plan).unwrap();
+
+    let message_text = format!(
+        "🔄 **Создание платежа\\.\\.\\.**\n\n\
+    🎯 **Чат:** @{}\n\
+    🎯 **Чат ID:** `{}`\n\
+    📋 **План:** {}\n\
+    💰 **Сумма:** {}₽\n\n\
+    🚧 **DEMO MODE** \\- Интеграция с Heleket в разработке\n\n\
+    ℹ️ После интеграции здесь будет:\n\
+    • Ссылка на оплату криптовалютой\n\
+    • Автоматическая активация подписки\n\
+    • Уведомления в чат",
+        target_chat_username,
+        target_chat_id,
+        plan.name,
+        payment_amount
+    );
+
+    let keyboard = InlineKeyboardMarkup::new(vec![
+        vec![InlineKeyboardButton::callback("🔄 Успешная оплату", "demo_payment_success")],
+        vec![InlineKeyboardButton::callback("❌ Отмена", "pay_cancel")],
+    ]);
+
+    bot.send_message(chat_id, message_text)
+        // .parse_mode(teloxide::types::ParseMode::MarkdownV2)
+        .reply_markup(keyboard)
+        .await?;
+
+    Ok(())
+}
+
+pub fn get_plan_by_id(plan_id: &str) -> Option<&'static SubscriptionPlan> {
+    SUBSCRIPTION_PLANS.iter().find(|plan| plan.id == plan_id)
 }
