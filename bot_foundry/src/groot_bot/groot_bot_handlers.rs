@@ -151,7 +151,8 @@ pub async fn groot_bot_command_handler(
 
     if (cmd == GrootBotCommands::Start
         || cmd == GrootBotCommands::Groot
-        || cmd == GrootBotCommands::Status)
+        || cmd == GrootBotCommands::Status
+        || cmd == GrootBotCommands::Subscription)
         && msg.chat.is_private()
     {
         info!(
@@ -175,6 +176,12 @@ pub async fn groot_bot_command_handler(
             GrootBotCommands::Status => {
                 get_message(AppsSystemMessages::GrootBot(
                     GrootBotMessages::PublicCmdUsedInPrivateChat,
+                ))
+                .await?
+            }
+            GrootBotCommands::Subscription => {
+                get_message(AppsSystemMessages::GrootBot(
+                    GrootBotMessages::SubscriptionCmdUsedInPrivateChat,
                 ))
                 .await?
             }
@@ -514,16 +521,12 @@ pub async fn handle_subscription_command(
     msg: Message,
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
-    if msg.chat.is_private() {
-        let bot_msg = "Команда /subscription доступна только в публичных чатах, чтобы я понял, какой чат вы хотите защитить.\n\n\
-        После вызова команды в целевом чате, мы продолжим общение тут и оформим подписку 👍";
-
-        bot.send_message(msg.chat.id, bot_msg).await?;
-
-        return Ok(());
-    }
-
     let target_chat_id = msg.chat.id.0;
+    let target_chat_title = msg
+        .chat
+        .title()
+        .map(|title| title.to_string())
+        .unwrap_or_else(|| "Unknown Chat".to_string());
     let target_chat_username = match msg.chat.username() {
         Some(username) => username.to_string(),
         None => {
@@ -621,6 +624,7 @@ pub async fn handle_subscription_command(
                     state: SubscriptionState::AwaitingPlanSelection,
                     target_chat_id: Some(target_chat_id),
                     target_chat_username: Some(target_chat_username.clone()),
+                    target_chat_title: Some(target_chat_title.clone()),
                     selected_plan: None,
                     payment_amount: None,
                     payment_id: None,
@@ -641,7 +645,13 @@ pub async fn handle_subscription_command(
         )
         .await;
 
-        show_plan_selection(bot, ChatId(owner.id.0 as i64), &target_chat_username).await
+        show_plan_selection(
+            bot,
+            ChatId(owner.id.0 as i64),
+            &target_chat_username,
+            &target_chat_title,
+        )
+        .await
     } else {
         info!("Subscription command from regular admin");
 
@@ -674,6 +684,7 @@ pub async fn handle_subscription_command(
                     state: SubscriptionState::AwaitingPlanSelection,
                     target_chat_id: Some(target_chat_id),
                     target_chat_username: Some(target_chat_username.clone()),
+                    target_chat_title: Some(target_chat_title.clone()),
                     selected_plan: None,
                     payment_amount: None,
                     payment_id: None,
@@ -694,7 +705,13 @@ pub async fn handle_subscription_command(
         )
         .await;
 
-        show_plan_selection(bot, ChatId(user_id as i64), &target_chat_username).await
+        show_plan_selection(
+            bot,
+            ChatId(user_id as i64),
+            &target_chat_username,
+            &target_chat_title,
+        )
+        .await
     }
 }
 

@@ -110,7 +110,11 @@ pub async fn chat_moderation(
     }
 
     let app_name = &app_state.app_name;
-    let chat_title = msg.chat.title().unwrap_or_else(|| "Unknown Chat");
+    let chat_title = msg
+        .chat
+        .title()
+        .map(|title| title.to_string())
+        .unwrap_or_else(|| "Unknown Chat".to_string());
     // let _paid_chats = load_paid_chats(app_name);
     // let is_paid_chat = true;
     // paid_chats.contains(&msg.chat.id.0);
@@ -140,7 +144,7 @@ pub async fn chat_moderation(
         msg.clone(),
         white_listed_users,
         black_listed_users,
-        chat_title,
+        &chat_title,
         is_paid_chat,
         app_name,
         &username,
@@ -156,7 +160,7 @@ pub async fn chat_moderation(
         msg.chat.id.0,
         user_id,
         &username,
-        chat_title,
+        &chat_title,
     )
     .await
     {
@@ -166,7 +170,7 @@ pub async fn chat_moderation(
     if via_bot_message_check(
         bot.clone(),
         msg.clone(),
-        chat_title,
+        &chat_title,
         is_paid_chat,
         app_name,
         &username,
@@ -181,7 +185,7 @@ pub async fn chat_moderation(
     if scam_stories_check(
         bot.clone(),
         msg.clone(),
-        chat_title,
+        &chat_title,
         is_paid_chat,
         app_name,
         &username,
@@ -193,7 +197,7 @@ pub async fn chat_moderation(
         return Ok(());
     };
 
-    // anonymous_user_treatment(bot.clone(), msg.clone(), is_paid_chat, app_name, chat_title, &username, user_id).await?;
+    // anonymous_user_treatment(bot.clone(), msg.clone(), is_paid_chat, app_name, &chat_title, &username, user_id).await?;
 
     if scam_emojis_check(
         bot.clone(),
@@ -201,7 +205,7 @@ pub async fn chat_moderation(
         &message_to_check,
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
     )
@@ -217,7 +221,7 @@ pub async fn chat_moderation(
         &message_to_check,
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
     )
@@ -232,7 +236,7 @@ pub async fn chat_moderation(
         msg.clone(),
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
     )
@@ -247,7 +251,7 @@ pub async fn chat_moderation(
         msg.clone(),
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
     )
@@ -263,7 +267,7 @@ pub async fn chat_moderation(
         &message_to_check,
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
     )
@@ -277,7 +281,7 @@ pub async fn chat_moderation(
         bot.clone(),
         msg.clone(),
         is_paid_chat,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
         app_name,
@@ -294,7 +298,7 @@ pub async fn chat_moderation(
         &message_to_check,
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
         app_state.clone(),
@@ -312,7 +316,7 @@ pub async fn chat_moderation(
 
     update_user_message_count(
         app_state.clone(),
-        chat_title,
+        &chat_title,
         msg.chat.id.0,
         user_id,
         &username,

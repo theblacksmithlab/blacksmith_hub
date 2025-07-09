@@ -96,7 +96,7 @@ async fn handle_plan_selection(
         }
     };
 
-    let chat_username = {
+    let (target_chat_title, target_chat_username) = {
         if let Some(payment_states_mutex) = &app_state.payment_states {
             let mut payment_states = payment_states_mutex.lock().await;
             if let Some(payment_process) = payment_states.get_mut(&user_id) {
@@ -104,10 +104,10 @@ async fn handle_plan_selection(
                 payment_process.selected_plan = Some(plan_id.to_string());
                 payment_process.payment_amount = Some(plan.price_usd);
 
-                payment_process
-                    .target_chat_username
-                    .clone()
-                    .unwrap_or_default()
+                (
+                    payment_process.target_chat_title.clone().unwrap_or_default(),
+                    payment_process.target_chat_username.clone().unwrap_or_default(),
+                )
             } else {
                 return handle_expired_session(bot, callback_query).await;
             }
@@ -124,7 +124,14 @@ async fn handle_plan_selection(
         bot.delete_message(chat_id, message.id()).await?;
     }
 
-    show_payment_confirmation(bot, chat_id, &chat_username, plan).await
+    show_payment_confirmation(
+        bot,
+        chat_id,
+        &target_chat_username,
+        &target_chat_title,
+        plan,
+    )
+    .await
 }
 
 async fn handle_back_to_plans(
@@ -135,17 +142,18 @@ async fn handle_back_to_plans(
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
 
-    let chat_username = {
+    let (chat_username, target_chat_title) = {
         if let Some(payment_states_mutex) = &app_state.payment_states {
             let mut payment_states = payment_states_mutex.lock().await;
             if let Some(payment_process) = payment_states.get_mut(&user_id) {
                 payment_process.state = SubscriptionState::AwaitingPlanSelection;
                 payment_process.selected_plan = None;
                 payment_process.payment_amount = None;
-                payment_process
-                    .target_chat_username
-                    .clone()
-                    .unwrap_or_default()
+
+                (
+                    payment_process.target_chat_username.clone().unwrap_or_default(),
+                    payment_process.target_chat_title.clone().unwrap_or_default(),
+                )
             } else {
                 return handle_expired_session(bot, callback_query).await;
             }
@@ -162,7 +170,7 @@ async fn handle_back_to_plans(
         bot.delete_message(chat_id, message.id()).await?;
     }
 
-    show_plan_selection(bot, chat_id, &chat_username).await
+    show_plan_selection(bot, chat_id, &chat_username, &target_chat_title).await
 }
 
 async fn handle_expired_session(bot: Bot, callback_query: CallbackQuery) -> Result<()> {
@@ -195,7 +203,7 @@ async fn handle_payment_confirm(
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
 
-    let (target_chat_username, payment_amount) = {
+    let (target_chat_username, payment_amount, target_chat_title) = {
         if let Some(payment_states_mutex) = &app_state.payment_states {
             let mut payment_states = payment_states_mutex.lock().await;
             if let Some(payment_process) = payment_states.get_mut(&user_id) {
@@ -204,6 +212,7 @@ async fn handle_payment_confirm(
                 (
                     payment_process.target_chat_username.clone(),
                     payment_process.payment_amount.clone(),
+                    payment_process.target_chat_title.clone(),
                 )
             } else {
                 return handle_expired_session(bot, callback_query).await;
@@ -217,6 +226,9 @@ async fn handle_payment_confirm(
         target_chat_username.ok_or_else(|| anyhow::anyhow!("Missing target_chat_username"))?;
 
     let payment_amount = payment_amount.ok_or_else(|| anyhow::anyhow!("Missing payment_amount"))?;
+
+    let target_chat_title =
+        target_chat_title.ok_or_else(|| anyhow::anyhow!("Missing target_chat_username"))?;
 
     let heleket_client = app_state.heleket_client.as_ref().unwrap();
     let invoice = match heleket_client
@@ -254,6 +266,7 @@ async fn handle_payment_confirm(
         chat_id,
         &invoice,
         &target_chat_username,
+        &target_chat_title,
         payment_amount,
     )
     .await?;
@@ -346,11 +359,12 @@ async fn handle_check_payment(
         let plan = get_plan_by_id(&payment_process.selected_plan.unwrap()).unwrap();
         let success_msg = format!(
             "✅ Оплата прошла успешно!\n\n\
-            🎯 Чат: @{}\n\
+            🎯 Чат: {} (@{})\n\
             📋 Тарифный план: {}\n\
-            💰 Сумма {}$\n\
+            💰 Сумма {} $\n\
             ⏱️ Период: {} дней\n\n\
-            🛡️ Защита от спама активирована!**",
+            🛡️ Защита от спама активирована!",
+            payment_process.target_chat_title.unwrap(),
             payment_process.target_chat_username.unwrap(),
             plan.name,
             payment_process.payment_amount.unwrap(),

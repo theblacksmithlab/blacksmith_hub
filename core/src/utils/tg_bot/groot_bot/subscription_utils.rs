@@ -21,6 +21,7 @@ pub struct PaymentProcess {
     pub state: SubscriptionState,
     pub target_chat_id: Option<i64>,
     pub target_chat_username: Option<String>,
+    pub target_chat_title: Option<String>,
     pub selected_plan: Option<String>,
     pub payment_amount: Option<u32>,
     pub payment_id: Option<String>,
@@ -71,12 +72,14 @@ pub async fn show_plan_selection(
     bot: Bot,
     user_chat_id: ChatId,
     chat_username: &str,
+    target_chat_title: &str,
 ) -> Result<()> {
     let message_text = format!(
         "Приветствую ещё раз!\n\n\
-        Я получил от Вас заявку на оплату подписки для чата: @{}\n\
+        Я получил заявку на оплату подписки для чата: {} (@{})\n\
         Внимательно проверьте username чата, изменить его после оплаты подписки будет невозможно!\n\n\
         Выберите тарифный план:",
+        target_chat_title,
         chat_username
     );
 
@@ -107,18 +110,24 @@ pub async fn show_plan_selection(
 pub async fn show_payment_confirmation(
     bot: Bot,
     chat_id: ChatId,
-    chat_username: &str,
+    target_chat_username: &str,
+    target_chat_title: &str,
     plan: &SubscriptionPlan,
 ) -> Result<()> {
     let message_text = format!(
         "Подтверждение заказа\n\n\
-        🎯 Чат username: @{}\n\
+        🎯 Чат: {} (@{})\n\
         📋 Тарифный план: {}\n\
         💰 Сумма: {} $\n\
         ⏱️ Период: {} дней\n\n\
         📝 Описание: {}\n\n\
         ✅ Подтверждаете оплату?",
-        chat_username, plan.name, plan.price_usd, plan.duration_days, plan.description
+        target_chat_title,
+        target_chat_username,
+        plan.name,
+        plan.price_usd,
+        plan.duration_days,
+        plan.description
     );
 
     let keyboard = InlineKeyboardMarkup::new(vec![
@@ -144,6 +153,7 @@ pub async fn show_payment_link(
     chat_id: ChatId,
     invoice: &InvoiceResult,
     chat_username: &str,
+    target_chat_title: &str,
     amount: u32,
 ) -> Result<()> {
     let expired_at = DateTime::from_timestamp(invoice.expired_at, 0)
@@ -153,12 +163,12 @@ pub async fn show_payment_link(
 
     let message_text = format!(
         "Оплата подписки\n\n\
-        🎯 Чат: @{}\n\
+        🎯 Чат: {} (@{})\n\
         💰 Сумма: {} $\n\
         🆔 Идентификатор заказа: `{}`\n\n\
         ⏰ Время на оплату: до {}\n\n\
         👇 Нажмите кнопку для оплаты:",
-        chat_username, amount, invoice.order_id, expired_at
+        target_chat_title, chat_username, amount, invoice.order_id, expired_at
     );
 
     let payment_url =
