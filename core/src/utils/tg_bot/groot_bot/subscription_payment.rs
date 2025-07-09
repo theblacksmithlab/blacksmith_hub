@@ -70,6 +70,7 @@ pub async fn handle_subscription_command(
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let user_id = msg.from.as_ref().unwrap().id.0;
+    
     info!("user_id: {}", user_id);
     let user = msg.from.as_ref().unwrap();
     info!("user: {:?}", user);
@@ -83,8 +84,8 @@ pub async fn handle_subscription_command(
         return Ok(());
     }
 
-    let user_username = match &user.username {
-        Some(username) => username.clone(),
+    let user_username = match msg.from.as_ref().unwrap().username {
+        Some(ref username) => username.clone(),
         None => {
             let bot_msg = "❌ У вас нет @username. Установите его в настройках Telegram, чтобы я мог написать вам в ЛС";
 
