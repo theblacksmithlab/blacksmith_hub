@@ -245,7 +245,7 @@ pub async fn show_payment_processing(
     );
 
     let keyboard = InlineKeyboardMarkup::new(vec![
-        vec![InlineKeyboardButton::callback("🔄 Успешная оплату", "demo_payment_success")],
+        vec![InlineKeyboardButton::callback("🔄 Успешная оплата", "demo_payment_success")],
         vec![InlineKeyboardButton::callback("❌ Отмена", "pay_cancel")],
     ]);
 

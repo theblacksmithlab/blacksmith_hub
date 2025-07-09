@@ -99,7 +99,7 @@ pub async fn groot_bot_command_handler(
     };
 
     // Execution area check
-    if cmd != GrootBotCommands::Start && cmd != GrootBotCommands::Groot && !msg.chat.is_private() {
+    if cmd != GrootBotCommands::Start && cmd != GrootBotCommands::Subscription && cmd != GrootBotCommands::Groot && !msg.chat.is_private() {
         info!(
             "User | {} | with id: {} tried to use {:?} command in public chat {}",
             username,
