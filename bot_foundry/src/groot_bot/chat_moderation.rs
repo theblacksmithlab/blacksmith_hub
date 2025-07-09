@@ -16,6 +16,8 @@ use teloxide::prelude::Message;
 use teloxide::Bot;
 use teloxide_core::prelude::{Request, Requester};
 use tracing::{error, info};
+use core::utils::common::get_message;
+use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 
 pub async fn chat_moderation(
     bot: Bot,
@@ -65,6 +67,18 @@ pub async fn chat_moderation(
         }
     }
 
+    if msg.chat.is_private() {
+        info!("Got private chat message - skipping moderation");
+
+        let bot_msg = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::NoNeedForCheckInPrivateChat,
+        ))
+            .await?;
+
+        bot.send_message(msg.chat.id, bot_msg).await?;
+        return Ok(());
+    }
+    
     let mut is_admin = false;
     let mut is_from_linked_channel = false;
 
