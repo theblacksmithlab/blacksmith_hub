@@ -1,27 +1,34 @@
-use std::fs;
-use std::path::Path;
+use crate::models::common::app_name::AppName;
 use anyhow::Context;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::SqlitePool;
+use std::fs;
+use std::path::Path;
 use tracing::{info, warn};
-use crate::models::common::app_name::AppName;
-
 
 pub async fn setup_bot_localdb_pool(app_name: &AppName) -> anyhow::Result<SqlitePool> {
     let db_path = match app_name {
         AppName::GrootBot => "common_res/local_db/groot_bot.db",
-        _ => return Err(anyhow::anyhow!("Database not supported for app: {}", app_name.as_str())),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Database not supported for app: {}",
+                app_name.as_str()
+            ))
+        }
     };
 
     if !Path::new(db_path).exists() {
         if let Some(parent) = Path::new(db_path).parent() {
             if !parent.exists() {
-                fs::create_dir_all(parent)
-                    .context("Error creating directory for bot DB")?;
+                fs::create_dir_all(parent).context("Error creating directory for bot DB")?;
             }
         }
         fs::File::create(db_path).context("Error creating db file for bot")?;
-        warn!("New db file for {} created at: {}", app_name.as_str(), db_path);
+        warn!(
+            "New db file for {} created at: {}",
+            app_name.as_str(),
+            db_path
+        );
     }
 
     let pool = SqlitePool::connect_with(
@@ -29,8 +36,8 @@ pub async fn setup_bot_localdb_pool(app_name: &AppName) -> anyhow::Result<Sqlite
             .filename(db_path)
             .create_if_missing(true),
     )
-        .await
-        .context("Error connecting to bot db pool")?;
+    .await
+    .context("Error connecting to bot db pool")?;
 
     info!("{} db pool initialized successfully", app_name.as_str());
 
@@ -43,8 +50,10 @@ pub async fn setup_bot_localdb_pool(app_name: &AppName) -> anyhow::Result<Sqlite
     Ok(pool)
 }
 
-
-async fn create_bot_localdb_tables(pool: &SqlitePool, app_name: &AppName) -> Result<(), sqlx::Error> {
+async fn create_bot_localdb_tables(
+    pool: &SqlitePool,
+    app_name: &AppName,
+) -> Result<(), sqlx::Error> {
     match app_name {
         AppName::GrootBot => {
             let query = "
@@ -64,7 +73,7 @@ async fn create_bot_localdb_tables(pool: &SqlitePool, app_name: &AppName) -> Res
                 CREATE INDEX IF NOT EXISTS idx_end_date ON subscriptions(end_date);
             ";
             sqlx::query(query).execute(pool).await?;
-        },
+        }
         _ => {
             info!("No tables to create for {}", app_name.as_str());
         }

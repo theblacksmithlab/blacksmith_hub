@@ -112,7 +112,7 @@ async fn process_payment_webhook(
     let webhook_id = &webhook_data.uuid;
     let user_id = extract_user_id_from_order(&webhook_data.order_id)?;
     let db_pool = app_state.get_db_pool();
-    
+
     let already_processed = sqlx::query("SELECT 1 FROM processed_webhooks WHERE webhook_id = ?")
         .bind(webhook_id)
         .fetch_optional(db_pool)
@@ -126,28 +126,38 @@ async fn process_payment_webhook(
 
     match webhook_data.status.as_str() {
         "paid" | "paid_over" => {
-            println!("Processing successful payment for order_id: {}", webhook_data.order_id);
+            println!(
+                "Processing successful payment for order_id: {}",
+                webhook_data.order_id
+            );
 
             let amount_usd: f64 = webhook_data.payment_amount_usd.parse()?;
 
             let mut user_balance = UserBalance::get_or_create(&db_pool, &user_id).await?;
-            user_balance.add_funds(
-                &db_pool,
-                amount_usd,
-                &format!("Top-up via Heleket: {}", webhook_data.order_id),
-            ).await?;
+            user_balance
+                .add_funds(
+                    &db_pool,
+                    amount_usd,
+                    &format!("Top-up via Heleket: {}", webhook_data.order_id),
+                )
+                .await?;
 
-            println!("Successfully added ${} to user {} balance", amount_usd, user_id);
+            println!(
+                "Successfully added ${} to user {} balance",
+                amount_usd, user_id
+            );
         }
         "fail" | "wrong_amount" | "cancel" | "system_fail" => {
-            println!("Payment failed for order_id: {}, status: {}",
-                     webhook_data.order_id, webhook_data.status);
+            println!(
+                "Payment failed for order_id: {}, status: {}",
+                webhook_data.order_id, webhook_data.status
+            );
         }
         _ => {
             println!("Received intermediate status: {}", webhook_data.status);
         }
     }
-    
+
     sqlx::query("INSERT INTO processed_webhooks (webhook_id, order_id) VALUES (?, ?)")
         .bind(webhook_id)
         .bind(&webhook_data.order_id)

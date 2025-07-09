@@ -4,7 +4,7 @@ use crate::models::the_viper_room::the_viper_room::{AuthStage, TheViperRoomServe
 use crate::state::the_viper_room::app_state::TheViperRoomAppState;
 use crate::state::the_viper_room::app_state_operation::reset_user_state_with_message;
 use crate::utils::common::update_the_viper_room_user_state;
-use crate::utils::tg_bot::groot_bot::build_resource_file_path;
+use crate::utils::tg_bot::groot_bot::groot_bot_utils::build_resource_file_path;
 use anyhow::{Context, Result};
 use axum::Json;
 use grammers_client::Config as g_Config;

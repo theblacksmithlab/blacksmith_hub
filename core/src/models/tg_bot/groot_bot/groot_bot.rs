@@ -2,7 +2,7 @@ use crate::grammers::grammers_functionality::{
     initialize_grammers_client, load_grammers_session_data_from_file,
 };
 use crate::models::common::app_name::AppName;
-use crate::utils::tg_bot::groot_bot::{
+use crate::utils::tg_bot::groot_bot::groot_bot_utils::{
     add_chat_to_file, build_resource_file_path, load_chats_objects_from_file,
 };
 use anyhow::{Context, Result};

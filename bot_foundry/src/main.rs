@@ -31,6 +31,7 @@ use teloxide::prelude::Update;
 use teloxide::{dptree, Bot};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
+use crate::groot_bot::groot_bot_callback_query_handler::groot_bot_callback_query_handler;
 
 pub mod groot_bot;
 pub mod probiot_bot;
@@ -79,7 +80,10 @@ async fn main() -> Result<()> {
     let llm_client = LLM_Client::new();
 
     let app_state = if app_name == AppName::GrootBot {
-        Arc::new(BotAppState::with_groot_bot_options(llm_client, qdrant_client, app_name.clone()).await?)
+        Arc::new(
+            BotAppState::with_groot_bot_options(llm_client, qdrant_client, app_name.clone())
+                .await?,
+        )
     } else {
         Arc::new(BotAppState::new(llm_client, qdrant_client, app_name.clone()).await?)
     };
@@ -181,7 +185,7 @@ fn get_handlers(
                 .filter_command::<GrootBotCommands>()
                 .endpoint(groot_bot_command_handler),
             Update::filter_message().endpoint(groot_bot_message_handler),
-            None,
+            Some(Update::filter_callback_query().endpoint(groot_bot_callback_query_handler)),
         )),
         AppName::TheViperRoom
         | AppName::W3AWeb

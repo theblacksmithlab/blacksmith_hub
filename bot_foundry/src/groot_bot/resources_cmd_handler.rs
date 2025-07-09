@@ -1,10 +1,10 @@
-use crate::groot_bot::groot_bot_utils::{
-    load_black_listed_users, load_restricted_words, load_white_listed_users,
-};
 use core::models::tg_bot::groot_bot::groot_bot::ResourcesDialogState;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ShowType};
 use core::state::tg_bot::app_state::BotAppState;
-use core::utils::tg_bot::groot_bot::build_resource_file_path;
+use core::utils::tg_bot::groot_bot::groot_bot_utils::build_resource_file_path;
+use core::utils::tg_bot::groot_bot::groot_bot_utils::{
+    load_black_listed_users, load_restricted_words, load_white_listed_users,
+};
 use serde_json::Value;
 use std::fs;
 use std::fs::File;

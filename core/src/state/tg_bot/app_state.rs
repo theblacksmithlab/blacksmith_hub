@@ -1,19 +1,19 @@
+use crate::local_db::tg_bot::tg_bot_local_db::setup_bot_localdb_pool;
 use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::models::tg_bot::groot_bot::groot_bot::{ChatMessageStats, ResourcesDialogState};
 use crate::models::tg_bot::groot_bot::groot_bot::{MessageCounts, MessageReports};
 use crate::models::tg_bot::the_viper_room_bot::podcast_manager::PodcastManager;
+use crate::utils::tg_bot::groot_bot::subscription_payment::PaymentProcess;
 use crate::utils::tg_bot::tg_bot::is_localdb_implemented;
+use anyhow::Result;
 use async_openai::config::OpenAIConfig;
 use async_openai::Client as LLM_Client;
 use qdrant_client::Qdrant;
+use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::Arc;
-use sqlx::SqlitePool;
 use tokio::sync::Mutex;
-use crate::local_db::tg_bot::tg_bot_local_db::setup_bot_localdb_pool;
-use anyhow::Result;
-
 
 pub struct BotAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,
@@ -22,6 +22,7 @@ pub struct BotAppState {
     pub qdrant_client: Arc<Qdrant>,
     pub app_name: AppName,
     pub dialog_states: Option<Mutex<HashMap<u64, ResourcesDialogState>>>,
+    pub payment_states: Option<Mutex<HashMap<u64, PaymentProcess>>>,
     pub message_counts: Option<Arc<Mutex<MessageCounts>>>,
     pub chat_message_stats: Option<Arc<Mutex<ChatMessageStats>>>,
     pub message_reports: Option<Arc<Mutex<MessageReports>>>,
@@ -49,6 +50,7 @@ impl BotAppState {
             qdrant_client,
             app_name,
             dialog_states: None,
+            payment_states: None,
             message_counts: None,
             chat_message_stats: None,
             message_reports: None,
@@ -78,6 +80,8 @@ impl BotAppState {
 
         let dialog_states = Some(Mutex::new(HashMap::new()));
 
+        let payment_states = Some(Mutex::new(HashMap::new()));
+
         let message_reports = Arc::new(Mutex::new(
             MessageReports::load_message_reports(&app_name)
                 .await
@@ -89,7 +93,7 @@ impl BotAppState {
         } else {
             None
         };
-        
+
         Ok(Self {
             llm_client,
             podcast_manager,
@@ -99,6 +103,7 @@ impl BotAppState {
             chat_message_stats: Some(chat_message_stats),
             message_counts: Some(message_counts),
             dialog_states,
+            payment_states,
             message_reports: Some(message_reports),
             db_pool,
         })

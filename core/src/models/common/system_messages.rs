@@ -38,7 +38,7 @@ pub enum GrootBotMessages {
     GrootCmdRestrictionAlert,
     StartCmdUsedInPrivateChat,
     DemoModeMessage,
-    NoNeedForCheckInPrivateChat
+    NoNeedForCheckInPrivateChat,
 }
 
 impl GrootBotMessages {

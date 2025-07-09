@@ -1,8 +1,7 @@
+use crate::models::common::app_name::AppName;
+use crate::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
+pub use crate::utils::common::{build_resource_file_path, get_message};
 use anyhow::{Context, Result};
-use core::models::common::app_name::AppName;
-use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
-use core::utils::common::get_message;
-use core::utils::tg_bot::groot_bot::build_resource_file_path;
 use serde_json::{from_reader, Value};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -19,6 +18,7 @@ use teloxide::Bot;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 use unicode_segmentation::UnicodeSegmentation;
+use crate::models::tg_bot::groot_bot::groot_bot::ChatObject;
 
 pub fn load_super_admins(app_name: &AppName) -> HashSet<u64> {
     let path = build_resource_file_path(app_name, "super_admins_list.json");
@@ -40,7 +40,7 @@ pub fn load_super_admins(app_name: &AppName) -> HashSet<u64> {
         .collect()
 }
 
-pub(crate) fn load_paid_chats(app_name: &AppName) -> HashSet<i64> {
+pub fn load_paid_chats(app_name: &AppName) -> HashSet<i64> {
     let file_path = build_resource_file_path(app_name, "paid_chats.json");
 
     let data = fs::read_to_string(&file_path).unwrap_or_else(|err| {
@@ -114,18 +114,6 @@ fn is_forum(msg: &Message) -> bool {
         return supergroup.is_forum;
     }
     false
-}
-
-pub(crate) async fn auto_delete_message(
-    bot: Bot,
-    chat_id: ChatId,
-    message_id: MessageId,
-    delay: Duration,
-) {
-    tokio::spawn(async move {
-        sleep(delay).await;
-        bot.delete_message(chat_id, message_id).await.ok();
-    });
 }
 
 pub async fn paid_chat_spam_warning(
@@ -420,11 +408,7 @@ pub async fn add_user_to_black_list(app_name: &AppName, user_id: u64) {
     }
 }
 
-
-pub async fn is_message_from_linked_channel(
-    bot: &Bot,
-    msg: &Message
-) -> Result<bool> {
+pub async fn is_message_from_linked_channel(bot: &Bot, msg: &Message) -> Result<bool> {
     if let Some(sender_chat) = &msg.sender_chat {
         if let Ok(Some(linked_channel_id)) = get_linked_channel_id(bot, msg.chat.id).await {
             return Ok(sender_chat.id.0 == linked_channel_id);
@@ -433,7 +417,10 @@ pub async fn is_message_from_linked_channel(
     Ok(false)
 }
 
-pub async fn get_linked_channel_id(bot: &Bot, chat_id: ChatId) -> Result<Option<i64>, reqwest::Error> {
+pub async fn get_linked_channel_id(
+    bot: &Bot,
+    chat_id: ChatId,
+) -> Result<Option<i64>, reqwest::Error> {
     let token = bot.token();
     let url = format!("https://api.telegram.org/bot{}/getChat", token);
 
@@ -455,4 +442,75 @@ pub async fn get_linked_channel_id(bot: &Bot, chat_id: ChatId) -> Result<Option<
     }
 
     Ok(None)
+}
+
+pub fn load_chats_objects_from_file(app_name: &AppName) -> Result<Vec<ChatObject>> {
+    let chats_path = build_resource_file_path(app_name, "chats_list.json");
+
+    if !chats_path.exists() {
+        return Err(anyhow::anyhow!(
+            "Chats list file not found: {}",
+            chats_path.display()
+        ));
+    }
+
+    let data = fs::read_to_string(&chats_path)
+        .with_context(|| format!("Failed to read chats list file: {}", chats_path.display()))?;
+
+    let chats: Vec<ChatObject> = serde_json::from_str(&data)
+        .with_context(|| format!("Failed to parse JSON in: {}", chats_path.display()))?;
+
+    Ok(chats)
+}
+
+pub fn add_chat_to_file(app_name: &AppName, chat_object: ChatObject) -> Result<()> {
+    let chats_path = build_resource_file_path(app_name, "chats_list.json");
+
+    let mut chats: Vec<ChatObject> = if chats_path.exists() {
+        let data = fs::read_to_string(&chats_path)
+            .with_context(|| format!("Failed to read chats list file: {}", chats_path.display()))?;
+        serde_json::from_str(&data).unwrap_or_else(|_| Vec::new())
+    } else {
+        Vec::new()
+    };
+
+    if chats.iter().any(|c| c.chat_id == chat_object.chat_id) {
+        info!(
+            "Chat: {} with id: {} already in the chats list. Continue",
+            chat_object.username, chat_object.chat_id
+        );
+        return Ok(());
+    }
+
+    chats.push(chat_object.clone());
+
+    let new_data = serde_json::to_string_pretty(&chats)
+        .with_context(|| "Failed to serialize updated chat list")?;
+    fs::write(&chats_path, new_data).with_context(|| {
+        format!(
+            "Failed to write updated chat list to file: {}",
+            chats_path.display()
+        )
+    })?;
+
+    info!(
+        "New chat: {} with id: {} added to chats list file {}.",
+        chat_object.username,
+        chat_object.chat_id,
+        chats_path.display()
+    );
+
+    Ok(())
+}
+
+pub async fn auto_delete_message(
+    bot: Bot,
+    chat_id: ChatId,
+    message_id: MessageId,
+    delay: Duration,
+) {
+    tokio::spawn(async move {
+        sleep(delay).await;
+        bot.delete_message(chat_id, message_id).await.ok();
+    });
 }

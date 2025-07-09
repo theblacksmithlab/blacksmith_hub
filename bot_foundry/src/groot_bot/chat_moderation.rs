@@ -4,19 +4,27 @@ use crate::groot_bot::chat_moderation_utils::{
     save_message_counts_to_file, scam_emojis_check, scam_stories_check, update_user_message_count,
     via_bot_message_check,
 };
-use crate::groot_bot::groot_bot_utils::{is_message_from_linked_channel, load_black_listed_users, load_paid_chats, load_white_listed_users};
 use crate::groot_bot::resources_cmd_handler::resources_cmd_handler;
-use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
-use core::utils::common::get_message;
 use anyhow::Result;
+use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::state::tg_bot::app_state::BotAppState;
+use core::utils::common::get_message;
+use core::utils::tg_bot::groot_bot::groot_bot_utils::{
+    is_message_from_linked_channel, load_black_listed_users, load_paid_chats,
+    load_white_listed_users,
+};
 use std::sync::Arc;
 use teloxide::prelude::Message;
 use teloxide::Bot;
 use teloxide_core::prelude::{Request, Requester};
 use tracing::{error, info};
 
-pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>, is_paid_chat: bool) -> Result<()> {
+pub async fn chat_moderation(
+    bot: Bot,
+    msg: Message,
+    app_state: Arc<BotAppState>,
+    is_paid_chat: bool,
+) -> Result<()> {
     let user_id = msg.clone().from.unwrap().id.0;
     let username = msg
         .from
@@ -65,15 +73,15 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         let bot_msg = get_message(AppsSystemMessages::GrootBot(
             GrootBotMessages::NoNeedForCheckInPrivateChat,
         ))
-            .await?;
+        .await?;
 
         bot.send_message(msg.chat.id, bot_msg).await?;
         return Ok(());
     }
-    
+
     let mut is_admin = false;
     let mut is_from_linked_channel = false;
-    
+
     match bot.get_chat_administrators(msg.chat.id).send().await {
         Ok(admins) => {
             is_admin = msg
@@ -86,12 +94,12 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
             error!("Error getting admins list from public chat: {:?}", err);
         }
     }
-    
+
     if let Ok(true) = is_message_from_linked_channel(&bot, &msg).await {
         is_from_linked_channel = true;
         info!("Message from linked channel detected");
     }
-    
+
     if is_admin {
         info!("Message from chat admin - skipping moderation");
         return Ok(());
@@ -101,7 +109,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         info!("Message from linked channel - skipping moderation");
         return Ok(());
     }
-    
+
     let app_name = &app_state.app_name;
     let chat_title = msg.chat.title().unwrap_or_else(|| "Unknown Chat");
     let _paid_chats = load_paid_chats(app_name);
@@ -153,7 +161,6 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
     )
     .await
     {
-        
         return Ok(());
     }
 

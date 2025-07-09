@@ -1,8 +1,7 @@
-use sqlx::{Pool, Sqlite};
-use chrono::{DateTime, Utc};
 use anyhow::Result;
-use tracing::{info, error};
-
+use chrono::{DateTime, Utc};
+use sqlx::{Pool, Sqlite};
+use tracing::{error, info};
 
 pub async fn check_chat_payment(db_pool: &Pool<Sqlite>, chat_id: i64) -> Result<bool> {
     let query = "
@@ -18,37 +17,37 @@ pub async fn check_chat_payment(db_pool: &Pool<Sqlite>, chat_id: i64) -> Result<
         .fetch_optional(db_pool)
         .await
     {
-        Ok(Some((end_date_str,))) => {
-            match DateTime::parse_from_rfc3339(&end_date_str) {
-                Ok(end_date) => {
-                    let now = Utc::now();
-                    let is_valid = end_date.with_timezone(&Utc) > now;
+        Ok(Some((end_date_str,))) => match DateTime::parse_from_rfc3339(&end_date_str) {
+            Ok(end_date) => {
+                let now = Utc::now();
+                let is_valid = end_date.with_timezone(&Utc) > now;
 
-                    if is_valid {
-                        info!("Chat {} has valid subscription until {}", chat_id, end_date);
-                    } else {
-                        info!("Chat {} subscription expired on {}", chat_id, end_date);
-                    }
-
-                    Ok(is_valid)
-                },
-                Err(e) => {
-                    error!("Failed to parse end_date for chat {}: {}", chat_id, e);
-                    Ok(false)
+                if is_valid {
+                    info!("Chat {} has valid subscription until {}", chat_id, end_date);
+                } else {
+                    info!("Chat {} subscription expired on {}", chat_id, end_date);
                 }
+
+                Ok(is_valid)
+            }
+            Err(e) => {
+                error!("Failed to parse end_date for chat {}: {}", chat_id, e);
+                Ok(false)
             }
         },
         Ok(None) => {
             info!("No subscription found for chat {}", chat_id);
             Ok(false)
-        },
+        }
         Err(e) => {
-            error!("Database error checking payment for chat {}: {}", chat_id, e);
+            error!(
+                "Database error checking payment for chat {}: {}",
+                chat_id, e
+            );
             Ok(false)
         }
     }
 }
-
 
 pub async fn create_subscription(
     db_pool: &Pool<Sqlite>,
@@ -64,7 +63,7 @@ pub async fn create_subscription(
         "yearly" => now + chrono::Duration::days(365),
         _ => return Err(anyhow::anyhow!("Invalid plan type: {}", plan_type)),
     };
-    
+
     let upsert_query = "
         INSERT INTO subscriptions
         (chat_id, chat_username, paid_by_user_id, paid_by_username, start_date, end_date, plan_type)
@@ -98,8 +97,10 @@ pub async fn create_subscription(
     Ok(())
 }
 
-
-pub async fn get_subscription_info(db_pool: &Pool<Sqlite>, chat_id: i64) -> Result<Option<SubscriptionInfo>> {
+pub async fn get_subscription_info(
+    db_pool: &Pool<Sqlite>,
+    chat_id: i64,
+) -> Result<Option<SubscriptionInfo>> {
     let query = "
         SELECT chat_username, paid_by_user_id, paid_by_username, start_date, end_date, plan_type
         FROM subscriptions
@@ -113,19 +114,27 @@ pub async fn get_subscription_info(db_pool: &Pool<Sqlite>, chat_id: i64) -> Resu
         .fetch_optional(db_pool)
         .await
     {
-        Ok(Some((chat_username, paid_by_user_id, paid_by_username, start_date, end_date, plan_type))) => {
-            Ok(Some(SubscriptionInfo {
-                chat_username,
-                paid_by_user_id,
-                paid_by_username,
-                start_date,
-                end_date,
-                plan_type,
-            }))
-        },
+        Ok(Some((
+            chat_username,
+            paid_by_user_id,
+            paid_by_username,
+            start_date,
+            end_date,
+            plan_type,
+        ))) => Ok(Some(SubscriptionInfo {
+            chat_username,
+            paid_by_user_id,
+            paid_by_username,
+            start_date,
+            end_date,
+            plan_type,
+        })),
         Ok(None) => Ok(None),
         Err(e) => {
-            error!("Error getting subscription info for chat {}: {}", chat_id, e);
+            error!(
+                "Error getting subscription info for chat {}: {}",
+                chat_id, e
+            );
             Err(e.into())
         }
     }
@@ -141,8 +150,10 @@ pub struct SubscriptionInfo {
     pub plan_type: String,
 }
 
-
-pub async fn get_expiring_subscriptions(db_pool: &Pool<Sqlite>, days_before: i64) -> Result<Vec<SubscriptionInfo>> {
+pub async fn get_expiring_subscriptions(
+    db_pool: &Pool<Sqlite>,
+    days_before: i64,
+) -> Result<Vec<SubscriptionInfo>> {
     let target_date = Utc::now() + chrono::Duration::days(days_before);
 
     let query = "
@@ -153,21 +164,35 @@ pub async fn get_expiring_subscriptions(db_pool: &Pool<Sqlite>, days_before: i64
         ORDER BY end_date ASC
     ";
 
-    let rows = sqlx::query_as::<_, (i64, String, i64, Option<String>, String, String, String)>(query)
-        .bind(target_date.to_rfc3339())
-        .fetch_all(db_pool)
-        .await?;
+    let rows =
+        sqlx::query_as::<_, (i64, String, i64, Option<String>, String, String, String)>(query)
+            .bind(target_date.to_rfc3339())
+            .fetch_all(db_pool)
+            .await?;
 
-    let subscriptions = rows.into_iter().map(|(_, chat_username, paid_by_user_id, paid_by_username, start_date, end_date, plan_type)| {
-        SubscriptionInfo {
-            chat_username,
-            paid_by_user_id,
-            paid_by_username,
-            start_date,
-            end_date,
-            plan_type,
-        }
-    }).collect();
+    let subscriptions = rows
+        .into_iter()
+        .map(
+            |(
+                _,
+                chat_username,
+                paid_by_user_id,
+                paid_by_username,
+                start_date,
+                end_date,
+                plan_type,
+            )| {
+                SubscriptionInfo {
+                    chat_username,
+                    paid_by_user_id,
+                    paid_by_username,
+                    start_date,
+                    end_date,
+                    plan_type,
+                }
+            },
+        )
+        .collect();
 
     Ok(subscriptions)
 }

@@ -1,12 +1,15 @@
+use core::utils::tg_bot::groot_bot::subscription_payment::SubscriptionState;
 use crate::groot_bot::chat_moderation::chat_moderation;
 use crate::groot_bot::chat_moderation_utils::handle_groot_report;
-use crate::groot_bot::groot_bot_utils::{auto_delete_message, is_message_from_linked_channel, load_super_admins};
 use anyhow::Result;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState, ShowType};
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
+use core::utils::tg_bot::groot_bot::groot_bot_utils::{
+    auto_delete_message, is_message_from_linked_channel, load_super_admins,
+};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,8 +18,7 @@ use teloxide::prelude::{Message, Request, Requester, Update};
 use teloxide::types::{KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
 use tracing::{error, info};
-use crate::groot_bot::subscription::check_chat_payment;
-
+use crate::groot_bot::groot_bot_callback_query_handler::handle_forwarded_message;
 
 pub async fn groot_bot_command_handler(
     bot: Bot,
@@ -65,7 +67,7 @@ pub async fn groot_bot_command_handler(
             info!("Command from linked channel detected");
         }
     }
-    
+
     // Setting-up LORD_ADMIN_ID
     let lord_admin_id = match env::var("LORD_ADMIN_ID") {
         Ok(val) => match val.parse::<u64>() {
@@ -95,7 +97,7 @@ pub async fn groot_bot_command_handler(
             return Ok(());
         }
     };
-    
+
     // Execution area check
     if cmd != GrootBotCommands::Start && cmd != GrootBotCommands::Groot && !msg.chat.is_private() {
         info!(
@@ -133,13 +135,15 @@ pub async fn groot_bot_command_handler(
             GrootBotCommands::Start => {
                 get_message(AppsSystemMessages::GrootBot(
                     GrootBotMessages::StartCmdUsedInPrivateChat,
-                )).await?
-            },
+                ))
+                .await?
+            }
             GrootBotCommands::Groot => {
                 get_message(AppsSystemMessages::GrootBot(
                     GrootBotMessages::PublicCmdUsedInPrivateChat,
-                )).await?
-            },
+                ))
+                .await?
+            }
             _ => unreachable!(),
         };
 
@@ -151,21 +155,26 @@ pub async fn groot_bot_command_handler(
             bot_system_message.id,
             Duration::from_secs(120),
         )
-            .await;
+        .await;
 
         return Ok(());
     }
-    
+
     // Executor check
-    if cmd == GrootBotCommands::Start && !is_admin && !is_from_linked_channel && user_id != lord_admin_id {
+    if cmd == GrootBotCommands::Start
+        && !is_admin
+        && !is_from_linked_channel
+        && user_id != lord_admin_id
+    {
         info!(
-        "User | {} | with id: {} tried to use /{:?} command in public chat",
-        username, user_id, cmd
-    );
+            "User | {} | with id: {} tried to use /{:?} command in public chat",
+            username, user_id, cmd
+        );
 
         let bot_msg = get_message(AppsSystemMessages::GrootBot(
             GrootBotMessages::CommonStartCmdReaction,
-        )).await?;
+        ))
+        .await?;
 
         let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
 
@@ -174,24 +183,26 @@ pub async fn groot_bot_command_handler(
             bot_system_message.chat.id,
             bot_system_message.id,
             Duration::from_secs(120),
-        ).await;
+        )
+        .await;
 
         return Ok(());
     }
 
     if cmd == GrootBotCommands::Start
         && !msg.chat.is_private()
-        && (is_admin || is_from_linked_channel || user_id == lord_admin_id) {
-
+        && (is_admin || is_from_linked_channel || user_id == lord_admin_id)
+    {
         if msg.chat.username().is_none() {
             info!(
-            "Admin | {} | with id: {} tried to use /{:?} command in chat without username",
-            username, user_id, cmd
-        );
+                "Admin | {} | with id: {} tried to use /{:?} command in chat without username",
+                username, user_id, cmd
+            );
 
             let bot_msg = get_message(AppsSystemMessages::GrootBot(
                 GrootBotMessages::NoUsernameForChatAlert,
-            )).await?;
+            ))
+            .await?;
 
             let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
 
@@ -200,14 +211,14 @@ pub async fn groot_bot_command_handler(
                 bot_system_message.chat.id,
                 bot_system_message.id,
                 Duration::from_secs(120),
-            ).await;
+            )
+            .await;
 
             return Ok(());
         }
     }
-    
-    if cmd == GrootBotCommands::Resources && !super_admins.contains(&user_id)
-    {
+
+    if cmd == GrootBotCommands::Resources && !super_admins.contains(&user_id) {
         info!(
             "Non-super-admin user | {} | with id: {} tried to use /{:?} command",
             username, user_id, cmd,
@@ -232,22 +243,25 @@ pub async fn groot_bot_command_handler(
 
     match cmd {
         GrootBotCommands::Start => {
-            let bot_msg =
-                get_message(AppsSystemMessages::GrootBot(GrootBotMessages::StartCmdUsedInPublicChat)).await?;
+            let bot_msg = get_message(AppsSystemMessages::GrootBot(
+                GrootBotMessages::StartCmdUsedInPublicChat,
+            ))
+            .await?;
             bot.send_message(msg.chat.id, bot_msg).await?;
-            
+
             if !is_paid_chat {
                 let demo_msg = get_message(AppsSystemMessages::GrootBot(
                     GrootBotMessages::DemoModeMessage,
-                )).await?;
+                ))
+                .await?;
                 bot.send_message(msg.chat.id, demo_msg).await?;
             } else {
                 let chat_username = msg.chat.username().unwrap();
 
                 info!(
-            "Chat: {} with id: {} is paid. Fetching chat history...",
-            chat_username, msg.chat.id
-        );
+                    "Chat: {} with id: {} is paid. Fetching chat history...",
+                    chat_username, msg.chat.id
+                );
 
                 let mut chat_stats = app_state.chat_message_stats.as_ref().unwrap().lock().await;
                 if let Err(err) = chat_stats
@@ -259,9 +273,9 @@ pub async fn groot_bot_command_handler(
                     .await
                 {
                     error!(
-                "Error fetching chat history for a new chat: {} with id: {}: {}",
-                chat_username, msg.chat.id, err
-            );
+                        "Error fetching chat history for a new chat: {} with id: {}: {}",
+                        chat_username, msg.chat.id, err
+                    );
                 }
             }
         }
@@ -405,26 +419,41 @@ pub async fn groot_bot_message_handler(
         _ => return Ok(()),
     };
 
+    if msg.chat.is_private() {
+        if let Some(payment_states_mutex) = &bot_app_state.payment_states {
+            let payment_states = payment_states_mutex.lock().await;
+            if let Some(payment_process) = payment_states.get(&msg.from.as_ref().unwrap().id.0) {
+                if payment_process.state == SubscriptionState::AwaitingChatSelection {
+                    drop(payment_states);
+                    return handle_forwarded_message(bot, msg, bot_app_state).await;
+                }
+            }
+        }
+        
+        info!("Private chat message - skipping moderation");
+        return Ok(());
+    }
+    
     // if msg.chat.is_private() {
     //     info!("Got private chat message - skipping moderation");
-    // 
+    //
     //     let bot_msg = get_message(AppsSystemMessages::GrootBot(
     //         GrootBotMessages::NoNeedForCheckInPrivateChat,
     //     ))
     //         .await?;
-    // 
+    //
     //     bot.send_message(msg.chat.id, bot_msg).await?;
     //     return Ok(());
     // }
 
     let is_paid_chat = true;
-    
+
     // let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
     //     check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
     // } else {
     //     false
     // };
-    
+
     chat_moderation(bot, msg, bot_app_state, is_paid_chat).await?;
 
     Ok(())
