@@ -1,9 +1,8 @@
-use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sqlx::{Pool, Sqlite};
 use tracing::{error, info};
 
-pub async fn check_chat_payment(db_pool: &Pool<Sqlite>, chat_id: i64) -> Result<bool> {
+pub async fn check_chat_payment(db_pool: &Pool<Sqlite>, chat_id: i64) -> anyhow::Result<bool> {
     let query = "
         SELECT end_date
         FROM subscriptions
@@ -56,7 +55,7 @@ pub async fn create_subscription(
     paid_by_user_id: i64,
     paid_by_username: Option<&str>,
     plan_type: &str,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let now = Utc::now();
     let end_date = match plan_type {
         "monthly" => now + chrono::Duration::days(30),
@@ -100,7 +99,7 @@ pub async fn create_subscription(
 pub async fn get_subscription_info(
     db_pool: &Pool<Sqlite>,
     chat_id: i64,
-) -> Result<Option<SubscriptionInfo>> {
+) -> anyhow::Result<Option<SubscriptionInfo>> {
     let query = "
         SELECT chat_username, paid_by_user_id, paid_by_username, start_date, end_date, plan_type
         FROM subscriptions
@@ -115,13 +114,13 @@ pub async fn get_subscription_info(
         .await
     {
         Ok(Some((
-            chat_username,
-            paid_by_user_id,
-            paid_by_username,
-            start_date,
-            end_date,
-            plan_type,
-        ))) => Ok(Some(SubscriptionInfo {
+                    chat_username,
+                    paid_by_user_id,
+                    paid_by_username,
+                    start_date,
+                    end_date,
+                    plan_type,
+                ))) => Ok(Some(SubscriptionInfo {
             chat_username,
             paid_by_user_id,
             paid_by_username,
@@ -153,7 +152,7 @@ pub struct SubscriptionInfo {
 pub async fn get_expiring_subscriptions(
     db_pool: &Pool<Sqlite>,
     days_before: i64,
-) -> Result<Vec<SubscriptionInfo>> {
+) -> anyhow::Result<Vec<SubscriptionInfo>> {
     let target_date = Utc::now() + chrono::Duration::days(days_before);
 
     let query = "
@@ -174,14 +173,14 @@ pub async fn get_expiring_subscriptions(
         .into_iter()
         .map(
             |(
-                _,
-                chat_username,
-                paid_by_user_id,
-                paid_by_username,
-                start_date,
-                end_date,
-                plan_type,
-            )| {
+                 _,
+                 chat_username,
+                 paid_by_user_id,
+                 paid_by_username,
+                 start_date,
+                 end_date,
+                 plan_type,
+             )| {
                 SubscriptionInfo {
                     chat_username,
                     paid_by_user_id,

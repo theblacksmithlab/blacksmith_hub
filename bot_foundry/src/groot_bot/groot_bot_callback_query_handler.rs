@@ -8,10 +8,8 @@ use core::utils::tg_bot::groot_bot::subscription_payment::{
     show_payment_processing,
     show_payment_confirmation,
     SubscriptionState,
-    show_chat_selection_message,
     show_plan_selection,
 };
-use crate::groot_bot::subscription::check_chat_payment;
 use core::utils::tg_bot::groot_bot::subscription_payment::get_plan_by_id;
 
 pub async fn groot_bot_callback_query_handler(
@@ -25,9 +23,7 @@ pub async fn groot_bot_callback_query_handler(
     info!("Callback from user {}: {}", user_id, callback_data);
     
     match callback_data.as_str() {
-        "pay_continue" => handle_pay_continue(bot, callback_query, app_state).await?,
         "pay_cancel" => handle_pay_cancel(bot, callback_query, app_state).await?,
-        "back_to_chat_selection" => handle_back_to_chat_selection(bot, callback_query, app_state).await?,
         "back_to_plans" => handle_back_to_plans(bot, callback_query, app_state).await?,
         "payment_confirm" => handle_payment_confirm(bot, callback_query, app_state).await?,
         
@@ -45,32 +41,6 @@ pub async fn groot_bot_callback_query_handler(
     }
 
     Ok(())
-}
-
-async fn handle_pay_continue(
-    bot: Bot,
-    callback_query: CallbackQuery,
-    app_state: Arc<BotAppState>,
-) -> Result<()> {
-    let user_id = callback_query.from.id.0;
-    let chat_id = callback_query.message.as_ref().unwrap().chat().id;
-    
-    if let Some(payment_states_mutex) = &app_state.payment_states {
-        let mut payment_states = payment_states_mutex.lock().await;
-        if let Some(payment_process) = payment_states.get_mut(&user_id) {
-            payment_process.state = SubscriptionState::AwaitingChatSelection;
-        }
-    }
-    
-    bot.answer_callback_query(callback_query.id)
-        .text("✅ Переходим к выбору чата")
-        .await?;
-    
-    if let Some(message) = callback_query.message {
-        bot.delete_message(chat_id, message.id()).await?;
-    }
-
-    show_chat_selection_message(bot, chat_id).await
 }
 
 async fn handle_pay_cancel(
@@ -100,111 +70,6 @@ async fn handle_pay_cancel(
     Ok(())
 }
 
-pub async fn handle_forwarded_message(
-    bot: Bot,
-    msg: Message,
-    app_state: Arc<BotAppState>,
-) -> Result<()> {
-    let user_id = msg.from.as_ref().unwrap().id.0;
-
-    if msg.forward_origin().is_none() {
-        bot.send_message(msg.chat.id, "❌ Переслите сообщение из чата").await?;
-        return Ok(());
-    }
-
-    let target_chat_id = match msg.forward_from_chat() {
-        Some(ref chat) => chat.id.0,
-        None => {
-            bot.send_message(msg.chat.id,
-                             "❌ Не удалось определить чат-источник. Попробуйте переслать другое сообщение.")
-                .await?;
-            return Ok(());
-        }
-    };
-
-    let chat_info = match bot.get_chat(ChatId(target_chat_id)).await {
-        Ok(chat) => chat,
-        Err(_) => {
-            bot.send_message(msg.chat.id, "❌ Не удалось получить информацию о чате").await?;
-            return Ok(());
-        }
-    };
-
-    let chat_username = match chat_info.username() {
-        Some(username) => username.to_string(),
-        None => {
-            bot.send_message(msg.chat.id,
-                             "❌ Чат должен иметь публичный @username для работы бота")
-                .await?;
-            return Ok(());
-        }
-    };
-    
-    info!("ID чата-источника: {}", target_chat_id);
-    info!("Username чата: @{}", chat_username);
-
-    if let Some(db_pool) = &app_state.db_pool {
-        if check_chat_payment(db_pool, target_chat_id).await.unwrap_or(false) {
-            bot.send_message(msg.chat.id,
-                             &format!("ℹ️ Чат @{} уже имеет активную подписку!", chat_username))
-                .await?;
-            return Ok(());
-        }
-    }
-
-    if let Some(payment_states_mutex) = &app_state.payment_states {
-        let mut payment_states = payment_states_mutex.lock().await;
-        if let Some(payment_process) = payment_states.get_mut(&user_id) {
-            payment_process.state = SubscriptionState::AwaitingPlanSelection;
-            payment_process.target_chat_id = Some(target_chat_id);
-            payment_process.target_chat_username = Some(chat_username.clone());
-        } else {
-            bot.send_message(msg.chat.id,
-                             "⏰ Сессия истекла. Начните заново с /subscription")
-                .await?;
-            return Ok(());
-        }
-    }
-
-    bot.send_message(msg.chat.id,
-                     &format!("✅ Выбран чат: @{}", chat_username))
-        .await?;
-
-    show_plan_selection(bot, msg.chat.id, &chat_username).await
-}
-
-async fn handle_back_to_chat_selection(
-    bot: Bot,
-    callback_query: CallbackQuery,
-    app_state: Arc<BotAppState>,
-) -> Result<()> {
-    let user_id = callback_query.from.id.0;
-    let chat_id = callback_query.message.as_ref().unwrap().chat().id;
-
-    if let Some(payment_states_mutex) = &app_state.payment_states {
-        let mut payment_states = payment_states_mutex.lock().await;
-        if let Some(payment_process) = payment_states.get_mut(&user_id) {
-            payment_process.state = SubscriptionState::AwaitingChatSelection;
-            payment_process.target_chat_id = None;
-            payment_process.target_chat_username = None;
-            payment_process.selected_plan = None;
-            payment_process.payment_amount = None;
-        } else {
-            return handle_expired_session(bot, callback_query).await;
-        }
-    }
-
-    bot.answer_callback_query(callback_query.id)
-        .text("⬅️ Возврат к выбору чата")
-        .await?;
-
-    if let Some(message) = callback_query.message {
-        bot.delete_message(chat_id, message.id()).await?;
-    }
-
-    show_chat_selection_message(bot, chat_id).await
-}
-
 async fn handle_plan_selection(
     bot: Bot,
     callback_query: CallbackQuery,
@@ -230,7 +95,7 @@ async fn handle_plan_selection(
             if let Some(payment_process) = payment_states.get_mut(&user_id) {
                 payment_process.state = SubscriptionState::AwaitingPaymentConfirmation;
                 payment_process.selected_plan = Some(plan_id.to_string());
-                payment_process.payment_amount = Some(plan.price_rub);
+                payment_process.payment_amount = Some(plan.price_usd);
 
                 payment_process.target_chat_username.clone().unwrap_or_default()
             } else {

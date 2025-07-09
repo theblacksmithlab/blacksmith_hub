@@ -1,4 +1,3 @@
-use core::utils::tg_bot::groot_bot::subscription_payment::SubscriptionState;
 use crate::groot_bot::chat_moderation_utils::{
     ai_check, check_sender, is_user_active, media_restriction_check, message_caption_check,
     message_entities_check, message_with_web_url_check, restricted_words_check,
@@ -7,11 +6,9 @@ use crate::groot_bot::chat_moderation_utils::{
 };
 use crate::groot_bot::resources_cmd_handler::resources_cmd_handler;
 use anyhow::Result;
-use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::state::tg_bot::app_state::BotAppState;
-use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
-    is_message_from_linked_channel, load_black_listed_users, load_paid_chats,
+    is_message_from_linked_channel, load_black_listed_users,
     load_white_listed_users,
 };
 use std::sync::Arc;
@@ -19,7 +16,6 @@ use teloxide::prelude::Message;
 use teloxide::Bot;
 use teloxide_core::prelude::{Request, Requester};
 use tracing::{error, info};
-use crate::groot_bot::groot_bot_callback_query_handler::handle_forwarded_message;
 
 pub async fn chat_moderation(
     bot: Bot,
@@ -67,25 +63,6 @@ pub async fn chat_moderation(
                 .await;
             }
         }
-    }
-
-    if msg.chat.is_private() {
-        if let Some(payment_states_mutex) = &app_state.payment_states {
-            let payment_states = payment_states_mutex.lock().await;
-            if let Some(payment_process) = payment_states.get(&user_id) {
-                if payment_process.state == SubscriptionState::AwaitingChatSelection {
-                    drop(payment_states);
-                    return handle_forwarded_message(bot, msg, app_state).await;
-                }
-            }
-        }
-        
-        info!("Got private chat message - skipping moderation");
-        let bot_msg = get_message(AppsSystemMessages::GrootBot(
-            GrootBotMessages::NoNeedForCheckInPrivateChat,
-        )).await?;
-        bot.send_message(msg.chat.id, bot_msg).await?;
-        return Ok(());
     }
 
     let mut is_admin = false;

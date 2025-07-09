@@ -7,6 +7,8 @@ use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Requester};
 use teloxide::types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup};
 use teloxide::Bot;
+use tracing::info;
+use crate::utils::tg_bot::groot_bot::subscription::check_chat_payment;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SubscriptionState {
@@ -31,7 +33,7 @@ pub struct SubscriptionPlan {
     pub id: &'static str,
     pub name: &'static str,
     pub duration_days: u32,
-    pub price_rub: u32,
+    pub price_usd: u32,
     pub description: &'static str,
 }
 
@@ -50,15 +52,15 @@ pub const SUBSCRIPTION_PLANS: [SubscriptionPlan; 2] = [
         id: "monthly",
         name: "Месячная подписка",
         duration_days: 30,
-        price_rub: 500,
+        price_usd: 15,
         description: "30 дней полной защиты от спама",
     },
     SubscriptionPlan {
         id: "yearly",
         name: "Годовая подписка",
         duration_days: 365,
-        price_rub: 5000,
-        description: "365 дней + скидка 17%",
+        price_usd: 150,
+        description: "365 дней + скидка 17% (2 мес. - FREE!)",
     },
 ];
 
@@ -68,21 +70,53 @@ pub async fn handle_subscription_command(
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let user_id = msg.from.as_ref().unwrap().id.0;
+    info!("user_id: {}", user_id);
+    let user = msg.from.as_ref().unwrap();
+    info!("user: {:?}", user);
 
-    if !msg.chat.is_private() {
-        let bot_msg = "Команда /subscription доступна только в личных сообщениях. Напишите мне в ЛС: @your_bot_username";
+    if msg.chat.is_private() {
+        let bot_msg = "Команда /subscription доступна только в публичных чатах, чтобы я понял, какой чат вы хотите защитить.\n\
+        После вызова команды /subscription в чате, мы продолжим общение тут";
 
-        let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
-
-        auto_delete_message(
-            bot.clone(),
-            bot_system_message.chat.id,
-            bot_system_message.id,
-            Duration::from_secs(120),
-        )
-        .await;
+        bot.send_message(msg.chat.id, bot_msg).await?;
 
         return Ok(());
+    }
+
+    let user_username = match &user.username {
+        Some(username) => username.clone(),
+        None => {
+            let bot_msg = "❌ У вас нет @username. Установите его в настройках Telegram, чтобы я мог написать вам в ЛС";
+
+            let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
+
+            auto_delete_message(
+                bot.clone(),
+                bot_system_message.chat.id,
+                bot_system_message.id,
+                Duration::from_secs(120),
+            ).await;
+
+            return Ok(());
+        }
+    };
+
+    let target_chat_id = msg.chat.id.0;
+    let target_chat_username = match msg.chat.username() {
+        Some(username) => username.to_string(),
+        None => {
+            bot.send_message(msg.chat.id, "❌ Чат должен иметь @username").await?;
+            return Ok(());
+        }
+    };
+
+    if let Some(db_pool) = &app_state.db_pool {
+        if check_chat_payment(db_pool, target_chat_id).await.unwrap_or(false) {
+            bot.send_message(msg.chat.id,
+                             &format!("ℹ️ Чат @{} уже имеет активную подписку!", target_chat_username))
+                .await?;
+            return Ok(());
+        }
     }
 
     if let Some(payment_states_mutex) = &app_state.payment_states {
@@ -91,9 +125,9 @@ pub async fn handle_subscription_command(
         payment_states.insert(
             user_id,
             PaymentProcess {
-                state: SubscriptionState::AwaitingChatSelection,
-                target_chat_id: None,
-                target_chat_username: None,
+                state: SubscriptionState::AwaitingPlanSelection,
+                target_chat_id: Some(target_chat_id),
+                target_chat_username: Some(target_chat_username.clone()),
                 selected_plan: None,
                 payment_amount: None,
                 payment_id: None,
@@ -101,69 +135,31 @@ pub async fn handle_subscription_command(
         );
     }
 
-    show_subscription_start_message(bot, msg.chat.id).await
+    let group_msg = format!("✅ @{}, проверьте ЛС для оплаты подписки", user_username);
+    let bot_system_message = bot.send_message(msg.chat.id, group_msg).await?;
+
+    auto_delete_message(
+        bot.clone(),
+        bot_system_message.chat.id,
+        bot_system_message.id,
+        Duration::from_secs(30),
+    ).await;
+
+    show_plan_selection(bot, ChatId(user_id as i64), &target_chat_username).await
 }
 
-async fn show_subscription_start_message(bot: Bot, chat_id: ChatId) -> Result<()> {
-    let message_text = "💰 **Подписка на GrootBot**\n\n\
-        🛡️ **Что вы получите:**\n\
-        • Полная защита от спама и скама\n\
-        • AI\\-модерация сообщений\n\
-        • Блокировка подозрительных ссылок\n\
-        • Защита от фишинга\n\
-        • Поддержка 24/7\n\n\
-        💳 **Тарифы:**\n\
-        📅 1 месяц \\- **500₽**\n\
-        📅 1 год \\- **5000₽** \\(скидка 17%\\)\n\n\
-        🔒 **Безопасная оплата криптовалютой**\n\
-        ⚡ **Активация мгновенная**".to_string();
-
-    let keyboard = InlineKeyboardMarkup::new(vec![
-        vec![InlineKeyboardButton::callback(
-            "💳 Понятно, продолжить",
-            "pay_continue",
-        )],
-        vec![InlineKeyboardButton::callback("❌ Отмена", "pay_cancel")],
-    ]);
-
-    bot.send_message(chat_id, message_text)
-        // .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-        .reply_markup(keyboard)
-        .await?;
-
-    Ok(())
-}
-
-pub async fn show_chat_selection_message(bot: Bot, chat_id: ChatId) -> Result<()> {
-    let message_text = "📨 **Выберите чат для подписки**\n\n\
-        Перешлите любое сообщение из чата, который хотите защитить.\n\n\
-        ⚠️ **Важно:** чат должен иметь @username (публичный)";
-
-    let keyboard = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
-        "❌ Отмена",
-        "pay_cancel",
-    )]]);
-
-    bot.send_message(chat_id, message_text)
-        // .parse_mode(teloxide::types::ParseMode::MarkdownV2)
-        .reply_markup(keyboard)
-        .await?;
-
-    Ok(())
-}
-
-pub async fn show_plan_selection(bot: Bot, chat_id: ChatId, chat_username: &str) -> Result<()> {
+pub async fn show_plan_selection(bot: Bot, user_chat_id: ChatId, chat_username: &str) -> Result<()> {
     let message_text = format!(
         "📋 **Выберите тарифный план**\n\n\
-        🎯 **Чат:** @{}\n\n\
+        🏠 **Чат:** @{}\n\n\
         💰 **Доступные планы:**",
         chat_username
     );
 
     let mut keyboard_rows = vec![];
-    
+
     for plan in &SUBSCRIPTION_PLANS {
-        let button_text = format!("{} - {}₽", plan.name, plan.price_rub);
+        let button_text = format!("{} - {}₽", plan.name, plan.price_usd);
         keyboard_rows.push(vec![InlineKeyboardButton::callback(
             button_text,
             format!("plan_{}", plan.id),
@@ -172,13 +168,12 @@ pub async fn show_plan_selection(bot: Bot, chat_id: ChatId, chat_username: &str)
 
 
     keyboard_rows.push(vec![
-        InlineKeyboardButton::callback("⬅️ Выбрать другой чат", "back_to_chat_selection"),
         InlineKeyboardButton::callback("❌ Отмена", "pay_cancel"),
     ]);
 
     let keyboard = InlineKeyboardMarkup::new(keyboard_rows);
 
-    bot.send_message(chat_id, message_text)
+    bot.send_message(user_chat_id, message_text)
         // .parse_mode(teloxide::types::ParseMode::MarkdownV2)
         .reply_markup(keyboard)
         .await?;
@@ -200,7 +195,7 @@ pub async fn show_payment_confirmation(
         ⏱️ **Период:** {} дней\n\n\
         📝 **Описание:** {}\n\n\
         ✅ **Подтверждаете оплату?**",
-        chat_username, plan.name, plan.price_rub, plan.duration_days, plan.description
+        chat_username, plan.name, plan.price_usd, plan.duration_days, plan.description
     );
 
     let keyboard = InlineKeyboardMarkup::new(vec![
