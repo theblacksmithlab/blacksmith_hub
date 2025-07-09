@@ -1,11 +1,11 @@
+use crate::utils::uniframe_studio::heleket_client::InvoiceResult;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use teloxide::payloads::SendMessageSetters;
-use teloxide::prelude::{Requester};
+use teloxide::prelude::Requester;
 use teloxide::types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup};
 use teloxide::Bot;
 use url::Url;
-use crate::utils::uniframe_studio::heleket_client::InvoiceResult;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SubscriptionState {
@@ -56,14 +56,14 @@ pub const SUBSCRIPTION_PLANS: [SubscriptionPlan; 2] = [
         name: "Месячная подписка",
         duration_days: 30,
         price_usd: 15,
-        description: "30 дней полной защиты от спама",
+        description: "30 дней ультимативной защиты от нечисти",
     },
     SubscriptionPlan {
         id: "yearly",
         name: "Годовая подписка",
         duration_days: 365,
         price_usd: 150,
-        description: "365 дней + скидка 17% (2 мес. - FREE!)",
+        description: "365 дней + скидка 17% 👉 2 месяца - В ПОДАРОК!)",
     },
 ];
 
@@ -75,8 +75,8 @@ pub async fn show_plan_selection(
     let message_text = format!(
         "Приветствую ещё раз!\n\n\
         Я получил от Вас заявку на оплату подписки для чата: @{}\n\
-        ❗️Внимательно проверьте username чата, изменить его после оплаты подписки будет невозможно!\n\n
-        📋 Выберите тарифный план:\n\n",
+        Внимательно проверьте username чата, изменить его после оплаты подписки будет невозможно!\n\n
+        Выберите тарифный план:\n\n",
         chat_username
     );
 
@@ -114,7 +114,7 @@ pub async fn show_payment_confirmation(
         "Подтверждение заказа\n\n\
         🎯 Чат username: @{}\n\
         📋 Тарифный план: {}\n\
-        💰 Сумма: {}$\n\
+        💰 Сумма: {} $\n\
         ⏱️ Период: {} дней\n\n\
         📝 Описание: {}\n\n\
         ✅ Подтверждаете оплату?",
@@ -153,7 +153,7 @@ pub async fn show_payment_link(
     let message_text = format!(
         "Оплата подписки\n\n\
         🎯 Чат: @{}\n\
-        💰 Сумма: {}$\n\
+        💰 Сумма: {} $\n\
         🆔 Номер заказа: `{}`\n\n\
         ⏰ Время на оплату: до {}\n\n\
         👇 Нажмите кнопку для оплаты:",
@@ -163,8 +163,8 @@ pub async fn show_payment_link(
         expired_at
     );
 
-    let payment_url = Url::parse(&invoice.url)
-        .map_err(|e| anyhow::anyhow!("Invalid payment URL: {}", e))?;
+    let payment_url =
+        Url::parse(&invoice.url).map_err(|e| anyhow::anyhow!("Invalid payment URL: {}", e))?;
 
     let keyboard = InlineKeyboardMarkup::new(vec![
         vec![InlineKeyboardButton::url("💳 Оплатить", payment_url)],

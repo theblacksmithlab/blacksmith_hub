@@ -1,10 +1,10 @@
 use anyhow::Result;
+use core::local_db::tg_bot::groot::subscription_management::create_subscription;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::tg_bot::groot_bot::subscription_utils::get_plan_by_id;
 use core::utils::tg_bot::groot_bot::subscription_utils::{
     show_payment_confirmation, show_payment_link, show_plan_selection, SubscriptionState,
 };
-use core::local_db::tg_bot::groot::subscription_management::create_subscription;
 use std::sync::Arc;
 use teloxide::prelude::*;
 use teloxide::types::CallbackQuery;
@@ -167,7 +167,9 @@ async fn handle_back_to_plans(
 
 async fn handle_expired_session(bot: Bot, callback_query: CallbackQuery) -> Result<()> {
     bot.answer_callback_query(callback_query.id)
-        .text("⏰ Сессия истекла. Для повторной попытки используйте /subscription (в публичном чате)")
+        .text(
+            "⏰ Сессия истекла. Для повторной попытки используйте /subscription (в публичном чате)",
+        )
         .await?;
 
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
@@ -192,7 +194,7 @@ async fn handle_payment_confirm(
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
-    
+
     let (target_chat_username, payment_amount) = {
         if let Some(payment_states_mutex) = &app_state.payment_states {
             let mut payment_states = payment_states_mutex.lock().await;
@@ -210,15 +212,12 @@ async fn handle_payment_confirm(
             return Ok(());
         }
     };
-    
-    let target_chat_username = target_chat_username.ok_or_else(|| {
-        anyhow::anyhow!("Missing target_chat_username")
-    })?;
 
-    let payment_amount = payment_amount.ok_or_else(|| {
-        anyhow::anyhow!("Missing payment_amount")
-    })?;
-    
+    let target_chat_username =
+        target_chat_username.ok_or_else(|| anyhow::anyhow!("Missing target_chat_username"))?;
+
+    let payment_amount = payment_amount.ok_or_else(|| anyhow::anyhow!("Missing payment_amount"))?;
+
     let heleket_client = app_state.heleket_client.as_ref().unwrap();
     let invoice = match heleket_client
         .create_invoice(payment_amount as f64, &user_id.to_string())
@@ -233,7 +232,7 @@ async fn handle_payment_confirm(
             return Ok(());
         }
     };
-    
+
     if let Some(payment_states_mutex) = &app_state.payment_states {
         let mut payment_states = payment_states_mutex.lock().await;
         if let Some(payment_process) = payment_states.get_mut(&user_id) {
@@ -250,7 +249,14 @@ async fn handle_payment_confirm(
         bot.delete_message(chat_id, message.id()).await?;
     }
 
-    show_payment_link(bot, chat_id, &invoice, &target_chat_username, payment_amount).await?;
+    show_payment_link(
+        bot,
+        chat_id,
+        &invoice,
+        &target_chat_username,
+        payment_amount,
+    )
+    .await?;
 
     Ok(())
 }
@@ -262,7 +268,7 @@ async fn handle_check_payment(
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
-    
+
     let (invoice_uuid, payment_process) = {
         if let Some(payment_states_mutex) = &app_state.payment_states {
             let payment_states = payment_states_mutex.lock().await;
@@ -288,7 +294,7 @@ async fn handle_check_payment(
             return Ok(());
         }
     };
-    
+
     let heleket_client = app_state.heleket_client.as_ref().unwrap();
     let status = match heleket_client.check_invoice_status(&invoice_uuid).await {
         Ok(status) => status,
@@ -307,7 +313,10 @@ async fn handle_check_payment(
                 "monthly" => "monthly",
                 "yearly" => "yearly",
                 _ => {
-                    error!("Unknown plan type: {}", payment_process.selected_plan.as_ref().unwrap());
+                    error!(
+                        "Unknown plan type: {}",
+                        payment_process.selected_plan.as_ref().unwrap()
+                    );
                     "monthly"
                 }
             };
@@ -322,34 +331,33 @@ async fn handle_check_payment(
                 user_username,
                 plan_type,
             )
-                .await?;
+            .await?;
         }
-        
+
         if let Some(payment_states_mutex) = &app_state.payment_states {
             let mut payment_states = payment_states_mutex.lock().await;
             payment_states.remove(&user_id);
         }
-        
+
         if let Some(message) = callback_query.message {
             bot.delete_message(chat_id, message.id()).await?;
         }
-        
+
         let plan = get_plan_by_id(&payment_process.selected_plan.unwrap()).unwrap();
         let success_msg = format!(
             "✅ Оплата прошла успешно!\n\n\
-        🎯 Чат: @{}\n\
-        📋 Тарифный план: {}\n\
-        💰 Сумма {}$\n\
-        ⏱️ Период: {} дней\n\n\
-        🛡️ Защита от спама активирована!**",
+            🎯 Чат: @{}\n\
+            📋 Тарифный план: {}\n\
+            💰 Сумма {}$\n\
+            ⏱️ Период: {} дней\n\n\
+            🛡️ Защита от спама активирована!**",
             payment_process.target_chat_username.unwrap(),
             plan.name,
             payment_process.payment_amount.unwrap(),
             plan.duration_days
         );
 
-        bot.send_message(chat_id, success_msg)
-            .await?;
+        bot.send_message(chat_id, success_msg).await?;
 
         bot.answer_callback_query(callback_query.id)
             .text("✅ Подписка активирована!")

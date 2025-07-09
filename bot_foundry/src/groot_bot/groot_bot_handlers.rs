@@ -1,6 +1,7 @@
 use crate::groot_bot::chat_moderation::chat_moderation;
 use crate::groot_bot::chat_moderation_utils::handle_groot_report;
 use anyhow::Result;
+use core::local_db::tg_bot::groot::subscription_management::check_chat_payment;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState, ShowType};
@@ -9,7 +10,9 @@ use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
     auto_delete_message, is_message_from_linked_channel, load_super_admins,
 };
-use core::local_db::tg_bot::groot::subscription_management::check_chat_payment;
+use core::utils::tg_bot::groot_bot::subscription_utils::{
+    show_plan_selection, PaymentProcess, SubscriptionState,
+};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,7 +22,6 @@ use teloxide::types::{KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
 use teloxide_core::prelude::ChatId;
 use tracing::{error, info};
-use core::utils::tg_bot::groot_bot::subscription_utils::{PaymentProcess, SubscriptionState, show_plan_selection};
 
 pub async fn groot_bot_command_handler(
     bot: Bot,
@@ -104,6 +106,7 @@ pub async fn groot_bot_command_handler(
     if cmd != GrootBotCommands::Start
         && cmd != GrootBotCommands::Subscription
         && cmd != GrootBotCommands::Groot
+        && cmd != GrootBotCommands::Status
         && !msg.chat.is_private()
     {
         info!(
@@ -131,7 +134,7 @@ pub async fn groot_bot_command_handler(
         return Ok(());
     }
 
-    if (cmd == GrootBotCommands::Start || cmd == GrootBotCommands::Groot) && msg.chat.is_private() {
+    if (cmd == GrootBotCommands::Start || cmd == GrootBotCommands::Groot || cmd == GrootBotCommands::Status) && msg.chat.is_private() {
         info!(
             "User | {} | with id: {} tried to use /{:?} command in private chat",
             username, user_id, cmd
@@ -149,6 +152,12 @@ pub async fn groot_bot_command_handler(
                     GrootBotMessages::PublicCmdUsedInPrivateChat,
                 ))
                 .await?
+            }
+            GrootBotCommands::Status => {
+                get_message(AppsSystemMessages::GrootBot(
+                    GrootBotMessages::PublicCmdUsedInPrivateChat,
+                ))
+                    .await?
             }
             _ => unreachable!(),
         };
@@ -411,6 +420,14 @@ pub async fn groot_bot_command_handler(
 
             handle_subscription_command(bot.clone(), msg.clone(), app_state.clone()).await?;
         }
+        GrootBotCommands::Status => {
+            info!(
+                "User | {} | with id: {} tried to use /{:?} command",
+                username, user_id, cmd,
+            );
+
+            // handle_subscription_command(bot.clone(), msg.clone(), app_state.clone()).await?;
+        }
     }
 
     Ok(())
@@ -455,7 +472,7 @@ pub async fn handle_subscription_command(
 
     if msg.chat.is_private() {
         let bot_msg = "Команда /subscription доступна только в публичных чатах, чтобы я понял, какой чат вы хотите защитить.\n\
-        После вызова команды /subscription в целевом чате, мы продолжим общение тут и оформим подписку 👍";
+        После вызова команды в целевом чате, мы продолжим общение тут и оформим подписку 👍";
 
         bot.send_message(msg.chat.id, bot_msg).await?;
 
@@ -475,7 +492,7 @@ pub async fn handle_subscription_command(
                 bot_system_message.id,
                 Duration::from_secs(60),
             )
-                .await;
+            .await;
 
             return Ok(());
         }
@@ -495,7 +512,7 @@ pub async fn handle_subscription_command(
                 bot_system_message.id,
                 Duration::from_secs(60),
             )
-                .await;
+            .await;
 
             return Ok(());
         }
@@ -506,13 +523,14 @@ pub async fn handle_subscription_command(
             .await
             .unwrap_or(false)
         {
-            let bot_system_message = bot.send_message(
-                msg.chat.id,
-                &format!(
-                    "ℹ️ Чат @{} уже имеет активную подписку!",
-                    target_chat_username
-                ),
-            )
+            let bot_system_message = bot
+                .send_message(
+                    msg.chat.id,
+                    &format!(
+                        "ℹ️ Чат @{} уже имеет активную подписку!",
+                        target_chat_username
+                    ),
+                )
                 .await?;
 
             auto_delete_message(
@@ -521,7 +539,7 @@ pub async fn handle_subscription_command(
                 bot_system_message.id,
                 Duration::from_secs(60),
             )
-                .await;
+            .await;
 
             return Ok(());
         }
@@ -554,7 +572,7 @@ pub async fn handle_subscription_command(
         bot_system_message.id,
         Duration::from_secs(60),
     )
-        .await;
+    .await;
 
     show_plan_selection(bot, ChatId(user_id as i64), &target_chat_username).await
 }

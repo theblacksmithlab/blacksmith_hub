@@ -296,4 +296,5 @@ pub enum GrootBotCommands {
     Results,
     Groot,
     Subscription,
+    Status,
 }

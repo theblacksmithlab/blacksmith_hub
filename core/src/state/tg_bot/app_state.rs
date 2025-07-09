@@ -6,6 +6,7 @@ use crate::models::tg_bot::groot_bot::groot_bot::{MessageCounts, MessageReports}
 use crate::models::tg_bot::the_viper_room_bot::podcast_manager::PodcastManager;
 use crate::utils::tg_bot::groot_bot::subscription_utils::PaymentProcess;
 use crate::utils::tg_bot::tg_bot::is_localdb_implemented;
+use crate::utils::uniframe_studio::heleket_client::{HeleketClient, HeleketConfig};
 use anyhow::Result;
 use async_openai::config::OpenAIConfig;
 use async_openai::Client as LLM_Client;
@@ -14,7 +15,6 @@ use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::utils::uniframe_studio::heleket_client::{HeleketClient, HeleketConfig};
 
 pub struct BotAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,
@@ -98,7 +98,7 @@ impl BotAppState {
         };
 
         let heleket_client = Some(HeleketClient::new(HeleketConfig::default()));
-        
+
         Ok(Self {
             llm_client,
             podcast_manager,

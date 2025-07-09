@@ -3,6 +3,7 @@ use base64::{engine::general_purpose, Engine as _};
 use md5::{Digest, Md5};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -109,24 +110,43 @@ impl HeleketClient {
     }
 
     pub async fn check_invoice_status(&self, invoice_uuid: &str) -> Result<InvoiceResult> {
+        let request = serde_json::json!({
+            "uuid": invoice_uuid
+        });
+
+        let body = serde_json::to_string(&request)?;
+        let signature = self.generate_signature(&body);
+
         let response = self
             .client
-            .get(&format!("{}/v1/payment/{}", self.config.base_url, invoice_uuid))
+            .post(&format!("{}/v1/payment/info", self.config.base_url))
+            .header("Content-Type", "application/json")
             .header("merchant", &self.config.merchant_id)
+            .header("sign", &signature)
+            .body(body.clone())
             .send()
             .await?;
 
         let response_data: CreateInvoiceResponse = response.json().await?;
 
         if response_data.state != 0 {
-            return Err(anyhow!("Failed to check payment status: state = {}", response_data.state));
+            let error_msg = if let Some(message) = response_data.clone().message {
+                format!("Heleket API error: {}", message)
+            } else if let Some(errors) = response_data.clone().errors {
+                format!("Heleket API validation errors: {}", errors)
+            } else {
+                format!("Heleket API error: state = {}", response_data.state)
+            };
+
+            error!("Heleket check status response: {:?}", response_data);
+            return Err(anyhow!(error_msg));
         }
 
         response_data
             .result
             .ok_or_else(|| anyhow!("No result in response"))
     }
-    
+
     pub async fn create_invoice(&self, amount_usd: f64, user_id: &str) -> Result<InvoiceResult> {
         let order_id = format!("topup_{}_{}", user_id, Uuid::new_v4());
 
