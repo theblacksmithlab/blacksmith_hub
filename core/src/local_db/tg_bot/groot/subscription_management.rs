@@ -114,13 +114,13 @@ pub async fn get_subscription_info(
         .await
     {
         Ok(Some((
-                    chat_username,
-                    paid_by_user_id,
-                    paid_by_username,
-                    start_date,
-                    end_date,
-                    plan_type,
-                ))) => Ok(Some(SubscriptionInfo {
+            chat_username,
+            paid_by_user_id,
+            paid_by_username,
+            start_date,
+            end_date,
+            plan_type,
+        ))) => Ok(Some(SubscriptionInfo {
             chat_username,
             paid_by_user_id,
             paid_by_username,
@@ -173,14 +173,14 @@ pub async fn get_expiring_subscriptions(
         .into_iter()
         .map(
             |(
-                 _,
-                 chat_username,
-                 paid_by_user_id,
-                 paid_by_username,
-                 start_date,
-                 end_date,
-                 plan_type,
-             )| {
+                _,
+                chat_username,
+                paid_by_user_id,
+                paid_by_username,
+                start_date,
+                end_date,
+                plan_type,
+            )| {
                 SubscriptionInfo {
                     chat_username,
                     paid_by_user_id,

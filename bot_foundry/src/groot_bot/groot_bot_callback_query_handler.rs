@@ -1,16 +1,14 @@
+use anyhow::Result;
+use core::state::tg_bot::app_state::BotAppState;
+use core::utils::tg_bot::groot_bot::subscription_utils::get_plan_by_id;
+use core::utils::tg_bot::groot_bot::subscription_utils::{
+    show_payment_confirmation, show_payment_link, show_plan_selection, SubscriptionState,
+};
+use core::local_db::tg_bot::groot::subscription_management::create_subscription;
+use std::sync::Arc;
 use teloxide::prelude::*;
 use teloxide::types::CallbackQuery;
-use anyhow::Result;
-use std::sync::Arc;
-use tracing::{info, error};
-use core::state::tg_bot::app_state::BotAppState;
-use core::utils::tg_bot::groot_bot::subscription_payment::{
-    show_payment_processing,
-    show_payment_confirmation,
-    SubscriptionState,
-    show_plan_selection,
-};
-use core::utils::tg_bot::groot_bot::subscription_payment::get_plan_by_id;
+use tracing::{error, info};
 
 pub async fn groot_bot_callback_query_handler(
     bot: Bot,
@@ -18,20 +16,25 @@ pub async fn groot_bot_callback_query_handler(
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
-    let callback_data = callback_query.data.as_ref().unwrap_or(&String::new()).clone();
+    let callback_data = callback_query
+        .data
+        .as_ref()
+        .unwrap_or(&String::new())
+        .clone();
 
     info!("Callback from user {}: {}", user_id, callback_data);
-    
+
     match callback_data.as_str() {
         "pay_cancel" => handle_pay_cancel(bot, callback_query, app_state).await?,
         "back_to_plans" => handle_back_to_plans(bot, callback_query, app_state).await?,
         "payment_confirm" => handle_payment_confirm(bot, callback_query, app_state).await?,
-        
+        "check_payment" => handle_check_payment(bot, callback_query, app_state).await?,
+
         data if data.starts_with("plan_") => {
             let plan_id = &data[5..];
             handle_plan_selection(bot, callback_query, app_state, plan_id).await?
-        },
-        
+        }
+
         _ => {
             error!("Unknown callback data: {}", callback_data);
             bot.answer_callback_query(callback_query.id)
@@ -50,12 +53,12 @@ async fn handle_pay_cancel(
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
-    
+
     if let Some(payment_states_mutex) = &app_state.payment_states {
         let mut payment_states = payment_states_mutex.lock().await;
         payment_states.remove(&user_id);
     }
-    
+
     bot.answer_callback_query(callback_query.id)
         .text("❌ Процесс оплаты отменен")
         .await?;
@@ -64,8 +67,12 @@ async fn handle_pay_cancel(
         bot.delete_message(chat_id, message.id()).await?;
     }
 
-    bot.send_message(chat_id, "❌ Процесс оплаты отменен. Для повторной попытки используйте /subscription")
-        .await?;
+    bot.send_message(
+        chat_id,
+        "❌ Процесс оплаты отменен.\n\
+        Для повторной попытки используйте /subscription (в публичном чате)",
+    )
+    .await?;
 
     Ok(())
 }
@@ -78,7 +85,7 @@ async fn handle_plan_selection(
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
-    
+
     let plan = match get_plan_by_id(plan_id) {
         Some(plan) => plan,
         None => {
@@ -97,7 +104,10 @@ async fn handle_plan_selection(
                 payment_process.selected_plan = Some(plan_id.to_string());
                 payment_process.payment_amount = Some(plan.price_usd);
 
-                payment_process.target_chat_username.clone().unwrap_or_default()
+                payment_process
+                    .target_chat_username
+                    .clone()
+                    .unwrap_or_default()
             } else {
                 return handle_expired_session(bot, callback_query).await;
             }
@@ -105,15 +115,15 @@ async fn handle_plan_selection(
             return Ok(());
         }
     };
-    
+
     bot.answer_callback_query(callback_query.id)
-        .text(&format!("✅ Выбран план: {}", plan.name))
+        .text(&format!("✅ Выбран тарифный план: {}", plan.name))
         .await?;
-    
+
     if let Some(message) = callback_query.message {
         bot.delete_message(chat_id, message.id()).await?;
     }
-    
+
     show_payment_confirmation(bot, chat_id, &chat_username, plan).await
 }
 
@@ -124,7 +134,7 @@ async fn handle_back_to_plans(
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
-    
+
     let chat_username = {
         if let Some(payment_states_mutex) = &app_state.payment_states {
             let mut payment_states = payment_states_mutex.lock().await;
@@ -132,7 +142,10 @@ async fn handle_back_to_plans(
                 payment_process.state = SubscriptionState::AwaitingPlanSelection;
                 payment_process.selected_plan = None;
                 payment_process.payment_amount = None;
-                payment_process.target_chat_username.clone().unwrap_or_default()
+                payment_process
+                    .target_chat_username
+                    .clone()
+                    .unwrap_or_default()
             } else {
                 return handle_expired_session(bot, callback_query).await;
             }
@@ -140,22 +153,21 @@ async fn handle_back_to_plans(
             return Ok(());
         }
     };
-    
+
     bot.answer_callback_query(callback_query.id)
-        .text("⬅️ Возврат к выбору планов")
+        .text("⬅️ Возврат к выбору тарифного плана")
         .await?;
-    
+
     if let Some(message) = callback_query.message {
         bot.delete_message(chat_id, message.id()).await?;
     }
-    
+
     show_plan_selection(bot, chat_id, &chat_username).await
 }
 
-
 async fn handle_expired_session(bot: Bot, callback_query: CallbackQuery) -> Result<()> {
     bot.answer_callback_query(callback_query.id)
-        .text("⏰ Сессия истекла. Начните заново с /subscription")
+        .text("⏰ Сессия истекла. Для повторной попытки используйте /subscription (в публичном чате)")
         .await?;
 
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
@@ -164,8 +176,11 @@ async fn handle_expired_session(bot: Bot, callback_query: CallbackQuery) -> Resu
         bot.delete_message(chat_id, message.id()).await?;
     }
 
-    bot.send_message(chat_id, "⏰ Сессия оплаты истекла. Для новой попытки используйте /subscription")
-        .await?;
+    bot.send_message(
+        chat_id,
+        "⏰ Сессия оплаты истекла. Для повторной попытки используйте /subscription (в публичном чате)",
+    )
+    .await?;
 
     Ok(())
 }
@@ -178,16 +193,14 @@ async fn handle_payment_confirm(
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
     
-    let (target_chat_id, target_chat_username, selected_plan, payment_amount) = {
+    let (target_chat_username, payment_amount) = {
         if let Some(payment_states_mutex) = &app_state.payment_states {
             let mut payment_states = payment_states_mutex.lock().await;
             if let Some(payment_process) = payment_states.get_mut(&user_id) {
                 payment_process.state = SubscriptionState::ProcessingPayment;
 
                 (
-                    payment_process.target_chat_id.clone(),
                     payment_process.target_chat_username.clone(),
-                    payment_process.selected_plan.clone(),
                     payment_process.payment_amount.clone(),
                 )
             } else {
@@ -198,37 +211,154 @@ async fn handle_payment_confirm(
         }
     };
     
-    let (target_chat_id, target_chat_username, selected_plan, payment_amount) = match (
-        target_chat_id, target_chat_username, selected_plan, payment_amount
-    ) {
-        (Some(chat_id), Some(username), Some(plan), Some(amount)) => (chat_id, username, plan, amount),
-        _ => {
+    let target_chat_username = target_chat_username.ok_or_else(|| {
+        anyhow::anyhow!("Missing target_chat_username")
+    })?;
+
+    let payment_amount = payment_amount.ok_or_else(|| {
+        anyhow::anyhow!("Missing payment_amount")
+    })?;
+    
+    let heleket_client = app_state.heleket_client.as_ref().unwrap();
+    let invoice = match heleket_client
+        .create_invoice(payment_amount as f64, &user_id.to_string())
+        .await
+    {
+        Ok(invoice) => invoice,
+        Err(e) => {
+            error!("Failed to create Heleket invoice: {}", e);
             bot.answer_callback_query(callback_query.id)
-                .text("❌ Ошибка данных платежа")
+                .text("❌ Ошибка создания платежа")
                 .await?;
             return Ok(());
         }
     };
     
+    if let Some(payment_states_mutex) = &app_state.payment_states {
+        let mut payment_states = payment_states_mutex.lock().await;
+        if let Some(payment_process) = payment_states.get_mut(&user_id) {
+            payment_process.heleket_order_id = Some(invoice.order_id.clone());
+            payment_process.heleket_invoice_uuid = Some(invoice.uuid.clone());
+        }
+    }
+
     bot.answer_callback_query(callback_query.id)
-        .text("🔄 Создаем платеж...")
+        .text("🔄 Создаю инвойс...")
         .await?;
-    
+
     if let Some(message) = callback_query.message {
         bot.delete_message(chat_id, message.id()).await?;
     }
 
-    // ТУТ БУДЕТ ИНТЕГРАЦИЯ С HELEKET
-    // Пока что показываем заглушку
-    show_payment_processing(bot, chat_id, target_chat_id, &target_chat_username, &selected_plan, payment_amount).await?;
+    show_payment_link(bot, chat_id, &invoice, &target_chat_username, payment_amount).await?;
 
-    // TODO: После интеграции с Heleket:
-    // 1. Создать платеж в Heleket
-    // 2. Получить ссылку на оплату
-    // 3. Отправить ссылку пользователю
-    // 4. Дождаться webhook'а об оплате
-    // 5. Создать подписку в БД
-    // 6. Уведомить пользователя об успехе
+    Ok(())
+}
+
+async fn handle_check_payment(
+    bot: Bot,
+    callback_query: CallbackQuery,
+    app_state: Arc<BotAppState>,
+) -> Result<()> {
+    let user_id = callback_query.from.id.0;
+    let chat_id = callback_query.message.as_ref().unwrap().chat().id;
+    
+    let (invoice_uuid, payment_process) = {
+        if let Some(payment_states_mutex) = &app_state.payment_states {
+            let payment_states = payment_states_mutex.lock().await;
+            if let Some(payment_process) = payment_states.get(&user_id) {
+                (
+                    payment_process.heleket_invoice_uuid.clone(),
+                    payment_process.clone(),
+                )
+            } else {
+                return handle_expired_session(bot, callback_query).await;
+            }
+        } else {
+            return Ok(());
+        }
+    };
+
+    let invoice_uuid = match invoice_uuid {
+        Some(uuid) => uuid,
+        None => {
+            bot.answer_callback_query(callback_query.id)
+                .text("❌ Ошибка: нет данных о платеже")
+                .await?;
+            return Ok(());
+        }
+    };
+    
+    let heleket_client = app_state.heleket_client.as_ref().unwrap();
+    let status = match heleket_client.check_invoice_status(&invoice_uuid).await {
+        Ok(status) => status,
+        Err(e) => {
+            error!("Failed to check payment status: {}", e);
+            bot.answer_callback_query(callback_query.id)
+                .text("❌ Ошибка проверки платежа")
+                .await?;
+            return Ok(());
+        }
+    };
+
+    if status.payment_status == "paid" {
+        if let Some(db_pool) = &app_state.db_pool {
+            let plan_type = match payment_process.selected_plan.as_ref().unwrap().as_str() {
+                "monthly" => "monthly",
+                "yearly" => "yearly",
+                _ => {
+                    error!("Unknown plan type: {}", payment_process.selected_plan.as_ref().unwrap());
+                    "monthly"
+                }
+            };
+
+            let user_username = callback_query.from.username.as_deref();
+
+            create_subscription(
+                db_pool,
+                payment_process.target_chat_id.unwrap(),
+                &payment_process.target_chat_username.clone().unwrap(),
+                user_id as i64,
+                user_username,
+                plan_type,
+            )
+                .await?;
+        }
+        
+        if let Some(payment_states_mutex) = &app_state.payment_states {
+            let mut payment_states = payment_states_mutex.lock().await;
+            payment_states.remove(&user_id);
+        }
+        
+        if let Some(message) = callback_query.message {
+            bot.delete_message(chat_id, message.id()).await?;
+        }
+        
+        let plan = get_plan_by_id(&payment_process.selected_plan.unwrap()).unwrap();
+        let success_msg = format!(
+            "✅ Оплата прошла успешно!\n\n\
+        🎯 Чат: @{}\n\
+        📋 Тарифный план: {}\n\
+        💰 Сумма {}$\n\
+        ⏱️ Период: {} дней\n\n\
+        🛡️ Защита от спама активирована!**",
+            payment_process.target_chat_username.unwrap(),
+            plan.name,
+            payment_process.payment_amount.unwrap(),
+            plan.duration_days
+        );
+
+        bot.send_message(chat_id, success_msg)
+            .await?;
+
+        bot.answer_callback_query(callback_query.id)
+            .text("✅ Подписка активирована!")
+            .await?;
+    } else {
+        bot.answer_callback_query(callback_query.id)
+            .text("💰 Оплата еще не поступила. Попробуйте проверить статус чуть позже.")
+            .await?;
+    }
 
     Ok(())
 }

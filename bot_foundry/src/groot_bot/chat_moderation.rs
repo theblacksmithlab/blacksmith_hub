@@ -6,18 +6,17 @@ use crate::groot_bot::chat_moderation_utils::{
 };
 use crate::groot_bot::resources_cmd_handler::resources_cmd_handler;
 use anyhow::Result;
+use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::state::tg_bot::app_state::BotAppState;
+use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
-    is_message_from_linked_channel, load_black_listed_users,
-    load_white_listed_users,
+    is_message_from_linked_channel, load_black_listed_users, load_white_listed_users,
 };
 use std::sync::Arc;
 use teloxide::prelude::Message;
 use teloxide::Bot;
 use teloxide_core::prelude::{Request, Requester};
 use tracing::{error, info};
-use core::utils::common::get_message;
-use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 
 pub async fn chat_moderation(
     bot: Bot,
@@ -73,12 +72,12 @@ pub async fn chat_moderation(
         let bot_msg = get_message(AppsSystemMessages::GrootBot(
             GrootBotMessages::NoNeedForCheckInPrivateChat,
         ))
-            .await?;
+        .await?;
 
         bot.send_message(msg.chat.id, bot_msg).await?;
         return Ok(());
     }
-    
+
     let mut is_admin = false;
     let mut is_from_linked_channel = false;
 

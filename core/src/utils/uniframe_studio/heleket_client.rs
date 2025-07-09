@@ -108,6 +108,25 @@ impl HeleketClient {
         format!("{:x}", result)
     }
 
+    pub async fn check_invoice_status(&self, invoice_uuid: &str) -> Result<InvoiceResult> {
+        let response = self
+            .client
+            .get(&format!("{}/v1/payment/{}", self.config.base_url, invoice_uuid))
+            .header("merchant", &self.config.merchant_id)
+            .send()
+            .await?;
+
+        let response_data: CreateInvoiceResponse = response.json().await?;
+
+        if response_data.state != 0 {
+            return Err(anyhow!("Failed to check payment status: state = {}", response_data.state));
+        }
+
+        response_data
+            .result
+            .ok_or_else(|| anyhow!("No result in response"))
+    }
+    
     pub async fn create_invoice(&self, amount_usd: f64, user_id: &str) -> Result<InvoiceResult> {
         let order_id = format!("topup_{}_{}", user_id, Uuid::new_v4());
 

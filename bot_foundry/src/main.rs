@@ -1,3 +1,4 @@
+use crate::groot_bot::groot_bot_callback_query_handler::groot_bot_callback_query_handler;
 use crate::groot_bot::groot_bot_handlers::{groot_bot_command_handler, groot_bot_message_handler};
 use crate::probiot_bot::probiot_bot_handlers::{
     probiot_callback_query_handler, probiot_command_handler,
@@ -31,7 +32,6 @@ use teloxide::prelude::Update;
 use teloxide::{dptree, Bot};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
-use crate::groot_bot::groot_bot_callback_query_handler::groot_bot_callback_query_handler;
 
 pub mod groot_bot;
 pub mod probiot_bot;

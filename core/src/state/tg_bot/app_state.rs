@@ -4,7 +4,7 @@ use crate::models::common::dialogue_cache::DialogueCache;
 use crate::models::tg_bot::groot_bot::groot_bot::{ChatMessageStats, ResourcesDialogState};
 use crate::models::tg_bot::groot_bot::groot_bot::{MessageCounts, MessageReports};
 use crate::models::tg_bot::the_viper_room_bot::podcast_manager::PodcastManager;
-use crate::utils::tg_bot::groot_bot::subscription_payment::PaymentProcess;
+use crate::utils::tg_bot::groot_bot::subscription_utils::PaymentProcess;
 use crate::utils::tg_bot::tg_bot::is_localdb_implemented;
 use anyhow::Result;
 use async_openai::config::OpenAIConfig;
@@ -14,6 +14,7 @@ use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use crate::utils::uniframe_studio::heleket_client::{HeleketClient, HeleketConfig};
 
 pub struct BotAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,
@@ -27,6 +28,7 @@ pub struct BotAppState {
     pub chat_message_stats: Option<Arc<Mutex<ChatMessageStats>>>,
     pub message_reports: Option<Arc<Mutex<MessageReports>>>,
     pub db_pool: Option<Arc<SqlitePool>>,
+    pub heleket_client: Option<HeleketClient>,
 }
 
 impl BotAppState {
@@ -55,6 +57,7 @@ impl BotAppState {
             chat_message_stats: None,
             message_reports: None,
             db_pool,
+            heleket_client: None,
         })
     }
 
@@ -94,6 +97,8 @@ impl BotAppState {
             None
         };
 
+        let heleket_client = Some(HeleketClient::new(HeleketConfig::default()));
+        
         Ok(Self {
             llm_client,
             podcast_manager,
@@ -106,6 +111,7 @@ impl BotAppState {
             payment_states,
             message_reports: Some(message_reports),
             db_pool,
+            heleket_client,
         })
     }
 }
