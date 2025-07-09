@@ -107,46 +107,44 @@ pub async fn handle_forwarded_message(
 ) -> Result<()> {
     let user_id = msg.from.as_ref().unwrap().id.0;
 
-    let forward_origin = match msg.forward_origin() {
-        Some(origin) => origin,
-        None => {
-            bot.send_message(msg.chat.id, "❌ Переслите сообщение из чата").await?;
-            return Ok(());
-        }
-    };
+    if msg.forward_origin().is_none() {
+        bot.send_message(msg.chat.id, "❌ Переслите сообщение из чата").await?;
+        return Ok(());
+    }
 
-    // Получаем ID чата-источника и его username
-    let (source_chat_id, source_chat_username) = match forward_origin {
-        teloxide::types::MessageOrigin::Channel { chat, .. } => {
-            (chat.id.0, chat.username().map(|u| u.to_string()))
-        },
-        teloxide::types::MessageOrigin::Chat { sender_chat, .. } => {
-            (sender_chat.id.0, sender_chat.username().map(|u| u.to_string()))
-        },
-        _ => {
-            bot.send_message(msg.chat.id, "❌ Можно только из групп/каналов").await?;
-            return Ok(());
-        }
-    };
-
-    // Проверяем наличие username у чата
-    let chat_username = match source_chat_username {
-        Some(username) => username,
+    let target_chat_id = match msg.forward_from_chat() {
+        Some(ref chat) => chat.id.0,
         None => {
             bot.send_message(msg.chat.id,
-                             "❌ Чат должен иметь публичный @username для работы бота.\n\n\
-                Попросите администратора чата установить username в настройках.")
+                             "❌ Не удалось определить чат-источник. Попробуйте переслать другое сообщение.")
                 .await?;
             return Ok(());
         }
     };
 
-    // Теперь source_chat_id - это ID чата, где должен работать бот
-    println!("ID чата-источника: {}", source_chat_id);
-    println!("Username чата: @{}", chat_username);
+    let chat_info = match bot.get_chat(ChatId(target_chat_id)).await {
+        Ok(chat) => chat,
+        Err(_) => {
+            bot.send_message(msg.chat.id, "❌ Не удалось получить информацию о чате").await?;
+            return Ok(());
+        }
+    };
+
+    let chat_username = match chat_info.username() {
+        Some(username) => username.to_string(),
+        None => {
+            bot.send_message(msg.chat.id,
+                             "❌ Чат должен иметь публичный @username для работы бота")
+                .await?;
+            return Ok(());
+        }
+    };
+    
+    info!("ID чата-источника: {}", target_chat_id);
+    info!("Username чата: @{}", chat_username);
 
     if let Some(db_pool) = &app_state.db_pool {
-        if check_chat_payment(db_pool, source_chat_id).await.unwrap_or(false) {
+        if check_chat_payment(db_pool, target_chat_id).await.unwrap_or(false) {
             bot.send_message(msg.chat.id,
                              &format!("ℹ️ Чат @{} уже имеет активную подписку!", chat_username))
                 .await?;
@@ -158,7 +156,7 @@ pub async fn handle_forwarded_message(
         let mut payment_states = payment_states_mutex.lock().await;
         if let Some(payment_process) = payment_states.get_mut(&user_id) {
             payment_process.state = SubscriptionState::AwaitingPlanSelection;
-            payment_process.target_chat_id = Some(source_chat_id);
+            payment_process.target_chat_id = Some(target_chat_id);
             payment_process.target_chat_username = Some(chat_username.clone());
         } else {
             bot.send_message(msg.chat.id,

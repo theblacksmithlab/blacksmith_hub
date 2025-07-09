@@ -121,7 +121,7 @@ pub async fn chat_moderation(
 
     let app_name = &app_state.app_name;
     let chat_title = msg.chat.title().unwrap_or_else(|| "Unknown Chat");
-    let _paid_chats = load_paid_chats(app_name);
+    // let _paid_chats = load_paid_chats(app_name);
     // let is_paid_chat = true;
     // paid_chats.contains(&msg.chat.id.0);
     let white_listed_users = load_white_listed_users(app_name);
