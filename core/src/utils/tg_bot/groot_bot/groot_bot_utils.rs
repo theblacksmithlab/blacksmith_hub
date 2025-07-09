@@ -193,7 +193,7 @@ pub async fn unpaid_chat_spam_warning(
     thread_id: Option<ThreadId>,
     chat_title: &str,
 ) -> Result<()> {
-    info!("Unpaid chat | \'{}\' | tried to use Groot", chat_title);
+    info!("Unpaid chat | \'{}\' | tried to use Groot bot", chat_title);
     let demo_bot_system_message = get_message(AppsSystemMessages::GrootBot(
         GrootBotMessages::DemoBotSystemMessage,
     ))
@@ -210,7 +210,7 @@ pub async fn unpaid_chat_spam_warning(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(1800),
+                Duration::from_secs(30),
             )
             .await;
         } else {
@@ -223,7 +223,7 @@ pub async fn unpaid_chat_spam_warning(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(1800),
+                Duration::from_secs(30),
             )
             .await;
         }
@@ -236,7 +236,7 @@ pub async fn unpaid_chat_spam_warning(
             bot.clone(),
             bot_system_message.chat.id,
             bot_system_message.id,
-            Duration::from_secs(1800),
+            Duration::from_secs(30),
         )
         .await;
     }

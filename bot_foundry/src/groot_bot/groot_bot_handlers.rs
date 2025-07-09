@@ -335,7 +335,7 @@ pub async fn groot_bot_command_handler(
                 if let Err(err) = chat_stats
                     .fetch_chat_history_for_new_chat(
                         &app_state.app_name,
-                        msg.clone(),
+                        msg.chat.id,
                         chat_username,
                     )
                     .await

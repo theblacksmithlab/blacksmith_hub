@@ -40,6 +40,7 @@ pub enum GrootBotMessages {
     DemoModeMessage,
     NoNeedForCheckInPrivateChat,
     SubscriptionCmdUsedInPrivateChat,
+    ImportantInstructions,
 }
 
 impl GrootBotMessages {
@@ -76,6 +77,7 @@ impl GrootBotMessages {
             GrootBotMessages::SubscriptionCmdUsedInPrivateChat => {
                 "subscription_cmd_used_in_private_chat"
             }
+            GrootBotMessages::ImportantInstructions => "important_instructions",
         }
     }
 }

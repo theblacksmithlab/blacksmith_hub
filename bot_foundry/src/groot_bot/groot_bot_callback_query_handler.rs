@@ -1,6 +1,8 @@
 use anyhow::Result;
 use core::local_db::tg_bot::groot::subscription_management::create_subscription;
+use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::state::tg_bot::app_state::BotAppState;
+use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::subscription_utils::get_plan_by_id;
 use core::utils::tg_bot::groot_bot::subscription_utils::{
     show_payment_confirmation, show_payment_link, show_plan_selection, SubscriptionState,
@@ -105,8 +107,14 @@ async fn handle_plan_selection(
                 payment_process.payment_amount = Some(plan.price_usd);
 
                 (
-                    payment_process.target_chat_title.clone().unwrap_or_default(),
-                    payment_process.target_chat_username.clone().unwrap_or_default(),
+                    payment_process
+                        .target_chat_title
+                        .clone()
+                        .unwrap_or_default(),
+                    payment_process
+                        .target_chat_username
+                        .clone()
+                        .unwrap_or_default(),
                 )
             } else {
                 return handle_expired_session(bot, callback_query).await;
@@ -151,8 +159,14 @@ async fn handle_back_to_plans(
                 payment_process.payment_amount = None;
 
                 (
-                    payment_process.target_chat_username.clone().unwrap_or_default(),
-                    payment_process.target_chat_title.clone().unwrap_or_default(),
+                    payment_process
+                        .target_chat_username
+                        .clone()
+                        .unwrap_or_default(),
+                    payment_process
+                        .target_chat_title
+                        .clone()
+                        .unwrap_or_default(),
                 )
             } else {
                 return handle_expired_session(bot, callback_query).await;
@@ -362,10 +376,9 @@ async fn handle_check_payment(
             🎯 Чат: {} (@{})\n\
             📋 Тарифный план: {}\n\
             💰 Сумма {} $\n\
-            ⏱️ Период: {} дней\n\n\
-            🛡️ Защита от спама активирована!",
+            ⏱️ Период: {} дней",
             payment_process.target_chat_title.unwrap(),
-            payment_process.target_chat_username.unwrap(),
+            payment_process.target_chat_username.clone().unwrap(),
             plan.name,
             payment_process.payment_amount.unwrap(),
             plan.duration_days
@@ -376,6 +389,32 @@ async fn handle_check_payment(
         bot.answer_callback_query(callback_query.id)
             .text("✅ Подписка активирована!")
             .await?;
+
+        let important_instructions = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::ImportantInstructions,
+        ))
+        .await?;
+
+        bot.send_message(chat_id, important_instructions).await?;
+
+        if let Some(chat_stats_mutex) = &app_state.chat_message_stats {
+            let mut chat_stats = chat_stats_mutex.lock().await;
+            if let Err(err) = chat_stats
+                .fetch_chat_history_for_new_chat(
+                    &app_state.app_name,
+                    ChatId(payment_process.target_chat_id.unwrap()),
+                    &payment_process.target_chat_username.clone().unwrap(),
+                )
+                .await
+            {
+                error!(
+                    "Error fetching chat history for a new chat: {} with id: {}: {}",
+                    payment_process.target_chat_username.as_ref().unwrap(),
+                    payment_process.target_chat_id.unwrap(),
+                    err
+                );
+            }
+        }
     } else {
         bot.answer_callback_query(callback_query.id)
             .text("💰 Оплата еще не поступила. Попробуйте проверить статус чуть позже.")
