@@ -50,6 +50,15 @@ pub async fn groot_bot_command_handler(
     //     false
     // };
 
+    // Checking subscription
+    let is_paid_debug = if let Some(db_pool) = &app_state.db_pool {
+        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+    } else {
+        false
+    };
+    
+    info!("is_paid debug: {} for chat: {}", is_paid_debug, chat_title);
+
     let is_paid_chat = true;
 
     // Getting public chat's administrators
@@ -118,43 +127,6 @@ pub async fn groot_bot_command_handler(
             return Ok(());
         }
     };
-
-    // TEMPORARY
-    if msg.text().unwrap_or("").starts_with("/force_subscription") && user_id == lord_admin_id {
-        let parts: Vec<&str> = msg.text().unwrap().split_whitespace().collect();
-        if parts.len() >= 6 {
-            let chat_id: i64 = parts[1].parse()?;
-            let chat_username = parts[2].trim_start_matches('@');
-            let paid_by_user_id: i64 = parts[3].parse()?;
-            let plan_type = parts[4];
-
-            if let Some(db_pool) = &app_state.db_pool {
-                create_subscription(
-                    db_pool,
-                    chat_id,
-                    chat_username,
-                    paid_by_user_id,
-                    None,
-                    plan_type,
-                )
-                .await?;
-
-                if let Some(chat_stats_mutex) = &app_state.chat_message_stats {
-                    let mut chat_stats = chat_stats_mutex.lock().await;
-                    let _ = chat_stats
-                        .fetch_chat_history_for_new_chat(
-                            &app_state.app_name,
-                            ChatId(chat_id),
-                            chat_username,
-                        )
-                        .await;
-                }
-
-                bot.send_message(msg.chat.id, "✅ Подписка создана вручную ЛОРДОМ-админом")
-                    .await?;
-            }
-        }
-    }
 
     // Execution area check
     if cmd != GrootBotCommands::Start
@@ -322,6 +294,7 @@ pub async fn groot_bot_command_handler(
         && !is_admin
         && !is_from_linked_channel
         && !is_chat_owner
+        && user_id != lord_admin_id
     {
         info!(
             "Non-admin user | {} | with id: {} tried to use /{:?} command",
@@ -381,7 +354,7 @@ pub async fn groot_bot_command_handler(
                 }
 
                 bot.send_message(msg.chat.id,
-                                 format!("✅ Подписка создана ЛОРДОМ:\n• Чат: {}\n• ID: {}\n• Оплачено: {} ({})\n• План: {}",
+                                 format!("✅ Подписка активирована вручную для чата:\n• Чат: @{}\n• ID: {}\n• Плательщик: {} ({})\n• Тарифный план: {}",
                                          chat_username, chat_id, paid_by_user_id,
                                          paid_by_username.unwrap_or("null"), plan_type))
                     .await?;
@@ -390,6 +363,37 @@ pub async fn groot_bot_command_handler(
             bot.send_message(msg.chat.id,
                              "❌ Формат: /forcesubscription CHAT_ID USERNAME USER_ID USERNAME_OR_NULL PLAN_TYPE")
                 .await?;
+        }
+    }
+
+    if cmd == GrootBotCommands::TestHeleket && lord_admin_id == user_id {
+        let parts: Vec<&str> = msg.text().unwrap().split_whitespace().collect();
+        if parts.len() >= 2 {
+            let test_uuid = parts[1];
+
+            if let Some(heleket_client) = &app_state.heleket_client {
+                info!("Testing Heleket with UUID: {}", test_uuid);
+
+                match heleket_client.check_invoice_status(test_uuid).await {
+                    Ok(status) => {
+                        bot.send_message(msg.chat.id, format!(
+                            "✅ Heleket ответил:\n\
+                        Payment Status: {}\n\
+                        Order ID: {}\n\
+                        Amount: {}\n\
+                        Is Final: {}",
+                            status.payment_status,
+                            status.order_id,
+                            status.amount,
+                            status.is_final
+                        )).await?;
+                    },
+                    Err(e) => {
+                        error!("Heleket test error: {}", e);
+                        bot.send_message(msg.chat.id, format!("❌ Ошибка: {}", e)).await?;
+                    }
+                }
+            }
         }
     }
 
@@ -432,7 +436,10 @@ pub async fn groot_bot_command_handler(
             }
         }
         GrootBotCommands::ForceSubscription => {
-            info!("Force subscription executed!");
+            info!("Force subscription cmd executed!");
+        }
+        GrootBotCommands::TestHeleket => {
+            info!("Test Heleket cmd executed!");
         }
         GrootBotCommands::About => {
             let bot_msg =
