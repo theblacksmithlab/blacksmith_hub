@@ -2,8 +2,8 @@ use crate::groot_bot::chat_moderation::chat_moderation;
 use crate::groot_bot::chat_moderation_utils::handle_groot_report;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use core::local_db::tg_bot::groot::subscription_management::check_chat_payment;
-use core::local_db::tg_bot::groot::subscription_management::get_subscription_info;
+use core::local_db::tg_bot::groot_bot::subscription_management::check_chat_payment;
+use core::local_db::tg_bot::groot_bot::subscription_management::get_subscription_info;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState, ShowType};
@@ -43,15 +43,14 @@ pub async fn groot_bot_command_handler(
     let mut is_admin = false;
     let mut is_from_linked_channel = false;
 
-    // // Checking subscription
-    // let is_paid_chat = if let Some(db_pool) = &app_state.db_pool {
-    //     check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
-    // } else {
-    //     false
-    // };
-
-    // TEMP
-    let is_paid_chat = true;
+    // Checking subscription
+    let is_paid_chat = if let Some(db_pool) = &app_state.db_pool {
+        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+    } else {
+        false
+    };
+    
+    // let is_paid_chat = true;
 
     // Getting public chat's administrators
     if !msg.chat.is_private() {
@@ -503,13 +502,13 @@ pub async fn groot_bot_message_handler(
         _ => return Ok(()),
     };
 
-    let is_paid_chat = true;
+    // let is_paid_chat = true;
 
-    // let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
-    //     check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
-    // } else {
-    //     false
-    // };
+    let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
+        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+    } else {
+        false
+    };
 
     chat_moderation(bot, msg, bot_app_state, is_paid_chat).await?;
 
@@ -740,6 +739,12 @@ pub async fn handle_status_command(
         }
     };
 
+    let chat_title = msg
+        .chat
+        .title()
+        .map(|title| title.to_string())
+        .unwrap_or_else(|| "Unknown Chat".to_string());
+    
     if let Some(db_pool) = &app_state.db_pool {
         match get_subscription_info(db_pool, chat_id).await {
             Ok(Some(subscription)) => {
@@ -795,7 +800,7 @@ pub async fn handle_status_command(
 
                 let status_msg = format!(
                     "{} Статус подписки\n\n\
-                    🏠 Чат: @{}\n\
+                    🏠 Чат: {} (@{})\n\
                     📊 Статус: {}\n\
                     📋 Тарифный план: {}\n\
                     📅 Начало: {}\n\
@@ -803,6 +808,7 @@ pub async fn handle_status_command(
                     👤 Оплачено: {}\n\n\
                     🛡️ Защита от спама: {}",
                     status_emoji,
+                    chat_title,
                     chat_username,
                     status_text,
                     plan_name,

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use core::local_db::tg_bot::groot::subscription_management::create_subscription;
+use core::local_db::tg_bot::groot_bot::subscription_management::create_subscription;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;

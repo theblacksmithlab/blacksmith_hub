@@ -116,7 +116,6 @@ pub async fn chat_moderation(
         .map(|title| title.to_string())
         .unwrap_or_else(|| "Unknown Chat".to_string());
     // let _paid_chats = load_paid_chats(app_name);
-    // let is_paid_chat = true;
     // paid_chats.contains(&msg.chat.id.0);
     let white_listed_users = load_white_listed_users(app_name);
     let black_listed_users = load_black_listed_users(app_name);

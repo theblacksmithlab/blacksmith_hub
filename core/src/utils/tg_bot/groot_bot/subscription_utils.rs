@@ -56,15 +56,15 @@ pub const SUBSCRIPTION_PLANS: [SubscriptionPlan; 2] = [
         id: "monthly",
         name: "Месячная подписка",
         duration_days: 30,
-        price_usd: 15,
-        description: "30 дней ультимативной защиты от нечисти",
+        price_usd: 12,
+        description: "30 дней ультимативной защиты от нечисти 🛡",
     },
     SubscriptionPlan {
         id: "yearly",
         name: "Годовая подписка",
         duration_days: 365,
-        price_usd: 150,
-        description: "365 дней + скидка 17% 👉 2 месяца - В ПОДАРОК!)",
+        price_usd: 120,
+        description: "365 дней 👉 2 месяца бесплатно 🎁)",
     },
 ];
 
@@ -75,8 +75,8 @@ pub async fn show_plan_selection(
     target_chat_title: &str,
 ) -> Result<()> {
     let message_text = format!(
-        "Приветствую ещё раз!\n\n\
-        Я получил заявку на оплату подписки для чата: {} (@{})\n\
+        "Приветствую!\n\
+        Я получил заявку на оплату подписки для чата: {} (@{})\n\n\
         Внимательно проверьте username чата, изменить его после оплаты подписки будет невозможно!\n\n\
         Выберите тарифный план:",
         target_chat_title,
