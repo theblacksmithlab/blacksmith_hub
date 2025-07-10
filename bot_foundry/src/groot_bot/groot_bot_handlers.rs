@@ -43,14 +43,14 @@ pub async fn groot_bot_command_handler(
     let mut is_admin = false;
     let mut is_from_linked_channel = false;
 
-    // Checking subscription
-    let is_paid_chat = if let Some(db_pool) = &app_state.db_pool {
-        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
-    } else {
-        false
-    };
+    // // Checking subscription
+    // let is_paid_chat = if let Some(db_pool) = &app_state.db_pool {
+    //     check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+    // } else {
+    //     false
+    // };
     
-    // let is_paid_chat = true;
+    let is_paid_chat = true;
 
     // Getting public chat's administrators
     if !msg.chat.is_private() {
@@ -502,13 +502,13 @@ pub async fn groot_bot_message_handler(
         _ => return Ok(()),
     };
 
-    // let is_paid_chat = true;
+    let is_paid_chat = true;
 
-    let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
-        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
-    } else {
-        false
-    };
+    // let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
+    //     check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+    // } else {
+    //     false
+    // };
 
     chat_moderation(bot, msg, bot_app_state, is_paid_chat).await?;
 
