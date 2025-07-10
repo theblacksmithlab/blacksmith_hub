@@ -122,7 +122,7 @@ pub async fn groot_bot_command_handler(
     // TEMPORARY
     if msg.text().unwrap_or("").starts_with("/force_subscription") && user_id == lord_admin_id {
         let parts: Vec<&str> = msg.text().unwrap().split_whitespace().collect();
-        if parts.len() >= 5 {
+        if parts.len() >= 6 {
             let chat_id: i64 = parts[1].parse()?;
             let chat_username = parts[2].trim_start_matches('@');
             let paid_by_user_id: i64 = parts[3].parse()?;
@@ -345,6 +345,54 @@ pub async fn groot_bot_command_handler(
         return Ok(());
     }
 
+    if cmd == GrootBotCommands::ForceSubscription && lord_admin_id == user_id {
+        let parts: Vec<&str> = msg.text().unwrap().split_whitespace().collect();
+        if parts.len() >= 6 {
+            let chat_id: i64 = parts[1].parse()?;
+            let chat_username = parts[2];
+            let paid_by_user_id: i64 = parts[3].parse()?;
+            let paid_by_username = if parts[4] != "null" {
+                Some(parts[4])
+            } else {
+                None
+            };
+            let plan_type = parts[5];
+
+            if let Some(db_pool) = &app_state.db_pool {
+                create_subscription(
+                    db_pool,
+                    chat_id,
+                    chat_username,
+                    paid_by_user_id,
+                    paid_by_username,
+                    plan_type,
+                )
+                    .await?;
+
+                if let Some(chat_stats_mutex) = &app_state.chat_message_stats {
+                    let mut chat_stats = chat_stats_mutex.lock().await;
+                    let _ = chat_stats
+                        .fetch_chat_history_for_new_chat(
+                            &app_state.app_name,
+                            ChatId(chat_id),
+                            chat_username,
+                        )
+                        .await;
+                }
+
+                bot.send_message(msg.chat.id,
+                                 format!("✅ Подписка создана ЛОРДОМ:\n• Чат: {}\n• ID: {}\n• Оплачено: {} ({})\n• План: {}",
+                                         chat_username, chat_id, paid_by_user_id,
+                                         paid_by_username.unwrap_or("null"), plan_type))
+                    .await?;
+            }
+        } else {
+            bot.send_message(msg.chat.id,
+                             "❌ Формат: /forcesubscription CHAT_ID USERNAME USER_ID USERNAME_OR_NULL PLAN_TYPE")
+                .await?;
+        }
+    }
+
     match cmd {
         GrootBotCommands::Start => {
             let bot_msg = get_message(AppsSystemMessages::GrootBot(
@@ -382,6 +430,9 @@ pub async fn groot_bot_command_handler(
                     );
                 }
             }
+        }
+        GrootBotCommands::ForceSubscription => {
+            info!("Force subscription executed!");
         }
         GrootBotCommands::About => {
             let bot_msg =

@@ -295,4 +295,5 @@ pub enum GrootBotCommands {
     Groot,
     Subscription,
     Status,
+    ForceSubscription
 }
