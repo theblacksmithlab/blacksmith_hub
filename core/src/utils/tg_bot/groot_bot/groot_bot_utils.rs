@@ -514,3 +514,38 @@ pub async fn auto_delete_message(
         bot.delete_message(chat_id, message_id).await.ok();
     });
 }
+
+pub fn get_username(msg: &Message) -> String {
+    msg.from
+        .as_ref()
+        .map(|user| {
+            if let Some(username) = &user.username {
+                return format!("@{}", username);
+            }
+
+            let first_name = user.first_name.trim();
+            let last_name = user.last_name.as_deref().unwrap_or("").trim();
+
+            match (first_name.is_empty(), last_name.is_empty()) {
+                (false, false) => format!("{} {}", first_name, last_name),
+                (false, true) => first_name.to_string(),
+                (true, false) => last_name.to_string(),
+                (true, true) => "mommy's_anon".to_string(),
+            }
+        })
+        .unwrap_or_else(|| "mommy's_anon".to_string())
+}
+
+pub fn get_chat_title(msg: &Message) -> String {
+    msg.chat
+        .title()
+        .map(|title| title.to_string())
+        .unwrap_or_else(|| "No Title Chat".to_string())
+}
+
+pub fn get_chat_username(msg: &Message) -> String {
+    msg.chat
+        .username()
+        .map(|username| username.to_string())
+        .unwrap_or_else(|| "_".to_string())
+}

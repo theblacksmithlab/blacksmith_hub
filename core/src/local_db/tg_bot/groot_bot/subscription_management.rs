@@ -89,8 +89,8 @@ pub async fn create_subscription(
         .await?;
 
     info!(
-        "Created/updated {} subscription for chat {} (paid by user {})",
-        plan_type, chat_id, paid_by_user_id
+        "Created/updated {} subscription for chat {} (paid by user: {}[@{:?}])",
+        plan_type, chat_id, paid_by_user_id, paid_by_username
     );
 
     Ok(())

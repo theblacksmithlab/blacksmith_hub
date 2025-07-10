@@ -1,7 +1,7 @@
 pub enum LlmModel {
     Light,               // OpenAI gpt-4o-mini
-    Complex,      
-    Complex2,// OpenAI gpt-4o
+    Complex,             // OpenAI gpt-4o
+    Complex2,            // OpenAI gpt-4.1
     TextEmbedding3Large, // OpenAI embedding generative model
 }
 

@@ -3,6 +3,7 @@ use crate::groot_bot::chat_moderation_utils::handle_groot_report;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use core::local_db::tg_bot::groot_bot::subscription_management::check_chat_payment;
+use core::local_db::tg_bot::groot_bot::subscription_management::create_subscription;
 use core::local_db::tg_bot::groot_bot::subscription_management::get_subscription_info;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
@@ -10,7 +11,8 @@ use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState,
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
-    auto_delete_message, is_message_from_linked_channel, load_super_admins,
+    auto_delete_message, get_chat_title, get_chat_username, get_username,
+    is_message_from_linked_channel, load_super_admins,
 };
 use core::utils::tg_bot::groot_bot::subscription_utils::{
     show_plan_selection, PaymentProcess, SubscriptionState,
@@ -34,12 +36,10 @@ pub async fn groot_bot_command_handler(
     let app_name = &app_state.app_name;
     let super_admins = load_super_admins(app_name);
     let user_id = msg.clone().from.unwrap().id.0;
-    let username = msg
-        .clone()
-        .from
-        .unwrap()
-        .username
-        .unwrap_or("Anonymous User".to_string());
+    let chat_title = get_chat_title(&msg);
+    let chat_id = msg.chat.id;
+    let chat_username = get_chat_username(&msg);
+    let username = get_username(&msg);
     let mut is_admin = false;
     let mut is_from_linked_channel = false;
 
@@ -49,7 +49,7 @@ pub async fn groot_bot_command_handler(
     // } else {
     //     false
     // };
-    
+
     let is_paid_chat = true;
 
     // Getting public chat's administrators
@@ -63,7 +63,10 @@ pub async fn groot_bot_command_handler(
                     .unwrap_or(false);
             }
             Err(err) => {
-                error!("Error getting admins list from public chat: {:?}", err);
+                error!(
+                    "Error getting admins list from chat '{}' [@{}] [id: {}]: {:?}",
+                    chat_title, chat_username, chat_id, err
+                );
             }
         }
 
@@ -116,6 +119,43 @@ pub async fn groot_bot_command_handler(
         }
     };
 
+    // TEMPORARY
+    if msg.text().unwrap_or("").starts_with("/force_subscription") && user_id == lord_admin_id {
+        let parts: Vec<&str> = msg.text().unwrap().split_whitespace().collect();
+        if parts.len() >= 5 {
+            let chat_id: i64 = parts[1].parse()?;
+            let chat_username = parts[2].trim_start_matches('@');
+            let paid_by_user_id: i64 = parts[3].parse()?;
+            let plan_type = parts[4];
+
+            if let Some(db_pool) = &app_state.db_pool {
+                create_subscription(
+                    db_pool,
+                    chat_id,
+                    chat_username,
+                    paid_by_user_id,
+                    None,
+                    plan_type,
+                )
+                .await?;
+
+                if let Some(chat_stats_mutex) = &app_state.chat_message_stats {
+                    let mut chat_stats = chat_stats_mutex.lock().await;
+                    let _ = chat_stats
+                        .fetch_chat_history_for_new_chat(
+                            &app_state.app_name,
+                            ChatId(chat_id),
+                            chat_username,
+                        )
+                        .await;
+                }
+
+                bot.send_message(msg.chat.id, "✅ Подписка создана вручную ЛОРДОМ-админом")
+                    .await?;
+            }
+        }
+    }
+
     // Execution area check
     if cmd != GrootBotCommands::Start
         && cmd != GrootBotCommands::Subscription
@@ -124,11 +164,8 @@ pub async fn groot_bot_command_handler(
         && !msg.chat.is_private()
     {
         info!(
-            "User | {} | with id: {} tried to use {:?} command in public chat {}",
-            username,
-            user_id,
-            cmd,
-            msg.chat.username().unwrap_or_default()
+            "User @{} [id: {}] tried to use {:?} command in public chat '{}' [@{}] [{}]",
+            username, user_id, cmd, chat_title, chat_username, chat_id
         );
         let bot_msg = get_message(AppsSystemMessages::GrootBot(
             GrootBotMessages::PrivateCmdUsedInPublicChat,
@@ -155,7 +192,7 @@ pub async fn groot_bot_command_handler(
         && msg.chat.is_private()
     {
         info!(
-            "User | {} | with id: {} tried to use /{:?} command in private chat",
+            "User @{} [id: {}] tried to use /{:?} command in private chat",
             username, user_id, cmd
         );
 
@@ -466,16 +503,16 @@ pub async fn groot_bot_command_handler(
         }
         GrootBotCommands::Subscription => {
             info!(
-                "User | {} | with id: {} tried to use /{:?} command",
-                username, user_id, cmd,
+                "User @{} [id: {}] tried to use /{:?} command in public chat '{}' [@{}] [id: {}]",
+                username, user_id, cmd, chat_title, chat_username, chat_id
             );
 
             handle_subscription_command(bot.clone(), msg.clone(), app_state.clone()).await?;
         }
         GrootBotCommands::Status => {
             info!(
-                "User | {} | with id: {} tried to use /{:?} command",
-                username, user_id, cmd,
+                "User @{} [id: {}] tried to use /{:?} command in public chat '{}' [@{}] [id: {}]",
+                username, user_id, cmd, chat_title, chat_username, chat_id
             );
 
             handle_status_command(bot.clone(), msg.clone(), app_state.clone()).await?;
@@ -521,11 +558,7 @@ pub async fn handle_subscription_command(
     app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let target_chat_id = msg.chat.id.0;
-    let target_chat_title = msg
-        .chat
-        .title()
-        .map(|title| title.to_string())
-        .unwrap_or_else(|| "Unknown Chat".to_string());
+    let target_chat_title = get_chat_title(&msg);
     let target_chat_username = match msg.chat.username() {
         Some(username) => username.to_string(),
         None => {
@@ -739,12 +772,8 @@ pub async fn handle_status_command(
         }
     };
 
-    let chat_title = msg
-        .chat
-        .title()
-        .map(|title| title.to_string())
-        .unwrap_or_else(|| "Unknown Chat".to_string());
-    
+    let chat_title = get_chat_title(&msg);
+
     if let Some(db_pool) = &app_state.db_pool {
         match get_subscription_info(db_pool, chat_id).await {
             Ok(Some(subscription)) => {
@@ -757,12 +786,6 @@ pub async fn handle_status_command(
                     .unwrap_or_else(|_| Utc::now().into())
                     .with_timezone(&chrono::FixedOffset::east_opt(3 * 3600).unwrap())
                     .format("%d.%m.%Y %H:%M UTC+3");
-
-                let paid_by = if let Some(username) = &subscription.paid_by_username {
-                    format!("@{}", username)
-                } else {
-                    format!("ID: {}", subscription.paid_by_user_id)
-                };
 
                 let plan_name = match subscription.plan_type.as_str() {
                     "monthly" => "Месячная подписка",
@@ -805,7 +828,6 @@ pub async fn handle_status_command(
                     📋 Тарифный план: {}\n\
                     📅 Начало: {}\n\
                     ⏰ Окончание: {}{}\n\
-                    👤 Оплачено: {}\n\n\
                     🛡️ Защита от спама: {}",
                     status_emoji,
                     chat_title,
@@ -815,7 +837,6 @@ pub async fn handle_status_command(
                     start_date,
                     end_date,
                     days_info,
-                    paid_by,
                     if is_active {
                         "Включена"
                     } else {

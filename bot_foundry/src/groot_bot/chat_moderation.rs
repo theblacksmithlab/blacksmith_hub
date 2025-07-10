@@ -10,7 +10,8 @@ use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
-    is_message_from_linked_channel, load_black_listed_users, load_white_listed_users,
+    get_chat_title, get_chat_username, get_username, is_message_from_linked_channel,
+    load_black_listed_users, load_white_listed_users,
 };
 use std::sync::Arc;
 use teloxide::prelude::Message;
@@ -25,24 +26,10 @@ pub async fn chat_moderation(
     is_paid_chat: bool,
 ) -> Result<()> {
     let user_id = msg.clone().from.unwrap().id.0;
-    let username = msg
-        .from
-        .as_ref()
-        .map(|user| {
-            if let Some(username) = &user.username {
-                username.to_string()
-            } else {
-                let first_name = &user.first_name;
-                let last_name = user.last_name.as_deref().unwrap_or("");
-
-                if !first_name.is_empty() || !last_name.is_empty() {
-                    format!("{} {}", first_name, last_name).trim().to_string()
-                } else {
-                    "Anonymous User".to_string()
-                }
-            }
-        })
-        .unwrap_or_else(|| "Anonymous User".to_string());
+    let username = get_username(&msg);
+    let chat_title = get_chat_title(&msg);
+    let chat_username = get_chat_username(&msg);
+    let chat_id = msg.chat.id;
 
     if let Some(dialog_states_mutex) = &app_state.dialog_states {
         let mut dialog_states = dialog_states_mutex.lock().await;
@@ -110,11 +97,6 @@ pub async fn chat_moderation(
     }
 
     let app_name = &app_state.app_name;
-    let chat_title = msg
-        .chat
-        .title()
-        .map(|title| title.to_string())
-        .unwrap_or_else(|| "Unknown Chat".to_string());
     // let _paid_chats = load_paid_chats(app_name);
     // paid_chats.contains(&msg.chat.id.0);
     let white_listed_users = load_white_listed_users(app_name);
