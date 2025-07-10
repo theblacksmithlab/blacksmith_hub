@@ -90,7 +90,11 @@ pub async fn create_subscription(
 
     info!(
         "Created/updated {} subscription for chat '{}' {} (paid by user: @{} [{}])",
-        plan_type, chat_username, chat_id, paid_by_username.unwrap_or("mommy's_anon"), paid_by_user_id
+        plan_type,
+        chat_username,
+        chat_id,
+        paid_by_username.unwrap_or("mommy's_anon"),
+        paid_by_user_id
     );
 
     Ok(())

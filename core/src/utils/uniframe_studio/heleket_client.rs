@@ -3,7 +3,6 @@ use base64::{engine::general_purpose, Engine as _};
 use md5::{Digest, Md5};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -111,8 +110,8 @@ impl HeleketClient {
 
     pub async fn check_invoice_status(&self, invoice_uuid: &str) -> Result<InvoiceResult> {
         let request = serde_json::json!({
-        "uuid": invoice_uuid
-    });
+            "uuid": invoice_uuid
+        });
 
         let body = serde_json::to_string(&request)?;
         let signature = self.generate_signature(&body);
@@ -128,19 +127,22 @@ impl HeleketClient {
             .await?;
 
         let response_text = response.text().await?;
-        error!("Raw Heleket response: {}", response_text);
-        
         let json_data: serde_json::Value = serde_json::from_str(&response_text)?;
 
         let state = json_data["state"].as_i64().unwrap_or(-1);
         if state != 0 {
             let errors = json_data["errors"].to_string();
-            return Err(anyhow!("Heleket API error: state = {}, errors = {}", state, errors));
+            return Err(anyhow!(
+                "Heleket API error: state = {}, errors = {}",
+                state,
+                errors
+            ));
         }
-        
-        let result = json_data["result"].as_object()
+
+        let result = json_data["result"]
+            .as_object()
             .ok_or_else(|| anyhow!("No result in response"))?;
-        
+
         Ok(InvoiceResult {
             uuid: result["uuid"].as_str().unwrap_or("").to_string(),
             order_id: result["order_id"].as_str().unwrap_or("").to_string(),
@@ -157,7 +159,10 @@ impl HeleketClient {
             address: result["address"].as_str().map(|s| s.to_string()),
             from: result["from"].as_str().map(|s| s.to_string()),
             txid: result["txid"].as_str().map(|s| s.to_string()),
-            payment_status: result["payment_status"].as_str().unwrap_or("unknown").to_string(),
+            payment_status: result["payment_status"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
             expired_at: result["expired_at"].as_i64().unwrap_or(0),
             is_final: result["is_final"].as_bool().unwrap_or(false),
             additional_data: result["additional_data"].as_str().map(|s| s.to_string()),

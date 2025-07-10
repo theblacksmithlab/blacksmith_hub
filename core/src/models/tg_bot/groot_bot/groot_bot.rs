@@ -296,5 +296,4 @@ pub enum GrootBotCommands {
     Subscription,
     Status,
     ForceSubscription,
-    TestHeleket,
 }

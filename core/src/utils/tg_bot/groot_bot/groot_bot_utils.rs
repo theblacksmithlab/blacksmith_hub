@@ -520,7 +520,7 @@ pub fn get_username(msg: &Message) -> String {
         .as_ref()
         .map(|user| {
             if let Some(username) = &user.username {
-                return format!("@{}", username);
+                return username.to_string();
             }
 
             let first_name = user.first_name.trim();

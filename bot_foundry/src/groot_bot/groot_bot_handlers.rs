@@ -43,23 +43,14 @@ pub async fn groot_bot_command_handler(
     let mut is_admin = false;
     let mut is_from_linked_channel = false;
 
-    // // Checking subscription
-    // let is_paid_chat = if let Some(db_pool) = &app_state.db_pool {
-    //     check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
-    // } else {
-    //     false
-    // };
-
     // Checking subscription
-    let is_paid_debug = if let Some(db_pool) = &app_state.db_pool {
+    let is_paid_chat = if let Some(db_pool) = &app_state.db_pool {
         check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
     } else {
         false
     };
-    
-    info!("is_paid debug: {} for chat: {}", is_paid_debug, chat_title);
 
-    let is_paid_chat = true;
+    let is_paid_chat = is_paid_chat || msg.chat.id.0 == -1001576410541;
 
     // Getting public chat's administrators
     if !msg.chat.is_private() {
@@ -73,7 +64,7 @@ pub async fn groot_bot_command_handler(
             }
             Err(err) => {
                 error!(
-                    "Error getting admins list from chat '{}' [@{}] [id: {}]: {:?}",
+                    "Error getting admins list from chat '{}' [{}] [id: {}]: {:?}",
                     chat_title, chat_username, chat_id, err
                 );
             }
@@ -136,7 +127,7 @@ pub async fn groot_bot_command_handler(
         && !msg.chat.is_private()
     {
         info!(
-            "User @{} [id: {}] tried to use {:?} command in public chat '{}' [@{}] [{}]",
+            "User {} [id: {}] tried to use {:?} command in public chat '{}' [{}] [{}]",
             username, user_id, cmd, chat_title, chat_username, chat_id
         );
         let bot_msg = get_message(AppsSystemMessages::GrootBot(
@@ -164,7 +155,7 @@ pub async fn groot_bot_command_handler(
         && msg.chat.is_private()
     {
         info!(
-            "User @{} [id: {}] tried to use /{:?} command in private chat",
+            "User {} [id: {}] tried to use /{:?} command in private chat",
             username, user_id, cmd
         );
 
@@ -340,7 +331,7 @@ pub async fn groot_bot_command_handler(
                     paid_by_username,
                     plan_type,
                 )
-                    .await?;
+                .await?;
 
                 if let Some(chat_stats_mutex) = &app_state.chat_message_stats {
                     let mut chat_stats = chat_stats_mutex.lock().await;
@@ -354,46 +345,17 @@ pub async fn groot_bot_command_handler(
                 }
 
                 bot.send_message(msg.chat.id,
-                                 format!("✅ Подписка активирована вручную для чата:\n• Чат: @{}\n• ID: {}\n• Плательщик: {} ({})\n• Тарифный план: {}",
+                                 format!("✅ Подписка активирована вручную для чата:\n• Чат: {}\n• ID: {}\n• Плательщик: {} ({})\n• Тарифный план: {}",
                                          chat_username, chat_id, paid_by_user_id,
                                          paid_by_username.unwrap_or("null"), plan_type))
                     .await?;
             }
         } else {
-            bot.send_message(msg.chat.id,
-                             "❌ Формат: /forcesubscription CHAT_ID USERNAME USER_ID USERNAME_OR_NULL PLAN_TYPE")
-                .await?;
-        }
-    }
-
-    if cmd == GrootBotCommands::TestHeleket && lord_admin_id == user_id {
-        let parts: Vec<&str> = msg.text().unwrap().split_whitespace().collect();
-        if parts.len() >= 2 {
-            let test_uuid = parts[1];
-
-            if let Some(heleket_client) = &app_state.heleket_client {
-                info!("Testing Heleket with UUID: {}", test_uuid);
-
-                match heleket_client.check_invoice_status(test_uuid).await {
-                    Ok(status) => {
-                        bot.send_message(msg.chat.id, format!(
-                            "✅ Heleket ответил:\n\
-                        Payment Status: {}\n\
-                        Order ID: {}\n\
-                        Amount: {}\n\
-                        Is Final: {}",
-                            status.payment_status,
-                            status.order_id,
-                            status.amount,
-                            status.is_final
-                        )).await?;
-                    },
-                    Err(e) => {
-                        error!("Heleket test error: {}", e);
-                        bot.send_message(msg.chat.id, format!("❌ Ошибка: {}", e)).await?;
-                    }
-                }
-            }
+            bot.send_message(
+                msg.chat.id,
+                "❌ Формат: /forcesubscription CHAT_ID USERNAME USER_ID USERNAME_OR_NULL PLAN_TYPE",
+            )
+            .await?;
         }
     }
 
@@ -437,9 +399,6 @@ pub async fn groot_bot_command_handler(
         }
         GrootBotCommands::ForceSubscription => {
             info!("Force subscription cmd executed!");
-        }
-        GrootBotCommands::TestHeleket => {
-            info!("Test Heleket cmd executed!");
         }
         GrootBotCommands::About => {
             let bot_msg =
@@ -561,7 +520,7 @@ pub async fn groot_bot_command_handler(
         }
         GrootBotCommands::Subscription => {
             info!(
-                "User @{} [id: {}] tried to use /{:?} command in public chat '{}' [@{}] [id: {}]",
+                "User {} [id: {}] tried to use /{:?} command in public chat '{}' [{}] [id: {}]",
                 username, user_id, cmd, chat_title, chat_username, chat_id
             );
 
@@ -569,7 +528,7 @@ pub async fn groot_bot_command_handler(
         }
         GrootBotCommands::Status => {
             info!(
-                "User @{} [id: {}] tried to use /{:?} command in public chat '{}' [@{}] [id: {}]",
+                "User {} [id: {}] tried to use /{:?} command in public chat '{}' [{}] [id: {}]",
                 username, user_id, cmd, chat_title, chat_username, chat_id
             );
 
@@ -597,14 +556,15 @@ pub async fn groot_bot_message_handler(
         _ => return Ok(()),
     };
 
-    let is_paid_chat = true;
+    // Checking subscription
+    let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
+        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+    } else {
+        false
+    };
 
-    // let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
-    //     check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
-    // } else {
-    //     false
-    // };
-
+    let is_paid_chat = is_paid_chat || msg.chat.id.0 == -1001576410541;
+    
     chat_moderation(bot, msg, bot_app_state, is_paid_chat).await?;
 
     Ok(())
@@ -645,7 +605,7 @@ pub async fn handle_subscription_command(
                 .send_message(
                     msg.chat.id,
                     &format!(
-                        "ℹ️ Чат @{} уже имеет активную подписку!",
+                        "ℹ️ Чат '{}' уже имеет активную подписку!",
                         target_chat_username
                     ),
                 )
@@ -698,7 +658,7 @@ pub async fn handle_subscription_command(
         let _owner_username = match &owner.username {
             Some(username) => username.clone(),
             None => {
-                bot.send_message(msg.chat.id, "❌ У владельца чата нет @username.\n\
+                bot.send_message(msg.chat.id, "❌ У владельца чата нет username.\n\
                 Данные владельца чата необходимы, чтобы я мог связаться с ним для оформления подписки.")
                     .await?;
                 return Ok(());
@@ -750,7 +710,7 @@ pub async fn handle_subscription_command(
             Some(username) => username.clone(),
             None => {
                 let bot_system_message = bot.send_message(msg.chat.id,
-                                                          "❌ У вас нет @username. Установите его в настройках Telegram, чтобы я мог написать вам в ЛС для оформления подписки.")
+                                                          "❌ У вас нет username. Установите его в настройках Telegram, чтобы я мог написать вам в ЛС для оформления подписки.")
                     .await?;
 
                 auto_delete_message(
@@ -823,7 +783,7 @@ pub async fn handle_status_command(
         None => {
             bot.send_message(
                 msg.chat.id,
-                "❌ Чат должен иметь @username для проверки статуса подписки",
+                "❌ Чат должен иметь username для проверки статуса подписки",
             )
             .await?;
             return Ok(());
@@ -902,7 +862,15 @@ pub async fn handle_status_command(
                     }
                 );
 
-                bot.send_message(msg.chat.id, status_msg).await?;
+                let bot_system_message = bot.send_message(msg.chat.id, status_msg).await?;
+
+                auto_delete_message(
+                    bot.clone(),
+                    bot_system_message.chat.id,
+                    bot_system_message.id,
+                    Duration::from_secs(120),
+                )
+                .await;
             }
             Ok(None) => {
                 let no_subscription_msg = format!(
@@ -913,20 +881,44 @@ pub async fn handle_status_command(
                     chat_username
                 );
 
-                bot.send_message(msg.chat.id, no_subscription_msg).await?;
+                let bot_system_message = bot.send_message(msg.chat.id, no_subscription_msg).await?;
+                auto_delete_message(
+                    bot.clone(),
+                    bot_system_message.chat.id,
+                    bot_system_message.id,
+                    Duration::from_secs(120),
+                )
+                .await;
             }
             Err(e) => {
                 error!(
                     "Error checking subscription status for chat {}: {}",
                     chat_id, e
                 );
-                bot.send_message(msg.chat.id, "❌ Ошибка при проверке статуса подписки")
+                let bot_system_message = bot
+                    .send_message(msg.chat.id, "❌ Ошибка при проверке статуса подписки")
                     .await?;
+                auto_delete_message(
+                    bot.clone(),
+                    bot_system_message.chat.id,
+                    bot_system_message.id,
+                    Duration::from_secs(120),
+                )
+                .await;
             }
         }
     } else {
-        bot.send_message(msg.chat.id, "❌ База данных недоступна")
+        let bot_system_message = bot
+            .send_message(msg.chat.id, "❌ База данных недоступна")
             .await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+        .await;
     }
 
     Ok(())

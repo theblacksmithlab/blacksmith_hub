@@ -28,8 +28,8 @@ pub async fn chat_moderation(
     let user_id = msg.clone().from.unwrap().id.0;
     let username = get_username(&msg);
     let chat_title = get_chat_title(&msg);
-    let chat_username = get_chat_username(&msg);
-    let chat_id = msg.chat.id;
+    // let chat_username = get_chat_username(&msg);
+    // let chat_id = msg.chat.id;
 
     if let Some(dialog_states_mutex) = &app_state.dialog_states {
         let mut dialog_states = dialog_states_mutex.lock().await;
