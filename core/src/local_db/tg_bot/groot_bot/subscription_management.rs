@@ -203,7 +203,7 @@ pub async fn get_expiring_subscriptions(
 pub async fn has_active_subscription_for_other_chats(
     db_pool: &Pool<Sqlite>,
     user_id: i64,
-    exclude_chat_id: i64
+    exclude_chat_id: i64,
 ) -> anyhow::Result<bool> {
     let query = "
         SELECT COUNT(*) as count

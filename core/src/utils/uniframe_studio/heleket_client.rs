@@ -24,8 +24,9 @@ impl Default for HeleketConfig {
             base_url: "https://api.heleket.com".to_string(),
             webhook_url: std::env::var("HELEKET_WEBHOOK_URL")
                 .expect("HELEKET_WEBHOOK_URL must be set"),
-            success_url: std::env::var("HELEKET_SUCCESS_URL")
-                .unwrap_or_else(|_| "https://uniframe-studio.com/billing?payment=success".to_string()),
+            success_url: std::env::var("HELEKET_SUCCESS_URL").unwrap_or_else(|_| {
+                "https://uniframe-studio.com/billing?payment=success".to_string()
+            }),
             cancel_url: std::env::var("HELEKET_CANCEL_URL").unwrap_or_else(|_| {
                 "https://uniframe-studio.com/billing?payment=cancelled".to_string()
             }),
@@ -41,8 +42,9 @@ impl HeleketConfig {
             api_key: std::env::var("HELEKET_API_KEY").expect("HELEKET_API_KEY must be set"),
             base_url: "https://api.heleket.com".to_string(),
             webhook_url: "".to_string(),
-            success_url: std::env::var("HELEKET_BOT_SUCCESS_URL")
-                .unwrap_or_else(|_| "https://uniframe-studio.com/groot-bot/payment-success".to_string()),
+            success_url: std::env::var("HELEKET_BOT_SUCCESS_URL").unwrap_or_else(|_| {
+                "https://uniframe-studio.com/groot-bot/payment-success".to_string()
+            }),
             cancel_url: "https://t.me/good_groot_bot".to_string(),
         }
     }

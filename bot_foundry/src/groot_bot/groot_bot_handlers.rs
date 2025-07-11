@@ -45,7 +45,9 @@ pub async fn groot_bot_command_handler(
 
     // Checking subscription
     let is_paid_chat = if let Some(db_pool) = &app_state.db_pool {
-        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+        check_chat_payment(db_pool, msg.chat.id.0)
+            .await
+            .unwrap_or(false)
     } else {
         false
     };
@@ -558,13 +560,15 @@ pub async fn groot_bot_message_handler(
 
     // Checking subscription
     let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
-        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+        check_chat_payment(db_pool, msg.chat.id.0)
+            .await
+            .unwrap_or(false)
     } else {
         false
     };
 
     let is_paid_chat = is_paid_chat || msg.chat.id.0 == -1001576410541;
-    
+
     chat_moderation(bot, msg, bot_app_state, is_paid_chat).await?;
 
     Ok(())
@@ -681,7 +685,7 @@ pub async fn handle_subscription_command(
                     heleket_invoice_uuid: None,
                     heleket_order_id: None,
                     original_price: None,
-                    discount_percent: None, 
+                    discount_percent: None,
                     final_price: None,
                     discount_reason: None,
                 },
@@ -704,6 +708,9 @@ pub async fn handle_subscription_command(
             ChatId(owner.id.0 as i64),
             &target_chat_username,
             &target_chat_title,
+            owner.id.0 as i64,
+            target_chat_id,
+            app_state.clone(),
         )
         .await
     } else {
@@ -768,6 +775,9 @@ pub async fn handle_subscription_command(
             ChatId(user_id as i64),
             &target_chat_username,
             &target_chat_title,
+            user_id as i64,
+            target_chat_id,
+            app_state.clone(),
         )
         .await
     }

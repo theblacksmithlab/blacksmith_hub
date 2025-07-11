@@ -1,6 +1,9 @@
+use crate::local_db::tg_bot::groot_bot::subscription_management::has_active_subscription_for_other_chats;
+use crate::state::tg_bot::app_state::BotAppState;
 use crate::utils::uniframe_studio::heleket_client::InvoiceResult;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use std::sync::Arc;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::Requester;
 use teloxide::types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup};
@@ -77,20 +80,52 @@ pub async fn show_plan_selection(
     user_chat_id: ChatId,
     chat_username: &str,
     target_chat_title: &str,
+    user_id: i64,
+    target_chat_id: i64,
+    app_state: Arc<BotAppState>,
 ) -> Result<()> {
+    let has_discount_for_other_chats = if let Some(db_pool) = &app_state.db_pool {
+        has_active_subscription_for_other_chats(db_pool, user_id, target_chat_id)
+            .await
+            .unwrap_or(false)
+    } else {
+        false
+    };
+
+    let discount_info = if has_discount_for_other_chats {
+        "\n🎉 Ваша скидка: 30% (активная подписка на другой чат)\n"
+    } else {
+        "\n💡 Доступные скидки:\n• Годовая подписка: скидка 17%\n• При наличии подписки на другой чат: скидка 30%\n"
+    };
+
     let message_text = format!(
         "Приветствую!\n\
-        Я получил заявку на оплату подписки для чата: {} (@{})\n\n\
+        Я получил заявку на оплату подписки для чата: {} (@{})\n\
+        {}\
         Внимательно проверьте username чата, изменить его после оплаты подписки будет невозможно!\n\n\
         Выберите тарифный план:",
-        target_chat_title,
-        chat_username
+        target_chat_title, chat_username, discount_info
     );
 
     let mut keyboard_rows = vec![];
 
     for plan in &SUBSCRIPTION_PLANS {
-        let button_text = format!("{} - {} $", plan.name, plan.price_usd);
+        let button_text = if has_discount_for_other_chats {
+            let discounted_price = (plan.price_usd as f64 * 0.7).round() as u32;
+            format!(
+                "{} - {}$ → {}$ (-30%)",
+                plan.name, plan.price_usd, discounted_price
+            )
+        } else if plan.id == "yearly" {
+            let discounted_price = (plan.price_usd as f64 * 0.83).round() as u32;
+            format!(
+                "{} - {}$ → {}$ (-17%)",
+                plan.name, plan.price_usd, discounted_price
+            )
+        } else {
+            format!("{} - {}$", plan.name, plan.price_usd)
+        };
+
         keyboard_rows.push(vec![InlineKeyboardButton::callback(
             button_text,
             format!("plan_{}", plan.id),

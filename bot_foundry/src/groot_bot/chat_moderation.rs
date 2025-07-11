@@ -10,8 +10,8 @@ use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
-    get_chat_title, get_chat_username, get_username, is_message_from_linked_channel,
-    load_black_listed_users, load_white_listed_users,
+    get_chat_title, get_username, is_message_from_linked_channel, load_black_listed_users,
+    load_white_listed_users,
 };
 use std::sync::Arc;
 use teloxide::prelude::Message;

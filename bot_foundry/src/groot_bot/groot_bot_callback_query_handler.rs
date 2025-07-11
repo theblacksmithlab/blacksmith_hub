@@ -1,7 +1,6 @@
 use anyhow::Result;
 use core::local_db::tg_bot::groot_bot::subscription_management::{
-    create_subscription,
-    has_active_subscription_for_other_chats
+    create_subscription, has_active_subscription_for_other_chats,
 };
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::state::tg_bot::app_state::BotAppState;
@@ -106,8 +105,14 @@ async fn handle_plan_selection(
             let payment_states = payment_states_mutex.lock().await;
             if let Some(payment_process) = payment_states.get(&user_id) {
                 (
-                    payment_process.target_chat_title.clone().unwrap_or_default(),
-                    payment_process.target_chat_username.clone().unwrap_or_default(),
+                    payment_process
+                        .target_chat_title
+                        .clone()
+                        .unwrap_or_default(),
+                    payment_process
+                        .target_chat_username
+                        .clone()
+                        .unwrap_or_default(),
                     payment_process.target_chat_id.unwrap_or(0),
                 )
             } else {
@@ -119,14 +124,20 @@ async fn handle_plan_selection(
     };
 
     let original_price = plan.price_usd;
-    let (discount_percent, discount_reason, final_price) = if let Some(db_pool) = &app_state.db_pool {
-        match has_active_subscription_for_other_chats(db_pool, user_id as i64, target_chat_id).await {
+    let (discount_percent, discount_reason, final_price) = if let Some(db_pool) = &app_state.db_pool
+    {
+        match has_active_subscription_for_other_chats(db_pool, user_id as i64, target_chat_id).await
+        {
             Ok(true) => {
                 info!(
                     "User {} gets 30% discount for having active subscription on other chats (current chat: {})",
                     user_id, target_chat_id
                 );
-                (30, "existing_subscription".to_string(), (original_price as f64 * 0.7).round() as u32)
+                (
+                    30,
+                    "existing_subscription".to_string(),
+                    (original_price as f64 * 0.7).round() as u32,
+                )
             }
             Ok(false) => {
                 if plan_id == "yearly" {
@@ -134,7 +145,11 @@ async fn handle_plan_selection(
                         "User {} gets 17% yearly discount for chat {}",
                         user_id, target_chat_id
                     );
-                    (17, "yearly_plan".to_string(), (original_price as f64 * 0.83).round() as u32)
+                    (
+                        17,
+                        "yearly_plan".to_string(),
+                        (original_price as f64 * 0.83).round() as u32,
+                    )
                 } else {
                     info!(
                         "User {} gets no discount for chat {}",
@@ -144,9 +159,16 @@ async fn handle_plan_selection(
                 }
             }
             Err(e) => {
-                error!("Error checking other subscriptions for user {}: {}", user_id, e);
+                error!(
+                    "Error checking other subscriptions for user {}: {}",
+                    user_id, e
+                );
                 if plan_id == "yearly" {
-                    (17, "yearly_plan".to_string(), (original_price as f64 * 0.83).round() as u32)
+                    (
+                        17,
+                        "yearly_plan".to_string(),
+                        (original_price as f64 * 0.83).round() as u32,
+                    )
                 } else {
                     (0, "none".to_string(), original_price)
                 }
@@ -154,7 +176,11 @@ async fn handle_plan_selection(
         }
     } else {
         if plan_id == "yearly" {
-            (17, "yearly_plan".to_string(), (original_price as f64 * 0.83).round() as u32)
+            (
+                17,
+                "yearly_plan".to_string(),
+                (original_price as f64 * 0.83).round() as u32,
+            )
         } else {
             (0, "none".to_string(), original_price)
         }
@@ -184,7 +210,10 @@ async fn handle_plan_selection(
     };
 
     bot.answer_callback_query(callback_query.id)
-        .text(&format!("✅ Выбран тарифный план: {}{}", plan.name, discount_info))
+        .text(&format!(
+            "✅ Выбран тарифный план: {}{}",
+            plan.name, discount_info
+        ))
         .await?;
 
     if let Some(message) = callback_query.message {
@@ -202,7 +231,7 @@ async fn handle_plan_selection(
         final_price,
         &discount_reason,
     )
-        .await
+    .await
 }
 
 async fn handle_back_to_plans(
@@ -213,13 +242,17 @@ async fn handle_back_to_plans(
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
 
-    let (chat_username, target_chat_title) = {
+    let (chat_username, target_chat_title, target_chat_id) = {
         if let Some(payment_states_mutex) = &app_state.payment_states {
             let mut payment_states = payment_states_mutex.lock().await;
             if let Some(payment_process) = payment_states.get_mut(&user_id) {
                 payment_process.state = SubscriptionState::AwaitingPlanSelection;
                 payment_process.selected_plan = None;
                 payment_process.payment_amount = None;
+                payment_process.original_price = None;
+                payment_process.discount_percent = None;
+                payment_process.final_price = None;
+                payment_process.discount_reason = None;
 
                 (
                     payment_process
@@ -230,6 +263,7 @@ async fn handle_back_to_plans(
                         .target_chat_title
                         .clone()
                         .unwrap_or_default(),
+                    payment_process.target_chat_id.unwrap_or(0),
                 )
             } else {
                 return handle_expired_session(bot, callback_query).await;
@@ -247,7 +281,16 @@ async fn handle_back_to_plans(
         bot.delete_message(chat_id, message.id()).await?;
     }
 
-    show_plan_selection(bot, chat_id, &chat_username, &target_chat_title).await
+    show_plan_selection(
+        bot,
+        chat_id,
+        &chat_username,
+        &target_chat_title,
+        user_id as i64,
+        target_chat_id,
+        app_state,
+    )
+    .await
 }
 
 async fn handle_expired_session(bot: Bot, callback_query: CallbackQuery) -> Result<()> {
@@ -404,43 +447,48 @@ async fn handle_check_payment(
                 "yearly" => "yearly",
                 _ => {
                     error!(
-                    "Unknown plan type: {}",
-                    payment_process.selected_plan.as_ref().unwrap()
-                );
+                        "Unknown plan type: {}",
+                        payment_process.selected_plan.as_ref().unwrap()
+                    );
                     "monthly"
                 }
             };
 
             let user_username = callback_query.from.username.as_deref();
-            
+
             // Tracing only block
-            if let (Some(original_price), Some(final_price), Some(discount_percent), Some(discount_reason)) = (
+            if let (
+                Some(original_price),
+                Some(final_price),
+                Some(discount_percent),
+                Some(discount_reason),
+            ) = (
                 payment_process.original_price,
                 payment_process.final_price,
                 payment_process.discount_percent,
-                payment_process.discount_reason.as_ref()
+                payment_process.discount_reason.as_ref(),
             ) {
                 if discount_percent > 0 {
                     info!(
-                    "User {} applied {}% discount ({}) for chat {}: {} $ -> {} $ (saved {} $)",
-                    user_id, 
-                    discount_percent, 
-                    discount_reason,
-                    payment_process.target_chat_id.unwrap(),
-                    original_price, 
-                    final_price,
-                    original_price - final_price
-                );
+                        "User {} applied {}% discount ({}) for chat {}: {} $ -> {} $ (saved {} $)",
+                        user_id,
+                        discount_percent,
+                        discount_reason,
+                        payment_process.target_chat_id.unwrap(),
+                        original_price,
+                        final_price,
+                        original_price - final_price
+                    );
                 } else {
                     info!(
-                    "User {} paid full price for chat {}: {} $",
-                    user_id,
-                    payment_process.target_chat_id.unwrap(), 
-                    final_price
-                );
+                        "User {} paid full price for chat {}: {} $",
+                        user_id,
+                        payment_process.target_chat_id.unwrap(),
+                        final_price
+                    );
                 }
             }
-            
+
             create_subscription(
                 db_pool,
                 payment_process.target_chat_id.unwrap(),
