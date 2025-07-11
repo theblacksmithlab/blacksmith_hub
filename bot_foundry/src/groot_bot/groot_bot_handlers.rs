@@ -680,6 +680,10 @@ pub async fn handle_subscription_command(
                     payment_id: None,
                     heleket_invoice_uuid: None,
                     heleket_order_id: None,
+                    original_price: None,
+                    discount_percent: None, 
+                    final_price: None,
+                    discount_reason: None,
                 },
             );
         }
@@ -740,6 +744,10 @@ pub async fn handle_subscription_command(
                     payment_id: None,
                     heleket_invoice_uuid: None,
                     heleket_order_id: None,
+                    original_price: None,
+                    discount_percent: None,
+                    final_price: None,
+                    discount_reason: None,
                 },
             );
         }

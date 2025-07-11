@@ -27,6 +27,10 @@ pub struct PaymentProcess {
     pub payment_id: Option<String>,
     pub heleket_invoice_uuid: Option<String>,
     pub heleket_order_id: Option<String>,
+    pub original_price: Option<u32>,
+    pub discount_percent: Option<u32>,
+    pub final_price: Option<u32>,
+    pub discount_reason: Option<String>,
 }
 
 pub struct SubscriptionPlan {
@@ -113,19 +117,38 @@ pub async fn show_payment_confirmation(
     target_chat_username: &str,
     target_chat_title: &str,
     plan: &SubscriptionPlan,
+    original_price: u32,
+    discount_percent: u32,
+    final_price: u32,
+    discount_reason: &str,
 ) -> Result<()> {
+    let price_text = if discount_percent > 0 {
+        let discount_description = match discount_reason {
+            "existing_subscription" => "скидка за активную подписку",
+            "yearly_plan" => "скидка за годовую подписку",
+            _ => "скидка",
+        };
+
+        format!(
+            "💰 Сумма: ~~{} $~~ → {} $ ({} {}%)",
+            original_price, final_price, discount_description, discount_percent
+        )
+    } else {
+        format!("💰 Сумма: {} $", final_price)
+    };
+
     let message_text = format!(
         "Подтверждение заказа\n\n\
         🎯 Чат: {} (@{})\n\
         📋 Тарифный план: {}\n\
-        💰 Сумма: {} $\n\
+        {}\n\
         ⏱️ Период: {} дней\n\n\
         📝 Описание: {}\n\n\
         ✅ Подтверждаете оплату?",
         target_chat_title,
         target_chat_username,
         plan.name,
-        plan.price_usd,
+        price_text,
         plan.duration_days,
         plan.description
     );

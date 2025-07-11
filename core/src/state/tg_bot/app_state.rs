@@ -97,7 +97,7 @@ impl BotAppState {
             None
         };
 
-        let heleket_client = Some(HeleketClient::new(HeleketConfig::default()));
+        let heleket_client = Some(HeleketClient::new(HeleketConfig::groot_bot()));
 
         Ok(Self {
             llm_client,

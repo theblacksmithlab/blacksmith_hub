@@ -25,10 +25,25 @@ impl Default for HeleketConfig {
             webhook_url: std::env::var("HELEKET_WEBHOOK_URL")
                 .expect("HELEKET_WEBHOOK_URL must be set"),
             success_url: std::env::var("HELEKET_SUCCESS_URL")
-                .unwrap_or_else(|_| "https://uniframe.studio/billing?payment=success".to_string()),
+                .unwrap_or_else(|_| "https://uniframe-studio.com/billing?payment=success".to_string()),
             cancel_url: std::env::var("HELEKET_CANCEL_URL").unwrap_or_else(|_| {
-                "https://uniframe.studio/billing?payment=cancelled".to_string()
+                "https://uniframe-studio.com/billing?payment=cancelled".to_string()
             }),
+        }
+    }
+}
+
+impl HeleketConfig {
+    pub fn groot_bot() -> Self {
+        Self {
+            merchant_id: std::env::var("HELEKET_MERCHANT_ID")
+                .expect("HELEKET_MERCHANT_ID must be set"),
+            api_key: std::env::var("HELEKET_API_KEY").expect("HELEKET_API_KEY must be set"),
+            base_url: "https://api.heleket.com".to_string(),
+            webhook_url: "".to_string(),
+            success_url: std::env::var("HELEKET_BOT_SUCCESS_URL")
+                .unwrap_or_else(|_| "https://uniframe-studio.com/groot-bot/payment-success".to_string()),
+            cancel_url: "https://t.me/good_groot_bot".to_string(),
         }
     }
 }
@@ -38,7 +53,8 @@ pub struct CreateInvoiceRequest {
     pub amount: String,
     pub currency: String,
     pub order_id: String,
-    pub url_callback: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url_callback: Option<String>,
     pub url_success: String,
     pub url_return: String,
 }
@@ -178,7 +194,11 @@ impl HeleketClient {
             amount: amount_usd.to_string(),
             currency: "USD".to_string(),
             order_id: order_id.clone(),
-            url_callback: self.config.webhook_url.clone(),
+            url_callback: if self.config.webhook_url.is_empty() {
+                None
+            } else {
+                Some(self.config.webhook_url.clone())
+            },
             url_success: self.config.success_url.clone(),
             url_return: self.config.cancel_url.clone(),
         };
