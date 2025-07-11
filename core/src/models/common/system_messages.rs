@@ -11,12 +11,11 @@ pub enum AppsSystemMessages {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GrootBotMessages {
-    StartMessage,
+    StartCmdUsedInPublicChat,
     PrivateCmdUsedInPublicChat,
     NoRightsForUseCmd,
     PublicCmdUsedInPrivateChat,
     About,
-    Ask,
     AlertForViolatorChannels,
     AlertForBlackListed,
     DemoBotSystemMessage,
@@ -28,7 +27,7 @@ pub enum GrootBotMessages {
     NoUsernameForChatAlert,
     ManualMessage,
     ResultsTempMessage,
-    StartCmdReaction,
+    CommonStartCmdReaction,
     ReportOnWhiteListedUser,
     ReportOnChatAdmin,
     ErrorDeletingMsg,
@@ -37,17 +36,21 @@ pub enum GrootBotMessages {
     NoUserIdWarn,
     NotCorrectReportUsage,
     GrootCmdRestrictionAlert,
+    StartCmdUsedInPrivateChat,
+    DemoModeMessage,
+    NoNeedForCheckInPrivateChat,
+    SubscriptionCmdUsedInPrivateChat,
+    ImportantInstructions,
 }
 
 impl GrootBotMessages {
     pub fn as_str(&self) -> &str {
         match self {
-            GrootBotMessages::StartMessage => "start_message",
+            GrootBotMessages::StartCmdUsedInPublicChat => "start_cmd_used_in_public_chat",
             GrootBotMessages::PrivateCmdUsedInPublicChat => "private_cmd_used_in_public_chat",
             GrootBotMessages::NoRightsForUseCmd => "no_rights_for_use_cmd",
             GrootBotMessages::PublicCmdUsedInPrivateChat => "public_cmd_used_in_private_chat",
             GrootBotMessages::About => "about",
-            GrootBotMessages::Ask => "ask",
             GrootBotMessages::AlertForViolatorChannels => "alert_for_violator_channels",
             GrootBotMessages::AlertForBlackListed => "alert_for_black_listed",
             GrootBotMessages::DemoBotSystemMessage => "demo_bot_system_message",
@@ -59,7 +62,7 @@ impl GrootBotMessages {
             GrootBotMessages::NoUsernameForChatAlert => "no_username_for_chat_alert",
             GrootBotMessages::ManualMessage => "manual_message",
             GrootBotMessages::ResultsTempMessage => "results_temp_message",
-            GrootBotMessages::StartCmdReaction => "start_cmd_reaction",
+            GrootBotMessages::CommonStartCmdReaction => "common_start_cmd_reaction",
             GrootBotMessages::ReportOnWhiteListedUser => "report_on_white_listed_user",
             GrootBotMessages::ReportOnChatAdmin => "report_on_chat_admin",
             GrootBotMessages::ErrorDeletingMsg => "error_deleting_message",
@@ -68,6 +71,13 @@ impl GrootBotMessages {
             GrootBotMessages::NoUserIdWarn => "no_user_id_warn",
             GrootBotMessages::NotCorrectReportUsage => "not_correct_report_usage",
             GrootBotMessages::GrootCmdRestrictionAlert => "groot_cmd_restriction_alert",
+            GrootBotMessages::StartCmdUsedInPrivateChat => "start_cmd_used_in_private_chat",
+            GrootBotMessages::DemoModeMessage => "demo_mode_message",
+            GrootBotMessages::NoNeedForCheckInPrivateChat => "no_need_for_check_in_private_chat",
+            GrootBotMessages::SubscriptionCmdUsedInPrivateChat => {
+                "subscription_cmd_used_in_private_chat"
+            }
+            GrootBotMessages::ImportantInstructions => "important_instructions",
         }
     }
 }

@@ -1,3 +1,4 @@
+use crate::groot_bot::groot_bot_callback_query_handler::groot_bot_callback_query_handler;
 use crate::groot_bot::groot_bot_handlers::{groot_bot_command_handler, groot_bot_message_handler};
 use crate::probiot_bot::probiot_bot_handlers::{
     probiot_callback_query_handler, probiot_command_handler,
@@ -80,14 +81,11 @@ async fn main() -> Result<()> {
 
     let app_state = if app_name == AppName::GrootBot {
         Arc::new(
-            BotAppState::with_groot_bot_options(llm_client, qdrant_client, app_name.clone()).await,
+            BotAppState::with_groot_bot_options(llm_client, qdrant_client, app_name.clone())
+                .await?,
         )
     } else {
-        Arc::new(BotAppState::new(
-            llm_client,
-            qdrant_client,
-            app_name.clone(),
-        ))
+        Arc::new(BotAppState::new(llm_client, qdrant_client, app_name.clone()).await?)
     };
 
     let handlers = match get_handlers(&app_name) {
@@ -187,7 +185,7 @@ fn get_handlers(
                 .filter_command::<GrootBotCommands>()
                 .endpoint(groot_bot_command_handler),
             Update::filter_message().endpoint(groot_bot_message_handler),
-            None,
+            Some(Update::filter_callback_query().endpoint(groot_bot_callback_query_handler)),
         )),
         AppName::TheViperRoom
         | AppName::W3AWeb

@@ -1,21 +1,30 @@
 use crate::groot_bot::chat_moderation::chat_moderation;
 use crate::groot_bot::chat_moderation_utils::handle_groot_report;
-use crate::groot_bot::groot_bot_utils::{auto_delete_message, load_super_admins};
 use anyhow::Result;
+use chrono::{DateTime, Utc};
+use core::local_db::tg_bot::groot_bot::subscription_management::check_chat_payment;
+use core::local_db::tg_bot::groot_bot::subscription_management::create_subscription;
+use core::local_db::tg_bot::groot_bot::subscription_management::get_subscription_info;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState, ShowType};
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
-use core::utils::tg_bot::groot_bot::build_resource_file_path;
+use core::utils::tg_bot::groot_bot::groot_bot_utils::{
+    auto_delete_message, get_chat_title, get_chat_username, get_username,
+    is_message_from_linked_channel, load_super_admins,
+};
+use core::utils::tg_bot::groot_bot::subscription_utils::{
+    show_plan_selection, PaymentProcess, SubscriptionState,
+};
 use std::env;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Request, Requester, Update};
-use teloxide::types::{InputFile, KeyboardButton, KeyboardMarkup, UpdateKind};
+use teloxide::types::{KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
+use teloxide_core::prelude::ChatId;
 use tracing::{error, info};
 
 pub async fn groot_bot_command_handler(
@@ -27,14 +36,23 @@ pub async fn groot_bot_command_handler(
     let app_name = &app_state.app_name;
     let super_admins = load_super_admins(app_name);
     let user_id = msg.clone().from.unwrap().id.0;
-    let username = msg
-        .clone()
-        .from
-        .unwrap()
-        .username
-        .unwrap_or("Anonymous User".to_string());
+    let chat_title = get_chat_title(&msg);
+    let chat_id = msg.chat.id;
+    let chat_username = get_chat_username(&msg);
+    let username = get_username(&msg);
     let mut is_admin = false;
+    let mut is_from_linked_channel = false;
 
+    // Checking subscription
+    let is_paid_chat = if let Some(db_pool) = &app_state.db_pool {
+        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+    } else {
+        false
+    };
+
+    let is_paid_chat = is_paid_chat || msg.chat.id.0 == -1001576410541;
+
+    // Getting public chat's administrators
     if !msg.chat.is_private() {
         match bot.get_chat_administrators(msg.chat.id).send().await {
             Ok(admins) => {
@@ -45,11 +63,33 @@ pub async fn groot_bot_command_handler(
                     .unwrap_or(false);
             }
             Err(err) => {
-                error!("Error getting admins list from public chat: {:?}", err);
+                error!(
+                    "Error getting admins list from chat '{}' [{}] [id: {}]: {:?}",
+                    chat_title, chat_username, chat_id, err
+                );
             }
+        }
+
+        if let Ok(true) = is_message_from_linked_channel(&bot, &msg).await {
+            is_from_linked_channel = true;
+            info!("Command from linked channel detected");
         }
     }
 
+    // Getting info about chat owner
+    let is_chat_owner = if !msg.chat.is_private() {
+        match bot.get_chat_administrators(msg.chat.id).await {
+            Ok(admins) => admins.iter().any(|admin| {
+                admin.status() == teloxide::types::ChatMemberStatus::Owner
+                    && admin.user.id.0 == user_id
+            }),
+            Err(_) => false,
+        }
+    } else {
+        false
+    };
+
+    // Setting-up LORD_ADMIN_ID
     let lord_admin_id = match env::var("LORD_ADMIN_ID") {
         Ok(val) => match val.parse::<u64>() {
             Ok(id) => id,
@@ -79,13 +119,16 @@ pub async fn groot_bot_command_handler(
         }
     };
 
-    if cmd != GrootBotCommands::Start && cmd != GrootBotCommands::Groot && !msg.chat.is_private() {
+    // Execution area check
+    if cmd != GrootBotCommands::Start
+        && cmd != GrootBotCommands::Subscription
+        && cmd != GrootBotCommands::Groot
+        && cmd != GrootBotCommands::Status
+        && !msg.chat.is_private()
+    {
         info!(
-            "User | {} | with id: {} tried to use {:?} command in public chat {}",
-            username,
-            user_id,
-            cmd,
-            msg.chat.username().unwrap_or_default()
+            "User {} [id: {}] tried to use {:?} command in public chat '{}' [{}] [{}]",
+            username, user_id, cmd, chat_title, chat_username, chat_id
         );
         let bot_msg = get_message(AppsSystemMessages::GrootBot(
             GrootBotMessages::PrivateCmdUsedInPublicChat,
@@ -105,9 +148,117 @@ pub async fn groot_bot_command_handler(
         return Ok(());
     }
 
-    if (cmd == GrootBotCommands::Resources || cmd == GrootBotCommands::Logs)
-        && !super_admins.contains(&user_id)
+    if (cmd == GrootBotCommands::Start
+        || cmd == GrootBotCommands::Groot
+        || cmd == GrootBotCommands::Status
+        || cmd == GrootBotCommands::Subscription)
+        && msg.chat.is_private()
     {
+        info!(
+            "User {} [id: {}] tried to use /{:?} command in private chat",
+            username, user_id, cmd
+        );
+
+        let bot_msg = match cmd {
+            GrootBotCommands::Start => {
+                get_message(AppsSystemMessages::GrootBot(
+                    GrootBotMessages::StartCmdUsedInPrivateChat,
+                ))
+                .await?
+            }
+            GrootBotCommands::Groot => {
+                get_message(AppsSystemMessages::GrootBot(
+                    GrootBotMessages::PublicCmdUsedInPrivateChat,
+                ))
+                .await?
+            }
+            GrootBotCommands::Status => {
+                get_message(AppsSystemMessages::GrootBot(
+                    GrootBotMessages::PublicCmdUsedInPrivateChat,
+                ))
+                .await?
+            }
+            GrootBotCommands::Subscription => {
+                get_message(AppsSystemMessages::GrootBot(
+                    GrootBotMessages::SubscriptionCmdUsedInPrivateChat,
+                ))
+                .await?
+            }
+            _ => unreachable!(),
+        };
+
+        let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+        .await;
+
+        return Ok(());
+    }
+
+    // Executor check
+    if cmd == GrootBotCommands::Start
+        && !is_admin
+        && !is_from_linked_channel
+        && user_id != lord_admin_id
+    {
+        info!(
+            "User | {} | with id: {} tried to use /{:?} command in public chat",
+            username, user_id, cmd
+        );
+
+        let bot_msg = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::CommonStartCmdReaction,
+        ))
+        .await?;
+
+        let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+        .await;
+
+        return Ok(());
+    }
+
+    if cmd == GrootBotCommands::Start
+        && !msg.chat.is_private()
+        && (is_admin || is_from_linked_channel || user_id == lord_admin_id)
+    {
+        if msg.chat.username().is_none() {
+            info!(
+                "Admin | {} | with id: {} tried to use /{:?} command in chat without username",
+                username, user_id, cmd
+            );
+
+            let bot_msg = get_message(AppsSystemMessages::GrootBot(
+                GrootBotMessages::NoUsernameForChatAlert,
+            ))
+            .await?;
+
+            let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
+
+            auto_delete_message(
+                bot.clone(),
+                bot_system_message.chat.id,
+                bot_system_message.id,
+                Duration::from_secs(120),
+            )
+            .await;
+
+            return Ok(());
+        }
+    }
+
+    if cmd == GrootBotCommands::Resources && !super_admins.contains(&user_id) {
         info!(
             "Non-super-admin user | {} | with id: {} tried to use /{:?} command",
             username, user_id, cmd,
@@ -130,90 +281,103 @@ pub async fn groot_bot_command_handler(
         return Ok(());
     }
 
-    if cmd == GrootBotCommands::Ask {
-        if !super_admins.contains(&user_id) {
-            info!(
-                "Non-super-admin | {} | with id: {} tried to use /{:?} command",
-                username, user_id, cmd
-            );
-            let bot_msg = get_message(AppsSystemMessages::GrootBot(
-                GrootBotMessages::NoRightsForUseCmd,
-            ))
-            .await?;
+    if (cmd == GrootBotCommands::Subscription || cmd == GrootBotCommands::Status)
+        && !is_admin
+        && !is_from_linked_channel
+        && !is_chat_owner
+        && user_id != lord_admin_id
+    {
+        info!(
+            "Non-admin user | {} | with id: {} tried to use /{:?} command",
+            username, user_id, cmd,
+        );
+        let bot_msg = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::NoRightsForUseCmd,
+        ))
+        .await?;
 
-            let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
+        let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
 
-            auto_delete_message(
-                bot.clone(),
-                bot_system_message.chat.id,
-                bot_system_message.id,
-                Duration::from_secs(120),
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+        .await;
+
+        return Ok(());
+    }
+
+    if cmd == GrootBotCommands::ForceSubscription && lord_admin_id == user_id {
+        let parts: Vec<&str> = msg.text().unwrap().split_whitespace().collect();
+        if parts.len() >= 6 {
+            let chat_id: i64 = parts[1].parse()?;
+            let chat_username = parts[2];
+            let paid_by_user_id: i64 = parts[3].parse()?;
+            let paid_by_username = if parts[4] != "null" {
+                Some(parts[4])
+            } else {
+                None
+            };
+            let plan_type = parts[5];
+
+            if let Some(db_pool) = &app_state.db_pool {
+                create_subscription(
+                    db_pool,
+                    chat_id,
+                    chat_username,
+                    paid_by_user_id,
+                    paid_by_username,
+                    plan_type,
+                )
+                .await?;
+
+                if let Some(chat_stats_mutex) = &app_state.chat_message_stats {
+                    let mut chat_stats = chat_stats_mutex.lock().await;
+                    let _ = chat_stats
+                        .fetch_chat_history_for_new_chat(
+                            &app_state.app_name,
+                            ChatId(chat_id),
+                            chat_username,
+                        )
+                        .await;
+                }
+
+                bot.send_message(msg.chat.id,
+                                 format!("✅ Подписка активирована вручную для чата:\n• Чат: {}\n• ID: {}\n• Плательщик: {} ({})\n• Тарифный план: {}",
+                                         chat_username, chat_id, paid_by_user_id,
+                                         paid_by_username.unwrap_or("null"), plan_type))
+                    .await?;
+            }
+        } else {
+            bot.send_message(
+                msg.chat.id,
+                "❌ Формат: /forcesubscription CHAT_ID USERNAME USER_ID USERNAME_OR_NULL PLAN_TYPE",
             )
-            .await;
-
-            return Ok(());
+            .await?;
         }
-
-        // TODO: implement an interactive ai-system of usage instructions
-    }
-
-    if (cmd == GrootBotCommands::Start || cmd == GrootBotCommands::Groot) && msg.chat.is_private() {
-        info!(
-            "User | {} | with id: {} tried to use /{:?} command in private chat",
-            username, user_id, cmd
-        );
-
-        let bot_msg = get_message(AppsSystemMessages::GrootBot(
-            GrootBotMessages::PublicCmdUsedInPrivateChat,
-        ))
-        .await?;
-
-        let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
-
-        auto_delete_message(
-            bot.clone(),
-            bot_system_message.chat.id,
-            bot_system_message.id,
-            Duration::from_secs(120),
-        )
-        .await;
-
-        return Ok(());
-    }
-
-    if cmd == GrootBotCommands::Start && !is_admin && user_id != lord_admin_id {
-        info!(
-            "User | {} | with id: {} tried to use /{:?} command in public chat: ",
-            username, user_id, cmd
-        );
-
-        let bot_msg = get_message(AppsSystemMessages::GrootBot(
-            GrootBotMessages::StartCmdReaction,
-        ))
-        .await?;
-
-        let bot_system_message = bot.send_message(msg.chat.id, bot_msg).await?;
-
-        auto_delete_message(
-            bot.clone(),
-            bot_system_message.chat.id,
-            bot_system_message.id,
-            Duration::from_secs(120),
-        )
-        .await;
-
-        return Ok(());
     }
 
     match cmd {
         GrootBotCommands::Start => {
-            let bot_msg =
-                get_message(AppsSystemMessages::GrootBot(GrootBotMessages::StartMessage)).await?;
+            let bot_msg = get_message(AppsSystemMessages::GrootBot(
+                GrootBotMessages::StartCmdUsedInPublicChat,
+            ))
+            .await?;
             bot.send_message(msg.chat.id, bot_msg).await?;
 
-            if let Some(chat_username) = msg.chat.username() {
+            if !is_paid_chat {
+                let demo_msg = get_message(AppsSystemMessages::GrootBot(
+                    GrootBotMessages::DemoModeMessage,
+                ))
+                .await?;
+                bot.send_message(msg.chat.id, demo_msg).await?;
+            } else {
+                let chat_username = msg.chat.username().unwrap();
+
                 info!(
-                    "Chat: {} with id: {} has username set. Fetching chat history...",
+                    "Chat: {} with id: {} is paid. Fetching chat history...",
                     chat_username, msg.chat.id
                 );
 
@@ -221,7 +385,7 @@ pub async fn groot_bot_command_handler(
                 if let Err(err) = chat_stats
                     .fetch_chat_history_for_new_chat(
                         &app_state.app_name,
-                        msg.clone(),
+                        msg.chat.id,
                         chat_username,
                     )
                     .await
@@ -231,14 +395,10 @@ pub async fn groot_bot_command_handler(
                         chat_username, msg.chat.id, err
                     );
                 }
-            } else {
-                let bot_msg = get_message(AppsSystemMessages::GrootBot(
-                    GrootBotMessages::NoUsernameForChatAlert,
-                ))
-                .await?;
-                bot.send_message(msg.chat.id, bot_msg).await?;
-                return Ok(());
             }
+        }
+        GrootBotCommands::ForceSubscription => {
+            info!("Force subscription cmd executed!");
         }
         GrootBotCommands::About => {
             let bot_msg =
@@ -280,62 +440,6 @@ pub async fn groot_bot_command_handler(
             ))
             .await?;
             bot.send_message(msg.chat.id, bot_msg).await?;
-        }
-        GrootBotCommands::Ask => {
-            let bot_msg = get_message(AppsSystemMessages::GrootBot(GrootBotMessages::Ask)).await?;
-            bot.send_message(msg.chat.id, bot_msg).await?;
-        }
-        GrootBotCommands::Backup => {
-            if user_id != lord_admin_id {
-                let bot_msg = get_message(AppsSystemMessages::GrootBot(
-                    GrootBotMessages::NoRightsForUseCmd,
-                ))
-                .await?;
-
-                bot.send_message(msg.chat.id, bot_msg).await?;
-            } else {
-                let files_to_send = [
-                    (
-                        build_resource_file_path(app_name, "white_listed_users.json"),
-                        "white_listed_users.json",
-                    ),
-                    (
-                        build_resource_file_path(app_name, "black_listed_users.json"),
-                        "black_listed_users.json",
-                    ),
-                    (
-                        build_resource_file_path(app_name, "message_counts.json"),
-                        "message_counts.json",
-                    ),
-                    (
-                        build_resource_file_path(app_name, "restricted_words.json"),
-                        "restricted_words.json",
-                    ),
-                    (
-                        build_resource_file_path(app_name, "chats_list.json"),
-                        "chats_list.json",
-                    ),
-                    (
-                        build_resource_file_path(app_name, "penalty_points.json"),
-                        "penalty_points.json",
-                    ),
-                ];
-
-                for (file_path, file_name) in files_to_send.iter() {
-                    let path = Path::new(file_path);
-                    if path.exists() {
-                        info!("Backup requested by LORD_ADMIN");
-                        bot.send_document(
-                            msg.chat.id,
-                            InputFile::file(path).file_name(file_name.to_string()),
-                        )
-                        .await?;
-                    } else {
-                        bot.send_message(msg.chat.id, format!("File {} not found", file_name))
-                            .await?;
-                    }
-                }
-            }
         }
         GrootBotCommands::Results => {
             let bot_msg = get_message(AppsSystemMessages::GrootBot(
@@ -414,8 +518,21 @@ pub async fn groot_bot_command_handler(
                 .await;
             }
         }
-        _ => {
-            bot.send_message(msg.chat.id, "Invalid cmd").await?;
+        GrootBotCommands::Subscription => {
+            info!(
+                "User {} [id: {}] tried to use /{:?} command in public chat '{}' [{}] [id: {}]",
+                username, user_id, cmd, chat_title, chat_username, chat_id
+            );
+
+            handle_subscription_command(bot.clone(), msg.clone(), app_state.clone()).await?;
+        }
+        GrootBotCommands::Status => {
+            info!(
+                "User {} [id: {}] tried to use /{:?} command in public chat '{}' [{}] [id: {}]",
+                username, user_id, cmd, chat_title, chat_username, chat_id
+            );
+
+            handle_status_command(bot.clone(), msg.clone(), app_state.clone()).await?;
         }
     }
 
@@ -439,7 +556,370 @@ pub async fn groot_bot_message_handler(
         _ => return Ok(()),
     };
 
-    chat_moderation(bot, msg, bot_app_state).await?;
+    // Checking subscription
+    let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
+        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+    } else {
+        false
+    };
+
+    let is_paid_chat = is_paid_chat || msg.chat.id.0 == -1001576410541;
+    
+    chat_moderation(bot, msg, bot_app_state, is_paid_chat).await?;
+
+    Ok(())
+}
+
+pub async fn handle_subscription_command(
+    bot: Bot,
+    msg: Message,
+    app_state: Arc<BotAppState>,
+) -> Result<()> {
+    let target_chat_id = msg.chat.id.0;
+    let target_chat_title = get_chat_title(&msg);
+    let target_chat_username = match msg.chat.username() {
+        Some(username) => username.to_string(),
+        None => {
+            let bot_system_message = bot.send_message(msg.chat.id, "❌ Чат должен иметь username (быть публичным), чтобы я мог защищать его от нечисти.\n\
+            Установите его в настройках и попробуйте вызвать команду /subscription снова")
+                .await?;
+
+            auto_delete_message(
+                bot.clone(),
+                bot_system_message.chat.id,
+                bot_system_message.id,
+                Duration::from_secs(60),
+            )
+            .await;
+
+            return Ok(());
+        }
+    };
+
+    if let Some(db_pool) = &app_state.db_pool {
+        if check_chat_payment(db_pool, target_chat_id)
+            .await
+            .unwrap_or(false)
+        {
+            let bot_system_message = bot
+                .send_message(
+                    msg.chat.id,
+                    &format!(
+                        "ℹ️ Чат '{}' уже имеет активную подписку!",
+                        target_chat_username
+                    ),
+                )
+                .await?;
+
+            auto_delete_message(
+                bot.clone(),
+                bot_system_message.chat.id,
+                bot_system_message.id,
+                Duration::from_secs(60),
+            )
+            .await;
+
+            return Ok(());
+        }
+    }
+
+    let is_from_linked_channel = is_message_from_linked_channel(&bot, &msg)
+        .await
+        .unwrap_or(false);
+
+    if is_from_linked_channel {
+        info!("Subscription command from linked channel - finding chat owner");
+
+        let chat_owner = match bot.get_chat_administrators(msg.chat.id).await {
+            Ok(admins) => admins
+                .into_iter()
+                .find(|admin| admin.status() == teloxide::types::ChatMemberStatus::Owner)
+                .map(|owner| owner.user.clone()),
+            Err(e) => {
+                error!("Failed to get chat administrators: {}", e);
+                bot.send_message(
+                    msg.chat.id,
+                    "❌ Не удалось получить информацию об администраторах чата.",
+                )
+                .await?;
+                return Ok(());
+            }
+        };
+
+        let owner = match chat_owner {
+            Some(owner) => owner,
+            None => {
+                bot.send_message(msg.chat.id, "❌ Не удалось найти владельца чата")
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        let _owner_username = match &owner.username {
+            Some(username) => username.clone(),
+            None => {
+                bot.send_message(msg.chat.id, "❌ У владельца чата нет username.\n\
+                Данные владельца чата необходимы, чтобы я мог связаться с ним для оформления подписки.")
+                    .await?;
+                return Ok(());
+            }
+        };
+
+        if let Some(payment_states_mutex) = &app_state.payment_states {
+            let mut payment_states = payment_states_mutex.lock().await;
+
+            payment_states.insert(
+                owner.id.0,
+                PaymentProcess {
+                    state: SubscriptionState::AwaitingPlanSelection,
+                    target_chat_id: Some(target_chat_id),
+                    target_chat_username: Some(target_chat_username.clone()),
+                    target_chat_title: Some(target_chat_title.clone()),
+                    selected_plan: None,
+                    payment_amount: None,
+                    payment_id: None,
+                    heleket_invoice_uuid: None,
+                    heleket_order_id: None,
+                },
+            );
+        }
+
+        let group_msg = "✅ Я отправил инструкцию по оформлению подписки владельцу чата в ЛС.";
+        let bot_system_message = bot.send_message(msg.chat.id, group_msg).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(60),
+        )
+        .await;
+
+        show_plan_selection(
+            bot,
+            ChatId(owner.id.0 as i64),
+            &target_chat_username,
+            &target_chat_title,
+        )
+        .await
+    } else {
+        info!("Subscription command from regular admin");
+
+        let user_id = msg.from.as_ref().unwrap().id.0;
+        let user_username = match &msg.from.as_ref().unwrap().username {
+            Some(username) => username.clone(),
+            None => {
+                let bot_system_message = bot.send_message(msg.chat.id,
+                                                          "❌ У вас нет username. Установите его в настройках Telegram, чтобы я мог написать вам в ЛС для оформления подписки.")
+                    .await?;
+
+                auto_delete_message(
+                    bot.clone(),
+                    bot_system_message.chat.id,
+                    bot_system_message.id,
+                    Duration::from_secs(60),
+                )
+                .await;
+
+                return Ok(());
+            }
+        };
+
+        if let Some(payment_states_mutex) = &app_state.payment_states {
+            let mut payment_states = payment_states_mutex.lock().await;
+
+            payment_states.insert(
+                user_id,
+                PaymentProcess {
+                    state: SubscriptionState::AwaitingPlanSelection,
+                    target_chat_id: Some(target_chat_id),
+                    target_chat_username: Some(target_chat_username.clone()),
+                    target_chat_title: Some(target_chat_title.clone()),
+                    selected_plan: None,
+                    payment_amount: None,
+                    payment_id: None,
+                    heleket_invoice_uuid: None,
+                    heleket_order_id: None,
+                },
+            );
+        }
+
+        let group_msg = format!("✅ @{}, проверьте ЛС для оплаты подписки", user_username);
+        let bot_system_message = bot.send_message(msg.chat.id, group_msg).await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(30),
+        )
+        .await;
+
+        show_plan_selection(
+            bot,
+            ChatId(user_id as i64),
+            &target_chat_username,
+            &target_chat_title,
+        )
+        .await
+    }
+}
+
+pub async fn handle_status_command(
+    bot: Bot,
+    msg: Message,
+    app_state: Arc<BotAppState>,
+) -> Result<()> {
+    let chat_id = msg.chat.id.0;
+
+    if msg.chat.is_private() {
+        bot.send_message(msg.chat.id, "❌ Эта команда работает только в группах")
+            .await?;
+        return Ok(());
+    }
+
+    let chat_username = match msg.chat.username() {
+        Some(username) => username,
+        None => {
+            bot.send_message(
+                msg.chat.id,
+                "❌ Чат должен иметь username для проверки статуса подписки",
+            )
+            .await?;
+            return Ok(());
+        }
+    };
+
+    let chat_title = get_chat_title(&msg);
+
+    if let Some(db_pool) = &app_state.db_pool {
+        match get_subscription_info(db_pool, chat_id).await {
+            Ok(Some(subscription)) => {
+                let end_date = DateTime::parse_from_rfc3339(&subscription.end_date)
+                    .unwrap_or_else(|_| Utc::now().into())
+                    .with_timezone(&chrono::FixedOffset::east_opt(3 * 3600).unwrap())
+                    .format("%d.%m.%Y %H:%M UTC+3");
+
+                let start_date = DateTime::parse_from_rfc3339(&subscription.start_date)
+                    .unwrap_or_else(|_| Utc::now().into())
+                    .with_timezone(&chrono::FixedOffset::east_opt(3 * 3600).unwrap())
+                    .format("%d.%m.%Y %H:%M UTC+3");
+
+                let plan_name = match subscription.plan_type.as_str() {
+                    "monthly" => "Месячная подписка",
+                    "yearly" => "Годовая подписка",
+                    _ => "Неизвестный план",
+                };
+
+                let now = Utc::now();
+                let end_date_utc = DateTime::parse_from_rfc3339(&subscription.end_date)
+                    .unwrap_or_else(|_| now.into())
+                    .with_timezone(&Utc);
+
+                let is_active = end_date_utc > now;
+                let status_emoji = if is_active { "✅" } else { "❌" };
+                let status_text = if is_active {
+                    "Активна"
+                } else {
+                    "Истекла"
+                };
+
+                let days_left = if is_active {
+                    let duration = end_date_utc.signed_duration_since(now);
+                    duration.num_days()
+                } else {
+                    0
+                };
+
+                let days_info = if is_active && days_left > 0 {
+                    format!("\n🗓️ **Осталось дней:** {}", days_left)
+                } else if is_active {
+                    "\n🗓️ **Истекает сегодня**".to_string()
+                } else {
+                    "".to_string()
+                };
+
+                let status_msg = format!(
+                    "{} Статус подписки\n\n\
+                    🏠 Чат: {} (@{})\n\
+                    📊 Статус: {}\n\
+                    📋 Тарифный план: {}\n\
+                    📅 Начало: {}\n\
+                    ⏰ Окончание: {}{}\n\
+                    🛡️ Защита от спама: {}",
+                    status_emoji,
+                    chat_title,
+                    chat_username,
+                    status_text,
+                    plan_name,
+                    start_date,
+                    end_date,
+                    days_info,
+                    if is_active {
+                        "Включена"
+                    } else {
+                        "Отключена"
+                    }
+                );
+
+                let bot_system_message = bot.send_message(msg.chat.id, status_msg).await?;
+
+                auto_delete_message(
+                    bot.clone(),
+                    bot_system_message.chat.id,
+                    bot_system_message.id,
+                    Duration::from_secs(120),
+                )
+                .await;
+            }
+            Ok(None) => {
+                let no_subscription_msg = format!(
+                    "❌ Подписка не найдена\n\n\
+                    🏠 Чат: @{}\n\
+                    📊 Статус: Не активна\n\n\
+                    💡 Для активации подписки используйте: /subscription",
+                    chat_username
+                );
+
+                let bot_system_message = bot.send_message(msg.chat.id, no_subscription_msg).await?;
+                auto_delete_message(
+                    bot.clone(),
+                    bot_system_message.chat.id,
+                    bot_system_message.id,
+                    Duration::from_secs(120),
+                )
+                .await;
+            }
+            Err(e) => {
+                error!(
+                    "Error checking subscription status for chat {}: {}",
+                    chat_id, e
+                );
+                let bot_system_message = bot
+                    .send_message(msg.chat.id, "❌ Ошибка при проверке статуса подписки")
+                    .await?;
+                auto_delete_message(
+                    bot.clone(),
+                    bot_system_message.chat.id,
+                    bot_system_message.id,
+                    Duration::from_secs(120),
+                )
+                .await;
+            }
+        }
+    } else {
+        let bot_system_message = bot
+            .send_message(msg.chat.id, "❌ База данных недоступна")
+            .await?;
+
+        auto_delete_message(
+            bot.clone(),
+            bot_system_message.chat.id,
+            bot_system_message.id,
+            Duration::from_secs(120),
+        )
+        .await;
+    }
 
     Ok(())
 }

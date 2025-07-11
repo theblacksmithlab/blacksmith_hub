@@ -108,6 +108,69 @@ impl HeleketClient {
         format!("{:x}", result)
     }
 
+    pub async fn check_invoice_status(&self, invoice_uuid: &str) -> Result<InvoiceResult> {
+        let request = serde_json::json!({
+            "uuid": invoice_uuid
+        });
+
+        let body = serde_json::to_string(&request)?;
+        let signature = self.generate_signature(&body);
+
+        let response = self
+            .client
+            .post(&format!("{}/v1/payment/info", self.config.base_url))
+            .header("Content-Type", "application/json")
+            .header("merchant", &self.config.merchant_id)
+            .header("sign", &signature)
+            .body(body.clone())
+            .send()
+            .await?;
+
+        let response_text = response.text().await?;
+        let json_data: serde_json::Value = serde_json::from_str(&response_text)?;
+
+        let state = json_data["state"].as_i64().unwrap_or(-1);
+        if state != 0 {
+            let errors = json_data["errors"].to_string();
+            return Err(anyhow!(
+                "Heleket API error: state = {}, errors = {}",
+                state,
+                errors
+            ));
+        }
+
+        let result = json_data["result"]
+            .as_object()
+            .ok_or_else(|| anyhow!("No result in response"))?;
+
+        Ok(InvoiceResult {
+            uuid: result["uuid"].as_str().unwrap_or("").to_string(),
+            order_id: result["order_id"].as_str().unwrap_or("").to_string(),
+            amount: result["amount"].as_str().unwrap_or("0").to_string(),
+            url: result["url"].as_str().unwrap_or("").to_string(),
+            payment_amount: result["payment_amount"].as_str().map(|s| s.to_string()),
+            payer_amount: result["payer_amount"].as_str().map(|s| s.to_string()),
+            discount_percent: result["discount_percent"].as_str().map(|s| s.to_string()),
+            discount: result["discount"].as_str().map(|s| s.to_string()),
+            payer_currency: result["payer_currency"].as_str().map(|s| s.to_string()),
+            currency: result["currency"].as_str().unwrap_or("USD").to_string(),
+            merchant_amount: result["merchant_amount"].as_str().map(|s| s.to_string()),
+            network: result["network"].as_str().map(|s| s.to_string()),
+            address: result["address"].as_str().map(|s| s.to_string()),
+            from: result["from"].as_str().map(|s| s.to_string()),
+            txid: result["txid"].as_str().map(|s| s.to_string()),
+            payment_status: result["payment_status"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string(),
+            expired_at: result["expired_at"].as_i64().unwrap_or(0),
+            is_final: result["is_final"].as_bool().unwrap_or(false),
+            additional_data: result["additional_data"].as_str().map(|s| s.to_string()),
+            created_at: result["created_at"].as_str().unwrap_or("").to_string(),
+            updated_at: result["updated_at"].as_str().unwrap_or("").to_string(),
+        })
+    }
+
     pub async fn create_invoice(&self, amount_usd: f64, user_id: &str) -> Result<InvoiceResult> {
         let order_id = format!("topup_{}_{}", user_id, Uuid::new_v4());
 

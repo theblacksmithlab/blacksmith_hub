@@ -153,11 +153,7 @@ pub async fn start_dubbing_pipeline(
 
     match state
         .dubbing_pipeline_service
-        .start_pipeline(
-            request.clone(),
-            state.clone(),
-            user_id.clone(),
-        )
+        .start_pipeline(request.clone(), state.clone(), user_id.clone())
         .await
     {
         Ok(response) => {

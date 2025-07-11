@@ -2,7 +2,7 @@ use crate::grammers::grammers_functionality::{
     initialize_grammers_client, load_grammers_session_data_from_file,
 };
 use crate::models::common::app_name::AppName;
-use crate::utils::tg_bot::groot_bot::{
+use crate::utils::tg_bot::groot_bot::groot_bot_utils::{
     add_chat_to_file, build_resource_file_path, load_chats_objects_from_file,
 };
 use anyhow::{Context, Result};
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use teloxide::macros::BotCommands;
-use teloxide::prelude::Message;
+use teloxide::types::ChatId;
 use tracing::{error, info, warn};
 
 pub struct ResourcesDialogState {
@@ -136,7 +136,6 @@ impl ChatMessageStats {
 
     pub async fn fetch_chat_history_for_all_chats(&mut self, app_name: &AppName) -> Result<()> {
         info!("Fetching chats history at bot's start...");
-        // TODO: Implement non-hard-coded session file name determination
         let session_data = load_grammers_session_data_from_file(app_name, "current.session")?;
         let g_client = initialize_grammers_client(session_data).await?;
 
@@ -181,11 +180,10 @@ impl ChatMessageStats {
     pub async fn fetch_chat_history_for_new_chat(
         &mut self,
         app_name: &AppName,
-        msg: Message,
+        chat_id: ChatId,
         chat_username: &str,
     ) -> Result<()> {
         info!("Fetching chat history for a new chat...");
-        // TODO: Implement non-hard-coded session file name determination
         let session_data = load_grammers_session_data_from_file(app_name, "current.session")?;
         let g_client = initialize_grammers_client(session_data).await?;
 
@@ -196,7 +194,7 @@ impl ChatMessageStats {
         }
 
         let chat_object = ChatObject {
-            chat_id: msg.chat.id.0,
+            chat_id: chat_id.0,
             username: chat_username.to_string(),
         };
 
@@ -293,9 +291,9 @@ pub enum GrootBotCommands {
     About,
     Resources,
     Manual,
-    Logs,
-    Ask,
-    Backup,
     Results,
     Groot,
+    Subscription,
+    Status,
+    ForceSubscription,
 }

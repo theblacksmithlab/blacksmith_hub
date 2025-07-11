@@ -4,37 +4,32 @@ use crate::groot_bot::chat_moderation_utils::{
     save_message_counts_to_file, scam_emojis_check, scam_stories_check, update_user_message_count,
     via_bot_message_check,
 };
-use crate::groot_bot::groot_bot_utils::{
-    load_black_listed_users, load_paid_chats, load_white_listed_users,
-};
 use crate::groot_bot::resources_cmd_handler::resources_cmd_handler;
 use anyhow::Result;
+use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::state::tg_bot::app_state::BotAppState;
+use core::utils::common::get_message;
+use core::utils::tg_bot::groot_bot::groot_bot_utils::{
+    get_chat_title, get_chat_username, get_username, is_message_from_linked_channel,
+    load_black_listed_users, load_white_listed_users,
+};
 use std::sync::Arc;
 use teloxide::prelude::Message;
 use teloxide::Bot;
-use tracing::info;
+use teloxide_core::prelude::{Request, Requester};
+use tracing::{error, info};
 
-pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>) -> Result<()> {
+pub async fn chat_moderation(
+    bot: Bot,
+    msg: Message,
+    app_state: Arc<BotAppState>,
+    is_paid_chat: bool,
+) -> Result<()> {
     let user_id = msg.clone().from.unwrap().id.0;
-    let username = msg
-        .from
-        .as_ref()
-        .map(|user| {
-            if let Some(username) = &user.username {
-                username.to_string()
-            } else {
-                let first_name = &user.first_name;
-                let last_name = user.last_name.as_deref().unwrap_or("");
-
-                if !first_name.is_empty() || !last_name.is_empty() {
-                    format!("{} {}", first_name, last_name).trim().to_string()
-                } else {
-                    "Anonymous User".to_string()
-                }
-            }
-        })
-        .unwrap_or_else(|| "Anonymous User".to_string());
+    let username = get_username(&msg);
+    let chat_title = get_chat_title(&msg);
+    // let chat_username = get_chat_username(&msg);
+    // let chat_id = msg.chat.id;
 
     if let Some(dialog_states_mutex) = &app_state.dialog_states {
         let mut dialog_states = dialog_states_mutex.lock().await;
@@ -55,16 +50,55 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
                 )
                 .await;
             }
-            // if state.awaiting_ask_message {
-            //     return handle_ask(bot, msg, state, app_state.clone()).await;
-            // }
         }
     }
 
+    if msg.chat.is_private() {
+        info!("Got private chat message - skipping moderation");
+
+        let bot_msg = get_message(AppsSystemMessages::GrootBot(
+            GrootBotMessages::NoNeedForCheckInPrivateChat,
+        ))
+        .await?;
+
+        bot.send_message(msg.chat.id, bot_msg).await?;
+        return Ok(());
+    }
+
+    let mut is_admin = false;
+    let mut is_from_linked_channel = false;
+
+    match bot.get_chat_administrators(msg.chat.id).send().await {
+        Ok(admins) => {
+            is_admin = msg
+                .from
+                .as_ref()
+                .map(|user| admins.iter().any(|admin| admin.user.id == user.id))
+                .unwrap_or(false);
+        }
+        Err(err) => {
+            error!("Error getting admins list from public chat: {:?}", err);
+        }
+    }
+
+    if let Ok(true) = is_message_from_linked_channel(&bot, &msg).await {
+        is_from_linked_channel = true;
+        info!("Message from linked channel detected");
+    }
+
+    if is_admin {
+        info!("Message from chat admin - skipping moderation");
+        return Ok(());
+    }
+
+    if is_from_linked_channel {
+        info!("Message from linked channel - skipping moderation");
+        return Ok(());
+    }
+
     let app_name = &app_state.app_name;
-    let chat_title = msg.chat.title().unwrap_or_else(|| "Unknown Chat");
-    let _paid_chats = load_paid_chats(app_name);
-    let is_paid_chat = true; //paid_chats.contains(&msg.chat.id.0);
+    // let _paid_chats = load_paid_chats(app_name);
+    // paid_chats.contains(&msg.chat.id.0);
     let white_listed_users = load_white_listed_users(app_name);
     let black_listed_users = load_black_listed_users(app_name);
     let message_to_check = if let Some(text) = msg.text() {
@@ -91,7 +125,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         msg.clone(),
         white_listed_users,
         black_listed_users,
-        chat_title,
+        &chat_title,
         is_paid_chat,
         app_name,
         &username,
@@ -107,19 +141,17 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         msg.chat.id.0,
         user_id,
         &username,
-        chat_title,
+        &chat_title,
     )
     .await
     {
-        // update_user_message_count(app_state.clone(), chat_title, msg.chat.id.0, user_id, &username).await;
-        // save_message_counts_to_file(app_state.clone()).await;
         return Ok(());
     }
 
     if via_bot_message_check(
         bot.clone(),
         msg.clone(),
-        chat_title,
+        &chat_title,
         is_paid_chat,
         app_name,
         &username,
@@ -134,7 +166,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
     if scam_stories_check(
         bot.clone(),
         msg.clone(),
-        chat_title,
+        &chat_title,
         is_paid_chat,
         app_name,
         &username,
@@ -146,7 +178,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         return Ok(());
     };
 
-    // anonymous_user_treatment(bot.clone(), msg.clone(), is_paid_chat, app_name, chat_title, &username, user_id).await?;
+    // anonymous_user_treatment(bot.clone(), msg.clone(), is_paid_chat, app_name, &chat_title, &username, user_id).await?;
 
     if scam_emojis_check(
         bot.clone(),
@@ -154,7 +186,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         &message_to_check,
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
     )
@@ -170,7 +202,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         &message_to_check,
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
     )
@@ -185,7 +217,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         msg.clone(),
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
     )
@@ -200,7 +232,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         msg.clone(),
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
     )
@@ -216,7 +248,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         &message_to_check,
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
     )
@@ -230,7 +262,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         bot.clone(),
         msg.clone(),
         is_paid_chat,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
         app_name,
@@ -247,7 +279,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
         &message_to_check,
         is_paid_chat,
         app_name,
-        chat_title,
+        &chat_title,
         &username,
         user_id,
         app_state.clone(),
@@ -265,7 +297,7 @@ pub async fn chat_moderation(bot: Bot, msg: Message, app_state: Arc<BotAppState>
 
     update_user_message_count(
         app_state.clone(),
-        chat_title,
+        &chat_title,
         msg.chat.id.0,
         user_id,
         &username,

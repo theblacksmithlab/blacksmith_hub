@@ -1,8 +1,3 @@
-use crate::groot_bot::groot_bot_utils::{
-    auto_delete_message, count_emojis, load_black_listed_users, load_scam_domains,
-    load_white_listed_users, paid_chat_spam_warning, parsing_restricted_words,
-    unpaid_chat_spam_warning,
-};
 use anyhow::Result;
 use core::ai::common::common::raw_llm_processing_json;
 use core::models::common::ai::LlmModel;
@@ -12,6 +7,11 @@ use core::models::common::system_roles::GrootRoleType;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::common::get_system_role_or_fallback;
+use core::utils::tg_bot::groot_bot::groot_bot_utils::{
+    auto_delete_message, count_emojis, load_black_listed_users, load_scam_domains,
+    load_white_listed_users, paid_chat_spam_warning, parsing_restricted_words,
+    unpaid_chat_spam_warning,
+};
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -587,9 +587,13 @@ pub async fn ai_check(
     let system_role =
         get_system_role_or_fallback(&AppName::GrootBot, GrootRoleType::MessageCheck, None);
 
-    let scam_detection_result =
-        raw_llm_processing_json(&system_role, message_to_check, app_state, LlmModel::Complex)
-            .await?;
+    let scam_detection_result = raw_llm_processing_json(
+        &system_role,
+        message_to_check,
+        app_state,
+        LlmModel::Complex2,
+    )
+    .await?;
 
     let is_scam: bool = match serde_json::from_str::<serde_json::Value>(&scam_detection_result) {
         Ok(json) => match json.get("is_scam") {
