@@ -31,7 +31,8 @@ impl GrootBotAlias {
                 return Ok(true);
             }
         }
-
+        info!("Packed chat: {}", packed_chat);
+        info!("Chat: {:?}", chat);
         info!("Bot {} not found in chat {}", self.bot_id, chat.id());
         Ok(false)
     }

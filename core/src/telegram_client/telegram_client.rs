@@ -176,9 +176,9 @@ impl TelegramAgent {
 
         match self.analyze_message(&text).await {
             Ok(AnalysisResult::Spam) => {
-                self.save_spam_message(&message, &chat, db_pool).await?;
                 self.update_chat_stats(&chat, db_pool, true, &groot_bot_alias)
                     .await?;
+                self.save_spam_message(&message, &chat, db_pool).await?;
             }
             Ok(AnalysisResult::Clear) => {
                 self.update_chat_stats(&chat, db_pool, false, &groot_bot_alias)
