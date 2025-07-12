@@ -1,12 +1,14 @@
 use anyhow::Result;
-use core::local_db::tg_bot::tg_bot_local_db::setup_localdb_pool;
+use async_openai::Client as LLM_Client;
 use core::models::common::app_name::AppName;
 use core::models::tg_agent::bot_alias::GrootBotAlias;
+use core::state::tg_agent::app_state::AgentAppState;
 use core::telegram_client::telegram_client::TelegramAgent;
 use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
 use dotenv::dotenv;
 use rustls::crypto::{aws_lc_rs, CryptoProvider};
 use std::env;
+use std::sync::Arc;
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
@@ -42,9 +44,10 @@ async fn main() -> Result<()> {
         error!("Failed to create app tmp directory: {}", e);
     }
 
-    let db_pool = setup_localdb_pool(&app_name).await?;
+    let llm_client = LLM_Client::new();
 
-    //TODO: Place *.session file to the ./common_res/agent_davon/ folder
+    let app_state = Arc::new(AgentAppState::new(llm_client, app_name.clone()).await?);
+
     let telegram_agent = TelegramAgent::new(&app_name, "current.session").await?;
 
     let groot_bot_alias = GrootBotAlias::new(
@@ -55,7 +58,7 @@ async fn main() -> Result<()> {
     info!("Starting | {} | Telegram agent...", app_name_str);
 
     telegram_agent
-        .start_monitoring(groot_bot_alias, db_pool)
+        .start_monitoring(groot_bot_alias, app_state.clone())
         .await?;
 
     Ok(())

@@ -1,6 +1,10 @@
+use crate::ai::common::common::raw_llm_processing_json;
+use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
+use crate::models::common::system_roles::GrootRoleType;
 use crate::models::tg_agent::bot_alias::GrootBotAlias;
-use crate::utils::common::build_resource_file_path;
+use crate::state::tg_agent::app_state::AgentAppState;
+use crate::utils::common::{build_resource_file_path, get_system_role_or_fallback};
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use grammers_client::types::{Chat, Message, Update, User};
@@ -9,6 +13,7 @@ use grammers_session::Session;
 use sqlx::{Row, SqlitePool};
 use std::io::Write;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 use std::{env, fs};
 use tracing::log::warn;
@@ -82,7 +87,7 @@ impl TelegramAgent {
     pub async fn start_monitoring(
         &self,
         groot_bot_alias: GrootBotAlias,
-        db_pool: SqlitePool,
+        app_state: Arc<AgentAppState>,
     ) -> Result<()> {
         info!("Agent Davon is starting monitoring updates...");
 
@@ -106,7 +111,7 @@ impl TelegramAgent {
             match self.client.next_update().await {
                 Ok(update) => {
                     if let Err(e) = self
-                        .process_update(update, &groot_bot_alias, &db_pool, &me)
+                        .process_update(update, &groot_bot_alias, app_state.clone(), &me)
                         .await
                     {
                         error!("Error processing update: {}", e);
@@ -124,12 +129,12 @@ impl TelegramAgent {
         &self,
         update: Update,
         groot_bot_alias: &GrootBotAlias,
-        db_pool: &SqlitePool,
+        app_state: Arc<AgentAppState>,
         me: &User,
     ) -> Result<()> {
         match update {
             Update::NewMessage(message) => {
-                self.handle_new_message(message, groot_bot_alias, db_pool, me)
+                self.handle_new_message(message, groot_bot_alias, app_state, me)
                     .await?;
             }
             _ => {
@@ -143,7 +148,7 @@ impl TelegramAgent {
         &self,
         message: Message,
         groot_bot_alias: &GrootBotAlias,
-        db_pool: &SqlitePool,
+        app_state: Arc<AgentAppState>,
         me: &User,
     ) -> Result<()> {
         if let Some(sender) = message.sender() {
@@ -174,19 +179,20 @@ impl TelegramAgent {
             return Ok(());
         }
 
-        match self.analyze_message(&text).await {
+        match self.analyze_message(&text, app_state.clone()).await {
             Ok(AnalysisResult::Spam) => {
-                self.update_chat_stats(&chat, db_pool, true, &groot_bot_alias)
+                self.update_chat_stats(&chat, &app_state.db_pool, true, &groot_bot_alias)
                     .await?;
-                self.save_spam_message(&message, &chat, db_pool).await?;
+                self.save_spam_message(&message, &chat, &app_state.db_pool)
+                    .await?;
             }
             Ok(AnalysisResult::Clear) => {
-                self.update_chat_stats(&chat, db_pool, false, &groot_bot_alias)
+                self.update_chat_stats(&chat, &app_state.db_pool, false, &groot_bot_alias)
                     .await?;
             }
             Err(e) => {
                 warn!("Failed to analyze message: {}", e);
-                self.update_chat_stats(&chat, db_pool, false, &groot_bot_alias)
+                self.update_chat_stats(&chat, &app_state.db_pool, false, &groot_bot_alias)
                     .await?;
             }
         }
@@ -194,10 +200,46 @@ impl TelegramAgent {
         Ok(())
     }
 
-    async fn analyze_message(&self, text: &str) -> Result<AnalysisResult> {
-        if text.contains("PUMP") || text.contains("🚀") {
-            Ok(AnalysisResult::Spam)
-        } else if text.contains("Send 0.1 ETH") || text.contains("giveaway") {
+    async fn analyze_message(
+        &self,
+        text: &str,
+        app_state: Arc<AgentAppState>,
+    ) -> Result<AnalysisResult> {
+        let system_role =
+            get_system_role_or_fallback(&AppName::GrootBot, GrootRoleType::MessageCheck, None);
+
+        let scam_detection_result =
+            raw_llm_processing_json(&system_role, text, app_state, LlmModel::Complex2).await?;
+
+        let is_scam: bool = match serde_json::from_str::<serde_json::Value>(&scam_detection_result)
+        {
+            Ok(json) => match json.get("is_scam") {
+                Some(value) => match value.as_bool() {
+                    Some(is_scam) => is_scam,
+                    None => {
+                        error!("'is_scam' value is not a boolean: {}", value);
+                        false
+                    }
+                },
+                None => {
+                    error!("No 'is_scam' field in response: {}", json);
+                    false
+                }
+            },
+            Err(err) => {
+                error!(
+                    "Failed to parse JSON response: '{}'. Error: {}",
+                    scam_detection_result, err
+                );
+                false
+            }
+        };
+
+        if is_scam {
+            info!(
+                "🚨 Spam detected in message: {}",
+                text.chars().take(50).collect::<String>()
+            );
             Ok(AnalysisResult::Spam)
         } else {
             Ok(AnalysisResult::Clear)
@@ -223,7 +265,7 @@ impl TelegramAgent {
             .bind(sender.id())
             .bind(username)
             .bind(message.text())
-            .bind(Utc::now().to_rfc3339())
+            .bind(Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string())
             .execute(db_pool)
             .await?;
 
@@ -266,7 +308,8 @@ impl TelegramAgent {
                                 } else {
                                     let spam_count = if is_spam { 1 } else { 0 };
                                     let total_count = 1;
-                                    let first_time = Utc::now().to_rfc3339();
+                                    let first_time =
+                                        Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
                                     (spam_count, total_count, Some(first_time), true)
                                 }
                             } else {
@@ -342,8 +385,8 @@ impl TelegramAgent {
         let first_time = DateTime::parse_from_rfc3339(first_time_str)?;
         let elapsed = Utc::now() - first_time.with_timezone(&Utc);
 
-        if elapsed.num_minutes() >= 15 {
-            // if elapsed.num_days() >= 3 {
+        if elapsed.num_hours() >= 3 {
+            // if elapsed.num_days() >= 1 {
             if spam_count >= 1 {
                 info!(
                     "Sending report for chat {}: {} spam messages in {} days",
@@ -382,7 +425,17 @@ impl TelegramAgent {
             .fetch_all(db_pool)
             .await?;
 
-        let csv_filename = format!("{}_report.csv", chat_id);
+        let chat_data =
+            sqlx::query("SELECT chat_title, chat_username FROM chat_monitoring WHERE chat_id = ?")
+                .bind(chat_id)
+                .fetch_one(db_pool)
+                .await?;
+
+        let chat_title: String = chat_data.get("chat_title");
+        let chat_username: Option<String> = chat_data.get("chat_username");
+
+        let bot_api_chat_id = -(1000000000000 + chat_id);
+        let csv_filename = format!("{} [{}] report.csv", chat_title, bot_api_chat_id);
         let csv_path = format!("common_res/agent_davon/reports/{}", csv_filename);
 
         if let Some(parent) = Path::new(&csv_path).parent() {
@@ -390,7 +443,11 @@ impl TelegramAgent {
                 match fs::create_dir_all(parent) {
                     Ok(_) => info!("Created directory: {}", parent.display()),
                     Err(e) => {
-                        error!("Failed to create directory {}: {}. Skipping report.", parent.display(), e);
+                        error!(
+                            "Failed to create directory {}: {}. Skipping report.",
+                            parent.display(),
+                            e
+                        );
                         return Ok(());
                     }
                 }
@@ -403,7 +460,10 @@ impl TelegramAgent {
                 file
             }
             Err(e) => {
-                error!("Failed to create CSV file {}: {}. Skipping report.", csv_path, e);
+                error!(
+                    "Failed to create CSV file {}: {}. Skipping report.",
+                    csv_path, e
+                );
                 return Ok(());
             }
         };
@@ -415,7 +475,14 @@ impl TelegramAgent {
 
         let mut wtr = csv::WriterBuilder::new().from_writer(file);
 
-        if let Err(e) = wtr.write_record(&["user_id", "username", "message_text", "detected_at"]) {
+        if let Err(e) = wtr.write_record(&[
+            "chat_title",
+            "chat_username",
+            "user_id",
+            "username",
+            "message_text",
+            "detected_at",
+        ]) {
             error!("Failed to write CSV headers: {}. Skipping report.", e);
             return Ok(());
         }
@@ -427,12 +494,19 @@ impl TelegramAgent {
             let detected_at: String = row.get("detected_at");
 
             if let Err(e) = wtr.write_record(&[
-                user_id.to_string(),
-                username.unwrap_or_else(|| "Unknown".to_string()),
-                message_text,
-                detected_at,
+                &chat_title,
+                &chat_username
+                    .clone()
+                    .unwrap_or_else(|| "Unknown".to_string()),
+                &user_id.to_string(),
+                &username.unwrap_or_else(|| "Unknown".to_string()),
+                &message_text,
+                &detected_at,
             ]) {
-                error!("Failed to write CSV record: {}. Continuing with next record.", e);
+                error!(
+                    "Failed to write CSV record: {}. Continuing with next record.",
+                    e
+                );
                 continue;
             }
         }
@@ -443,22 +517,31 @@ impl TelegramAgent {
 
         info!("CSV report created: {}", csv_path);
 
-        let bot_api_chat_id = -(1000000000000 + chat_id);
         let command = format!("/agent_report {}", bot_api_chat_id);
         match groot_bot_alias.send_message_to_bot(self, &command).await {
-            Ok(_) => info!("Report command sent to bot for chat {} (Bot API: {})", chat_id, bot_api_chat_id),
+            Ok(_) => info!(
+                "Report command sent to bot for chat {} (Bot API: {})",
+                chat_id, bot_api_chat_id
+            ),
             Err(e) => error!("Failed to send report command to bot: {}", e),
         }
 
         info!("Report command sent to bot for chat {}", chat_id);
 
-        sqlx::query(
+        match sqlx::query(
             "UPDATE chat_monitoring SET status = 'silence', last_report_sent = ? WHERE chat_id = ?",
         )
-        .bind(Utc::now().to_rfc3339())
+        .bind(Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string())
         .bind(chat_id)
         .execute(db_pool)
-        .await?;
+        .await
+        {
+            Ok(_) => info!(
+                "Updated chat {} status to 'silence' - monitoring suspended",
+                chat_id
+            ),
+            Err(e) => error!("Database update failed for chat {}: {}", chat_id, e),
+        }
 
         Ok(())
     }

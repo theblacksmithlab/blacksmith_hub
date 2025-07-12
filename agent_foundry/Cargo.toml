@@ -10,5 +10,6 @@ dotenv.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 rustls.workspace = true
+async-openai.workspace = true
 
 core = { path = "../core" }
