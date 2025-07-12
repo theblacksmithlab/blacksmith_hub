@@ -1,4 +1,5 @@
 use crate::models::common::app_name::AppName;
+use crate::telegram_client::telegram_client::TelegramAgent;
 use crate::utils::tg_bot::groot_bot::groot_bot_utils::{
     add_chat_to_file, build_resource_file_path, load_chats_objects_from_file,
 };
@@ -9,7 +10,6 @@ use std::fs;
 use teloxide::macros::BotCommands;
 use teloxide::types::ChatId;
 use tracing::{error, info, warn};
-use crate::telegram_client::telegram_client::TelegramAgent;
 
 pub struct ResourcesDialogState {
     pub awaiting_option_choice: bool,
@@ -109,8 +109,15 @@ impl ChatMessageStats {
     ) -> Result<Vec<MessageIterationObject>> {
         let mut collected_messages = Vec::new();
 
-        if let Some(chat_username) = telegram_agent.client.resolve_username(&chat_object.username).await? {
-            let mut msgs = telegram_agent.client.iter_messages(chat_username).limit(5000);
+        if let Some(chat_username) = telegram_agent
+            .client
+            .resolve_username(&chat_object.username)
+            .await?
+        {
+            let mut msgs = telegram_agent
+                .client
+                .iter_messages(chat_username)
+                .limit(5000);
 
             while let Some(msg) = msgs.next().await? {
                 if let Some(sender) = msg.sender() {
@@ -133,7 +140,7 @@ impl ChatMessageStats {
 
     pub async fn fetch_chat_history_for_all_chats(&mut self, app_name: &AppName) -> Result<()> {
         info!("Fetching chats history at bot's start...");
-        let g_client= match TelegramAgent::new(&app_name, "current.session").await {
+        let g_client = match TelegramAgent::new(&app_name, "current.session").await {
             Ok(agent) => agent,
             Err(e) => {
                 error!("Failed to initialize TelegramAgent: {}", e);
@@ -180,7 +187,7 @@ impl ChatMessageStats {
         chat_username: &str,
     ) -> Result<()> {
         info!("Fetching chat history for a new chat...");
-        let telegram_agent= match TelegramAgent::new(&app_name, "current.session").await {
+        let telegram_agent = match TelegramAgent::new(&app_name, "current.session").await {
             Ok(agent) => agent,
             Err(e) => {
                 error!("Failed to initialize TelegramAgent: {}", e);

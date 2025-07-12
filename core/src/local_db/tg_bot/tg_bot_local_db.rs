@@ -51,10 +51,7 @@ pub async fn setup_localdb_pool(app_name: &AppName) -> anyhow::Result<SqlitePool
     Ok(pool)
 }
 
-async fn create_localdb_tables(
-    pool: &SqlitePool,
-    app_name: &AppName,
-) -> Result<(), sqlx::Error> {
+async fn create_localdb_tables(pool: &SqlitePool, app_name: &AppName) -> Result<(), sqlx::Error> {
     match app_name {
         AppName::GrootBot => {
             let query = "

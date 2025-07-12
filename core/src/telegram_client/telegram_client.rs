@@ -1,18 +1,18 @@
-use grammers_client::{Client as g_Client, Config as g_Config};
-use grammers_session::Session;
-use anyhow::Result;
-use std::{env, fs};
-use std::io::Write;
-use std::path::Path;
-use std::time::Duration;
-use chrono::{DateTime, Utc};
-use sqlx::{Row, SqlitePool};
-use tracing::{error, info};
 use crate::models::common::app_name::AppName;
 use crate::models::tg_agent::bot_alias::GrootBotAlias;
 use crate::utils::common::build_resource_file_path;
+use anyhow::Result;
+use chrono::{DateTime, Utc};
 use grammers_client::types::{Chat, Message, Update, User};
+use grammers_client::{Client as g_Client, Config as g_Config};
+use grammers_session::Session;
+use sqlx::{Row, SqlitePool};
+use std::io::Write;
+use std::path::Path;
+use std::time::Duration;
+use std::{env, fs};
 use tracing::log::warn;
+use tracing::{error, info};
 
 enum AnalysisResult {
     Spam,
@@ -48,12 +48,13 @@ impl TelegramAgent {
             ));
         }
 
-        fs::read(&session_path)
-            .map_err(|e| anyhow::anyhow!(
+        fs::read(&session_path).map_err(|e| {
+            anyhow::anyhow!(
                 "Failed to read session file {}: {}",
                 session_path.display(),
                 e
-            ))
+            )
+        })
     }
 
     async fn initialize_client(session_data: Vec<u8>) -> Result<g_Client> {
@@ -72,8 +73,8 @@ impl TelegramAgent {
             api_hash,
             params: Default::default(),
         })
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to connect Grammers client: {}", e))?;
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to connect Grammers client: {}", e))?;
 
         Ok(client)
     }
@@ -81,7 +82,7 @@ impl TelegramAgent {
     pub async fn start_monitoring(
         &self,
         groot_bot_alias: GrootBotAlias,
-        db_pool: SqlitePool
+        db_pool: SqlitePool,
     ) -> Result<()> {
         info!("Agent Davon is starting monitoring updates...");
 
@@ -89,7 +90,12 @@ impl TelegramAgent {
 
         match me.last_name().is_some() {
             true => {
-                info!("Monitoring as: {} {:?} ({})", me.first_name(), me.last_name() , me.id());
+                info!(
+                    "Monitoring as: {} {:?} ({})",
+                    me.first_name(),
+                    me.last_name(),
+                    me.id()
+                );
             }
             false => {
                 info!("Monitoring as: {} ({})", me.first_name(), me.id());
@@ -99,7 +105,10 @@ impl TelegramAgent {
         loop {
             match self.client.next_update().await {
                 Ok(update) => {
-                    if let Err(e) = self.process_update(update, &groot_bot_alias, &db_pool, &me).await {
+                    if let Err(e) = self
+                        .process_update(update, &groot_bot_alias, &db_pool, &me)
+                        .await
+                    {
                         error!("Error processing update: {}", e);
                     }
                 }
@@ -120,7 +129,8 @@ impl TelegramAgent {
     ) -> Result<()> {
         match update {
             Update::NewMessage(message) => {
-                self.handle_new_message(message, groot_bot_alias, db_pool, me).await?;
+                self.handle_new_message(message, groot_bot_alias, db_pool, me)
+                    .await?;
             }
             _ => {
                 info!("Agent Davon got non-text update... ignore");
@@ -140,9 +150,13 @@ impl TelegramAgent {
             if sender.id() == me.id() {
                 return Ok(());
             }
-            
+
             if sender.id() == groot_bot_alias.bot_id {
-                info!("Got message from bot: {}: {}", groot_bot_alias.bot_username, message.text());
+                info!(
+                    "Got message from bot: {}: {}",
+                    groot_bot_alias.bot_username,
+                    message.text()
+                );
                 return Ok(());
             }
         } else {
@@ -163,14 +177,17 @@ impl TelegramAgent {
         match self.analyze_message(&text).await {
             Ok(AnalysisResult::Spam) => {
                 self.save_spam_message(&message, &chat, db_pool).await?;
-                self.update_chat_stats(&chat, db_pool, true, &groot_bot_alias).await?;
+                self.update_chat_stats(&chat, db_pool, true, &groot_bot_alias)
+                    .await?;
             }
             Ok(AnalysisResult::Clear) => {
-                self.update_chat_stats(&chat, db_pool, false, &groot_bot_alias).await?;
+                self.update_chat_stats(&chat, db_pool, false, &groot_bot_alias)
+                    .await?;
             }
             Err(e) => {
                 warn!("Failed to analyze message: {}", e);
-                self.update_chat_stats(&chat, db_pool, false, &groot_bot_alias).await?;
+                self.update_chat_stats(&chat, db_pool, false, &groot_bot_alias)
+                    .await?;
             }
         }
 
@@ -214,11 +231,17 @@ impl TelegramAgent {
         Ok(())
     }
 
-    async fn update_chat_stats(&self, chat: &Chat, db_pool: &SqlitePool, is_spam: bool, groot_bot_alias: &GrootBotAlias) -> Result<()> {
+    async fn update_chat_stats(
+        &self,
+        chat: &Chat,
+        db_pool: &SqlitePool,
+        is_spam: bool,
+        groot_bot_alias: &GrootBotAlias,
+    ) -> Result<()> {
         let chat_id = chat.id();
         let chat_title = chat.name().to_string();
         let chat_username = chat.username().map(|u| u.to_string());
-        
+
         let existing = sqlx::query("SELECT spam_count, total_messages, first_message_time, status, last_report_sent FROM chat_monitoring WHERE chat_id = ?")
             .bind(chat_id)
             .fetch_optional(db_pool)
@@ -228,14 +251,15 @@ impl TelegramAgent {
             Some(record) => {
                 let status: String = record.get("status");
                 let last_report_sent: Option<String> = record.get("last_report_sent");
-                
+
                 match status.as_str() {
                     "not_relevant" => {
                         return Ok(());
                     }
                     "silence" => {
                         if let Some(last_sent_str) = last_report_sent {
-                            if let Ok(last_sent_time) = DateTime::parse_from_rfc3339(&last_sent_str) {
+                            if let Ok(last_sent_time) = DateTime::parse_from_rfc3339(&last_sent_str)
+                            {
                                 let elapsed = Utc::now() - last_sent_time.with_timezone(&Utc);
                                 if elapsed.num_days() < 11 {
                                     return Ok(());
@@ -293,7 +317,14 @@ impl TelegramAgent {
                 .await?;
 
             if let Some(first_time_str) = first_time {
-                self.check_report_ready(chat_id, &first_time_str, new_spam_count, db_pool, groot_bot_alias).await?;
+                self.check_report_ready(
+                    chat_id,
+                    &first_time_str,
+                    new_spam_count,
+                    db_pool,
+                    groot_bot_alias,
+                )
+                .await?;
             }
         }
 
@@ -312,16 +343,23 @@ impl TelegramAgent {
         let elapsed = Utc::now() - first_time.with_timezone(&Utc);
 
         if elapsed.num_minutes() >= 15 {
-        
-        // if elapsed.num_days() >= 3 {
+            // if elapsed.num_days() >= 3 {
             if spam_count >= 1 {
-                info!("Sending report for chat {}: {} spam messages in {} days", 
-                  chat_id, spam_count, elapsed.num_days());
+                info!(
+                    "Sending report for chat {}: {} spam messages in {} days",
+                    chat_id,
+                    spam_count,
+                    elapsed.num_days()
+                );
 
                 self.send_report(chat_id, db_pool, groot_bot).await?;
             } else {
-                info!("Chat {} not relevant: only {} spam messages in {} days", 
-                  chat_id, spam_count, elapsed.num_days());
+                info!(
+                    "Chat {} not relevant: only {} spam messages in {} days",
+                    chat_id,
+                    spam_count,
+                    elapsed.num_days()
+                );
 
                 sqlx::query("UPDATE chat_monitoring SET status = 'not_relevant' WHERE chat_id = ?")
                     .bind(chat_id)
@@ -333,12 +371,17 @@ impl TelegramAgent {
         Ok(())
     }
 
-    async fn send_report(&self, chat_id: i64, db_pool: &SqlitePool, groot_bot_alias: &GrootBotAlias) -> Result<()> {
+    async fn send_report(
+        &self,
+        chat_id: i64,
+        db_pool: &SqlitePool,
+        groot_bot_alias: &GrootBotAlias,
+    ) -> Result<()> {
         let spam_messages = sqlx::query("SELECT user_id, username, message_text, detected_at FROM spam_messages WHERE chat_id = ? ORDER BY detected_at")
             .bind(chat_id)
             .fetch_all(db_pool)
             .await?;
-        
+
         let csv_filename = format!("{}_report.csv", chat_id);
         let csv_path = format!("common_res/agent_davon/reports/{}", csv_filename);
 
@@ -349,15 +392,15 @@ impl TelegramAgent {
                 }
             }
         }
-        
+
         let mut file = fs::File::create(&csv_path)?;
-        
+
         file.write_all(b"\xEF\xBB\xBF")?;
 
         let mut wtr = csv::WriterBuilder::new().from_writer(file);
-        
+
         wtr.write_record(&["user_id", "username", "message_text", "detected_at"])?;
-        
+
         for row in spam_messages {
             let user_id: i64 = row.get("user_id");
             let username: Option<String> = row.get("username");
@@ -375,19 +418,20 @@ impl TelegramAgent {
         wtr.flush()?;
 
         info!("CSV report created: {}", csv_path);
-        
+
         let command = format!("/agent_report {}", chat_id);
         groot_bot_alias.send_message_to_bot(self, &command).await?;
 
         info!("Report command sent to bot for chat {}", chat_id);
 
-        sqlx::query("UPDATE chat_monitoring SET status = 'silence', last_report_sent = ? WHERE chat_id = ?")
-            .bind(Utc::now().to_rfc3339())
-            .bind(chat_id)
-            .execute(db_pool)
-            .await?;
+        sqlx::query(
+            "UPDATE chat_monitoring SET status = 'silence', last_report_sent = ? WHERE chat_id = ?",
+        )
+        .bind(Utc::now().to_rfc3339())
+        .bind(chat_id)
+        .execute(db_pool)
+        .await?;
 
         Ok(())
     }
-
 }
