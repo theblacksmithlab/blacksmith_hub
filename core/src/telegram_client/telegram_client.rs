@@ -385,21 +385,40 @@ impl TelegramAgent {
         let csv_filename = format!("{}_report.csv", chat_id);
         let csv_path = format!("common_res/agent_davon/reports/{}", csv_filename);
 
-        if !Path::new(&csv_path).exists() {
-            if let Some(parent) = Path::new(&csv_path).parent() {
-                if !parent.exists() {
-                    fs::create_dir_all(parent)?;
+        if let Some(parent) = Path::new(&csv_path).parent() {
+            if !parent.exists() {
+                match fs::create_dir_all(parent) {
+                    Ok(_) => info!("Created directory: {}", parent.display()),
+                    Err(e) => {
+                        error!("Failed to create directory {}: {}. Skipping report.", parent.display(), e);
+                        return Ok(());
+                    }
                 }
             }
         }
 
-        let mut file = fs::File::create(&csv_path)?;
+        let mut file = match fs::File::create(&csv_path) {
+            Ok(file) => {
+                info!("Created CSV file: {}", csv_path);
+                file
+            }
+            Err(e) => {
+                error!("Failed to create CSV file {}: {}. Skipping report.", csv_path, e);
+                return Ok(());
+            }
+        };
 
-        file.write_all(b"\xEF\xBB\xBF")?;
+        if let Err(e) = file.write_all(b"\xEF\xBB\xBF") {
+            error!("Failed to write BOM to CSV: {}. Skipping report.", e);
+            return Ok(());
+        }
 
         let mut wtr = csv::WriterBuilder::new().from_writer(file);
 
-        wtr.write_record(&["user_id", "username", "message_text", "detected_at"])?;
+        if let Err(e) = wtr.write_record(&["user_id", "username", "message_text", "detected_at"]) {
+            error!("Failed to write CSV headers: {}. Skipping report.", e);
+            return Ok(());
+        }
 
         for row in spam_messages {
             let user_id: i64 = row.get("user_id");
@@ -407,20 +426,29 @@ impl TelegramAgent {
             let message_text: String = row.get("message_text");
             let detected_at: String = row.get("detected_at");
 
-            wtr.write_record(&[
+            if let Err(e) = wtr.write_record(&[
                 user_id.to_string(),
                 username.unwrap_or_else(|| "Unknown".to_string()),
                 message_text,
                 detected_at,
-            ])?;
+            ]) {
+                error!("Failed to write CSV record: {}. Continuing with next record.", e);
+                continue;
+            }
         }
 
-        wtr.flush()?;
+        if let Err(e) = wtr.flush() {
+            error!("Failed to flush CSV file: {}. File may be incomplete.", e);
+        }
 
         info!("CSV report created: {}", csv_path);
 
-        let command = format!("/agent_report {}", chat_id);
-        groot_bot_alias.send_message_to_bot(self, &command).await?;
+        let bot_api_chat_id = -(1000000000000 + chat_id);
+        let command = format!("/agent_report {}", bot_api_chat_id);
+        match groot_bot_alias.send_message_to_bot(self, &command).await {
+            Ok(_) => info!("Report command sent to bot for chat {} (Bot API: {})", chat_id, bot_api_chat_id),
+            Err(e) => error!("Failed to send report command to bot: {}", e),
+        }
 
         info!("Report command sent to bot for chat {}", chat_id);
 
