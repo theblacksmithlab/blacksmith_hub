@@ -1,7 +1,7 @@
 pub mod ai;
 pub mod config;
 pub mod gpu_instance_client;
-pub mod grammers;
+pub mod telegram_client;
 pub mod local_db;
 pub mod message_processing_flow;
 pub mod models;

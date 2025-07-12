@@ -190,7 +190,8 @@ fn get_handlers(
         AppName::TheViperRoom
         | AppName::W3AWeb
         | AppName::BlacksmithWeb
-        | AppName::UniframeStudio => Err(anyhow!(
+        | AppName::UniframeStudio
+        | AppName::AgentDavon => Err(anyhow!(
             "No Telegram bot implementation for app: {}",
             app_name.as_str()
         )),

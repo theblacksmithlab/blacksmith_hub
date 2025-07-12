@@ -1,0 +1,5 @@
+FROM agent_foundry_base
+
+USER 1001:1000
+
+ENV APP_NAME="agent_davon"

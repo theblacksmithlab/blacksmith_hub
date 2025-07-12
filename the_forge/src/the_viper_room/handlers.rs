@@ -1,7 +1,7 @@
 use crate::the_viper_room::local_utils::{generate_user_system_nickname, get_user_system_nickname};
 use axum::extract::State;
 use axum::Json;
-use core::grammers::grammers_functionality::{initialize_grammers_client, session_file_creation};
+use core::telegram_client::grammers_functionality::{initialize_grammers_client, session_file_creation};
 use core::models::the_viper_room::the_viper_room::AuthStage::MiniAppInitConfirmed;
 use core::models::the_viper_room::the_viper_room::{
     ActionStep, AuthStage, TheViperRoomServerResponse, TheViperRoomUserAction,

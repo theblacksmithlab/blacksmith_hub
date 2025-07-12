@@ -18,6 +18,5 @@ grammers-client.workspace = true
 serde_json.workspace = true
 regex.workspace = true
 rustls.workspace = true
-sqlx.workspace = true
 
 core = { path = "../core" }

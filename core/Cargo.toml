@@ -33,3 +33,4 @@ md-5.workspace = true
 unicode-segmentation.workspace = true
 emojis.workspace = true
 url.workspace = true
+csv.workspace = true

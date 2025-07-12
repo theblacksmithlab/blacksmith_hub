@@ -204,7 +204,7 @@ async fn handle_plan_selection(
     }
 
     let discount_info = if discount_percent > 0 {
-        format!(" (скидка {}%)", discount_percent)
+        format!(" (скидка {}% 🎁)", discount_percent)
     } else {
         String::new()
     };

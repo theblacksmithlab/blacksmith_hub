@@ -1,18 +1,15 @@
-use crate::grammers::grammers_functionality::{
-    initialize_grammers_client, load_grammers_session_data_from_file,
-};
 use crate::models::common::app_name::AppName;
 use crate::utils::tg_bot::groot_bot::groot_bot_utils::{
     add_chat_to_file, build_resource_file_path, load_chats_objects_from_file,
 };
 use anyhow::{Context, Result};
-use grammers_client::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use teloxide::macros::BotCommands;
 use teloxide::types::ChatId;
 use tracing::{error, info, warn};
+use crate::telegram_client::telegram_client::TelegramAgent;
 
 pub struct ResourcesDialogState {
     pub awaiting_option_choice: bool,
@@ -108,12 +105,12 @@ impl ChatMessageStats {
     pub async fn fetch_chat_history_for_single_chat(
         &self,
         chat_object: &ChatObject,
-        g_client: &Client,
+        telegram_agent: &TelegramAgent,
     ) -> Result<Vec<MessageIterationObject>> {
         let mut collected_messages = Vec::new();
 
-        if let Some(chat_username) = g_client.resolve_username(&chat_object.username).await? {
-            let mut msgs = g_client.iter_messages(chat_username).limit(5000);
+        if let Some(chat_username) = telegram_agent.client.resolve_username(&chat_object.username).await? {
+            let mut msgs = telegram_agent.client.iter_messages(chat_username).limit(5000);
 
             while let Some(msg) = msgs.next().await? {
                 if let Some(sender) = msg.sender() {
@@ -136,14 +133,13 @@ impl ChatMessageStats {
 
     pub async fn fetch_chat_history_for_all_chats(&mut self, app_name: &AppName) -> Result<()> {
         info!("Fetching chats history at bot's start...");
-        let session_data = load_grammers_session_data_from_file(app_name, "current.session")?;
-        let g_client = initialize_grammers_client(session_data).await?;
-
-        if !g_client.is_authorized().await? {
-            error!("Achtung! G_Client is not authorized!");
-        } else {
-            info!("G_client is ok!");
-        }
+        let g_client= match TelegramAgent::new(&app_name, "current.session").await {
+            Ok(agent) => agent,
+            Err(e) => {
+                error!("Failed to initialize TelegramAgent: {}", e);
+                return Err(e);
+            }
+        };
 
         let chats_objects_list = load_chats_objects_from_file(app_name)?;
 
@@ -184,14 +180,13 @@ impl ChatMessageStats {
         chat_username: &str,
     ) -> Result<()> {
         info!("Fetching chat history for a new chat...");
-        let session_data = load_grammers_session_data_from_file(app_name, "current.session")?;
-        let g_client = initialize_grammers_client(session_data).await?;
-
-        if !g_client.is_authorized().await? {
-            error!("Achtung! G_Client is not authorized!");
-        } else {
-            info!("G_client is ok!");
-        }
+        let telegram_agent= match TelegramAgent::new(&app_name, "current.session").await {
+            Ok(agent) => agent,
+            Err(e) => {
+                error!("Failed to initialize TelegramAgent: {}", e);
+                return Err(e);
+            }
+        };
 
         let chat_object = ChatObject {
             chat_id: chat_id.0,
@@ -199,7 +194,7 @@ impl ChatMessageStats {
         };
 
         let messages = self
-            .fetch_chat_history_for_single_chat(&chat_object, &g_client)
+            .fetch_chat_history_for_single_chat(&chat_object, &telegram_agent)
             .await?;
 
         let mut user_message_count = HashMap::new();

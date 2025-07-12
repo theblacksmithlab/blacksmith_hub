@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
-use core::grammers::grammers_functionality::initialize_grammers_client;
+use core::telegram_client::grammers_functionality::initialize_grammers_client;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::the_viper_room::news_block_creation::news_block_creation;
 use core::utils::the_viper_room::news_block_creation_utils::generate_waveform;

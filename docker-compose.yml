@@ -14,6 +14,13 @@ services:
     image: bot_foundry_base
     profiles: ["never-start"]
 
+  agent_foundry_base:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent_foundry_base
+    image: agent_foundry_base
+    profiles: [ "never-start" ]
+
   the_forge_base:
     build:
       context: .
@@ -48,6 +55,24 @@ services:
       - ./common_res/messages/groot_bot:/app/common_res/messages/groot_bot
       - ./common_res/messages/common:/app/common_res/messages/common
       - ./common_res/system_roles/groot_bot:/app/common_res/system_roles/groot_bot
+      - ./common_res/local_db:/app/common_res/local_db
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    restart: unless-stopped
+
+  agent_davon:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent_davon
+    env_file:
+      - .env
+    volumes:
+      - ./common_res/agent_davon:/app/common_res/agent_davon
+      - ./common_res/messages/common:/app/common_res/messages/common
+      - ./common_res/system_roles/agent_davon:/app/common_res/system_roles/agent_davon
       - ./common_res/local_db:/app/common_res/local_db
     deploy:
       resources:
