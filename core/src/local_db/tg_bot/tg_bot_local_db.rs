@@ -82,7 +82,16 @@ async fn create_localdb_tables(pool: &SqlitePool, app_name: &AppName) -> Result<
                     last_report_sent TEXT,
                     spam_count INTEGER DEFAULT 0,
                     total_messages INTEGER DEFAULT 0,
-                    status TEXT NOT NULL DEFAULT 'collecting'
+                    status TEXT NOT NULL DEFAULT 'collecting',
+                    report_response TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS chat_admins (
+                    chat_id INTEGER,
+                    user_id INTEGER, 
+                    role TEXT, -- 'owner', 'admin', 'linked_channel'
+                    fetched_at TEXT,
+                    PRIMARY KEY (chat_id, user_id)
                 );
 
                 CREATE TABLE IF NOT EXISTS spam_messages (

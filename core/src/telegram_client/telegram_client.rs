@@ -16,6 +16,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, fs};
+use teloxide::payloads::SendContactSetters;
 use tracing::log::warn;
 use tracing::{error, info};
 
@@ -137,9 +138,7 @@ impl TelegramAgent {
                 self.handle_new_message(message, groot_bot_alias, app_state, me)
                     .await?;
             }
-            _ => {
-                info!("Agent Davon got non-text update... ignore");
-            }
+            _ => {}
         }
         Ok(())
     }
@@ -157,6 +156,22 @@ impl TelegramAgent {
             }
 
             if sender.id() == groot_bot_alias.bot_id {
+                if let Some((chat_id, json_data)) =
+                    self.parse_chat_admins_response(&message.text()).await?
+                {
+                    self.process_chat_admins_response(chat_id, json_data, &app_state.db_pool)
+                        .await?;
+                    return Ok(());
+                }
+
+                if let Some((chat_id, response)) =
+                    self.parse_report_response(&message.text()).await?
+                {
+                    self.process_report_response(chat_id, response, &app_state.db_pool)
+                        .await?;
+                    return Ok(());
+                }
+
                 info!(
                     "Got message from bot: {}: {}",
                     groot_bot_alias.bot_username,
@@ -172,6 +187,31 @@ impl TelegramAgent {
 
         if !groot_bot_alias.should_process_chat(self, &chat).await? {
             return Ok(());
+        }
+
+        let admins_fetched = self
+            .are_admins_fetched(chat.id(), &app_state.db_pool)
+            .await?;
+
+        if !admins_fetched {
+            self.request_chat_admins(chat.id(), groot_bot_alias).await?;
+            info!("Requested admins list for chat {}", chat.id());
+        }
+
+        if admins_fetched {
+            if let Some(sender) = message.sender() {
+                if self
+                    .is_sender_admin(sender.id(), chat.id(), &app_state.db_pool)
+                    .await?
+                {
+                    info!(
+                        "Skipping message from admin {} in chat {}",
+                        sender.id(),
+                        chat.id()
+                    );
+                    return Ok(());
+                }
+            }
         }
 
         let text = message.text();
@@ -209,7 +249,7 @@ impl TelegramAgent {
             get_system_role_or_fallback(&AppName::GrootBot, GrootRoleType::MessageCheck, None);
 
         let scam_detection_result =
-            raw_llm_processing_json(&system_role, text, app_state, LlmModel::Complex2).await?;
+            raw_llm_processing_json(&system_role, text, app_state, LlmModel::Light).await?;
 
         let is_scam: bool = match serde_json::from_str::<serde_json::Value>(&scam_detection_result)
         {
@@ -254,10 +294,30 @@ impl TelegramAgent {
     ) -> Result<()> {
         let sender = message.sender().unwrap();
 
-        let username = if let Some(username) = sender.username() {
-            username.to_string()
+        // let username = if let Chat::User(user) = sender.clone() {
+        //     if let Some(username) = user.username() {
+        //         username.to_string()
+        //     } else {
+        //         let first = user.first_name();
+        //         let last = user.last_name();
+        //
+        //         match (first, last) {
+        //             (f, Some(l)) => format!("{} {}", f, l),
+        //             (f, None) => f.to_string()
+        //         }
+        //     }
+        // } else {
+        //     sender.name().to_string()
+        // };
+
+        let username = if let Chat::User(user) = sender.clone() {
+            if let Some(username) = user.username() {
+                username.to_string()
+            } else {
+                "mommy's_anon".to_string()
+            }
         } else {
-            "mommy's_anon".to_string()
+            sender.name().to_string()
         };
 
         sqlx::query("INSERT INTO spam_messages (chat_id, user_id, username, message_text, detected_at) VALUES (?, ?, ?, ?, ?)")
@@ -385,9 +445,9 @@ impl TelegramAgent {
         let first_time = DateTime::parse_from_rfc3339(first_time_str)?;
         let elapsed = Utc::now() - first_time.with_timezone(&Utc);
 
-        if elapsed.num_hours() >= 3 {
+        if elapsed.num_hours() >= 10 {
             // if elapsed.num_days() >= 1 {
-            if spam_count >= 1 {
+            if spam_count >= 5 {
                 info!(
                     "Sending report for chat {}: {} spam messages in {} days",
                     chat_id,
@@ -435,7 +495,7 @@ impl TelegramAgent {
         let chat_username: Option<String> = chat_data.get("chat_username");
 
         let bot_api_chat_id = -(1000000000000 + chat_id);
-        let csv_filename = format!("{} [{}] report.csv", chat_title, bot_api_chat_id);
+        let csv_filename = format!("{}_report.csv", bot_api_chat_id);
         let csv_path = format!("common_res/agent_davon/reports/{}", csv_filename);
 
         if let Some(parent) = Path::new(&csv_path).parent() {
@@ -495,11 +555,9 @@ impl TelegramAgent {
 
             if let Err(e) = wtr.write_record(&[
                 &chat_title,
-                &chat_username
-                    .clone()
-                    .unwrap_or_else(|| "Unknown".to_string()),
+                &chat_username.clone().unwrap_or_else(|| "_".to_string()),
                 &user_id.to_string(),
-                &username.unwrap_or_else(|| "Unknown".to_string()),
+                &username.unwrap_or_else(|| "mommy's_anon".to_string()),
                 &message_text,
                 &detected_at,
             ]) {
@@ -541,6 +599,175 @@ impl TelegramAgent {
                 chat_id
             ),
             Err(e) => error!("Database update failed for chat {}: {}", chat_id, e),
+        }
+
+        Ok(())
+    }
+
+    async fn are_admins_fetched(&self, chat_id: i64, db_pool: &SqlitePool) -> Result<bool> {
+        let count = sqlx::query("SELECT COUNT(*) as count FROM chat_admins WHERE chat_id = ?")
+            .bind(chat_id)
+            .fetch_one(db_pool)
+            .await?;
+
+        let admin_count: i64 = count.get("count");
+        Ok(admin_count > 0)
+    }
+
+    async fn request_chat_admins(
+        &self,
+        chat_id: i64,
+        groot_bot_alias: &GrootBotAlias,
+    ) -> Result<()> {
+        let bot_api_chat_id = -(1000000000000 + chat_id);
+        let command = format!("/chat_admins_request {}", bot_api_chat_id);
+        groot_bot_alias.send_message_to_bot(self, &command).await?;
+        Ok(())
+    }
+
+    async fn is_sender_admin(
+        &self,
+        sender_id: i64,
+        chat_id: i64,
+        db_pool: &SqlitePool,
+    ) -> Result<bool> {
+        let admin_exists =
+            sqlx::query("SELECT 1 FROM chat_admins WHERE chat_id = ? AND user_id = ?")
+                .bind(chat_id)
+                .bind(sender_id)
+                .fetch_optional(db_pool)
+                .await?;
+
+        Ok(admin_exists.is_some())
+    }
+
+    async fn parse_chat_admins_response(
+        &self,
+        text: &str,
+    ) -> Result<Option<(i64, serde_json::Value)>> {
+        if !text.starts_with("chat_admins_response:") {
+            return Ok(None);
+        }
+
+        let parts: Vec<&str> = text.splitn(3, ':').collect();
+        if parts.len() != 3 {
+            return Ok(None);
+        }
+
+        if parts[2].starts_with("error:") {
+            warn!(
+                "Received error response for chat {}: {}",
+                parts[1], parts[2]
+            );
+            return Ok(None);
+        }
+
+        let chat_id: i64 = parts[1].parse()?;
+        let json_data: serde_json::Value = serde_json::from_str(parts[2])?;
+
+        Ok(Some((chat_id, json_data)))
+    }
+
+    async fn parse_report_response(&self, text: &str) -> Result<Option<(i64, String)>> {
+        if !text.starts_with("report_response:") {
+            return Ok(None);
+        }
+
+        let parts: Vec<&str> = text.splitn(3, ':').collect();
+        if parts.len() >= 2 {
+            if let Ok(chat_id) = parts[1].parse::<i64>() {
+                let response_details = if parts.len() >= 3 {
+                    parts[2].to_string()
+                } else {
+                    "Unknown response".to_string()
+                };
+
+                return Ok(Some((chat_id, response_details)));
+            }
+        }
+
+        Ok(None)
+    }
+
+    async fn process_chat_admins_response(
+        &self,
+        chat_id: i64,
+        json_data: serde_json::Value,
+        db_pool: &SqlitePool,
+    ) -> Result<()> {
+        sqlx::query("DELETE FROM chat_admins WHERE chat_id = ?")
+            .bind(chat_id)
+            .execute(db_pool)
+            .await?;
+
+        let owner_id = json_data["owner"].as_i64().unwrap_or(0);
+        let admin_ids = json_data["admins"]
+            .as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_i64()).collect::<Vec<i64>>())
+            .unwrap_or_default();
+        let linked_channel_id = json_data["linked"].as_i64();
+
+        let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+
+        sqlx::query("INSERT INTO chat_admins (chat_id, user_id, role, fetched_at) VALUES (?, ?, 'owner', ?)")
+            .bind(chat_id)
+            .bind(owner_id)
+            .bind(&timestamp)
+            .execute(db_pool)
+            .await?;
+
+        for admin_id in &admin_ids {
+            sqlx::query("INSERT INTO chat_admins (chat_id, user_id, role, fetched_at) VALUES (?, ?, 'admin', ?)")
+                .bind(chat_id)
+                .bind(admin_id)
+                .bind(&timestamp)
+                .execute(db_pool)
+                .await?;
+        }
+
+        if let Some(linked_id) = linked_channel_id {
+            sqlx::query("INSERT INTO chat_admins (chat_id, user_id, role, fetched_at) VALUES (?, ?, 'linked_channel', ?)")
+                .bind(chat_id)
+                .bind(linked_id)
+                .bind(&timestamp)
+                .execute(db_pool)
+                .await?;
+        }
+
+        info!(
+            "Saved admins for chat {}: owner={}, admins={:?}, linked={:?}",
+            chat_id, owner_id, admin_ids, linked_channel_id
+        );
+        Ok(())
+    }
+
+    async fn process_report_response(
+        &self,
+        chat_id: i64,
+        response: String,
+        db_pool: &SqlitePool,
+    ) -> Result<()> {
+        sqlx::query("UPDATE chat_monitoring SET report_response = ? WHERE chat_id = ?")
+            .bind(&response)
+            .bind(chat_id)
+            .execute(db_pool)
+            .await?;
+
+        if response.contains("Offer sent:") {
+            info!(
+                "Report successfully processed for chat {}: {}",
+                chat_id, response
+            );
+        } else if response.contains("Error") {
+            warn!(
+                "Report processing failed for chat {}: {}",
+                chat_id, response
+            );
+        } else {
+            info!(
+                "Report response recorded for chat {}: {}",
+                chat_id, response
+            );
         }
 
         Ok(())

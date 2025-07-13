@@ -1,7 +1,7 @@
 use crate::telegram_client::telegram_client::TelegramAgent;
 use anyhow::Result;
 use grammers_client::types::Chat;
-use tracing::info;
+use tracing::{info, warn};
 
 pub struct GrootBotAlias {
     pub bot_id: i64,
@@ -22,17 +22,52 @@ impl GrootBotAlias {
         chat: &Chat,
     ) -> Result<bool> {
         let packed_chat = chat.pack();
-
         let mut participants = telegram_agent.client.iter_participants(packed_chat);
 
-        while let Some(participant) = participants.next().await? {
-            if participant.user.id() == self.bot_id {
-                info!("Bot {} found in chat {}", self.bot_id, chat.id());
-                return Ok(true);
+        match participants.next().await {
+            Ok(Some(participant)) => {
+                if participant.user.id() == self.bot_id {
+                    info!("Bot {} found in chat {}", self.bot_id, chat.id());
+                    return Ok(true);
+                }
+            }
+            Ok(None) => {
+                info!(
+                    "No participants in chat {} - assuming bot not present",
+                    chat.id()
+                );
+                return Ok(false);
+            }
+            Err(e) => {
+                warn!(
+                    "Cannot access participants in chat {} ({}): {} - assuming bot not present",
+                    chat.id(),
+                    chat.name(),
+                    e
+                );
+                return Ok(false);
             }
         }
-        info!("Packed chat: {}", packed_chat);
-        info!("Chat: {:?}", chat);
+
+        loop {
+            match participants.next().await {
+                Ok(Some(participant)) => {
+                    if participant.user.id() == self.bot_id {
+                        info!("Bot {} found in chat {}", self.bot_id, chat.id());
+                        return Ok(true);
+                    }
+                }
+                Ok(None) => break,
+                Err(e) => {
+                    warn!(
+                        "Error while checking participants: {} - assuming bot not present",
+                        e
+                    );
+                    return Ok(false);
+                }
+            }
+        }
+
         info!("Bot {} not found in chat {}", self.bot_id, chat.id());
         Ok(false)
     }

@@ -6,6 +6,8 @@ use core::local_db::tg_bot::groot_bot::subscription_management::check_chat_payme
 use core::local_db::tg_bot::groot_bot::subscription_management::create_subscription;
 use core::local_db::tg_bot::groot_bot::subscription_management::get_subscription_info;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
+use core::models::tg_agent::agent_davon::MemberRole;
+use core::models::tg_agent::agent_davon::ReportedChatInfo;
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState, ShowType};
 use core::state::tg_bot::app_state::BotAppState;
@@ -24,6 +26,7 @@ use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Request, Requester, Update};
 use teloxide::types::{KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
+use teloxide_core::payloads::SendDocumentSetters;
 use teloxide_core::prelude::ChatId;
 use tracing::{error, info};
 
@@ -535,6 +538,238 @@ pub async fn groot_bot_command_handler(
             );
 
             handle_status_command(bot.clone(), msg.clone(), app_state.clone()).await?;
+        }
+        GrootBotCommands::DavonReport => {
+            let message_text = msg.text().unwrap_or("");
+            let parts: Vec<&str> = message_text.split_whitespace().collect();
+
+            if parts.len() >= 2 {
+                match parts[1].parse::<i64>() {
+                    Ok(reported_chat_id) => {
+                        let report_response_prefix =
+                            format!("report_response:{}", reported_chat_id);
+                        info!(
+                            "Processing agent report for chat: {}... Compiling chat dosier",
+                            reported_chat_id
+                        );
+
+                        let chat_info = match ReportedChatInfo::new(&bot, reported_chat_id).await {
+                            Ok(info) => info,
+                            Err(e) => {
+                                error!("Failed to get chat info: {}", e);
+                                bot.send_message(
+                                    msg.chat.id,
+                                    format!(
+                                        "{}:Error compiling chat dosier: {}",
+                                        report_response_prefix, e
+                                    ),
+                                )
+                                .await?;
+                                return Ok(());
+                            }
+                        };
+
+                        info!(
+                            "Chat dosier compiled: {} (@{}) - Owner: {} {} (@{})",
+                            &chat_info.chat_title
+                            chat_info.username
+                            chat_info.owner.first_name,
+                            chat_info.owner.last_name.as_deref().unwrap_or(""),
+                            chat_info
+                                .owner
+                                .username
+                                .as_deref()
+                                .unwrap_or("mommy's_anon")
+                        );
+
+                        // Just for debug
+                        let chat_dosier = format!(
+                            "{}\n{}\n{}\n{}\n{}",
+                            chat_info.chat_title,
+                            chat_info.username,
+                            chat_info.owner.first_name,
+                            chat_info.owner.last_name.as_deref().unwrap_or(""),
+                            chat_info
+                                .owner
+                                .username
+                                .as_deref()
+                                .unwrap_or("mommy's_anon")
+                        );
+
+                        let offer = format!(
+                            "Добрый день! Я распарсил ваш чат: {} (@{}) [id: {}] и мы нашли ряд спам сообщений, о которых отправляем вам отчёт в прикрепленном файле.\n\nDEBUG:\n{}",
+                            chat_info.chat_title,
+                            chat_info.username,
+                            reported_chat_id,
+                            chat_dosier
+                        );
+
+                        let admins = chat_info.get_all_admins();
+                        let mut sent_count = 0;
+
+                        for admin in admins.clone() {
+                            match bot.send_message(ChatId(lord_admin_id as i64), &offer).await {
+                                // match bot.send_message(ChatId(admin.user_id), &offer).await {
+                                Ok(_) => {
+                                    info!(
+                                        "Message sent to admin {} [id: {}]",
+                                        admin.user_id,
+                                        admin.username.as_deref().unwrap_or("mommy's_anon")
+                                    );
+                                    sent_count += 1;
+                                }
+                                Err(e) => {
+                                    error!("Failed to send to admin {}: {}", admin.user_id, e);
+                                }
+                            }
+                        }
+
+                        if sent_count > 0 {
+                            info!("Messages sent to {}/{} admins", sent_count, admins.len());
+
+                            let csv_path = format!(
+                                "common_res/agent_davon/reports/{}_report.csv",
+                                reported_chat_id
+                            );
+                            let mut file_sent_count = 0;
+
+                            for admin in admins {
+                                let document = teloxide::types::InputFile::file(&csv_path);
+
+                                match bot
+                                    // .send_document(ChatId(admin.user_id), document)
+                                    .send_document(ChatId(lord_admin_id as i64), document)
+                                    .caption("Отчет о спам-сообщениях:")
+                                    .await
+                                {
+                                    Ok(_) => {
+                                        info!(
+                                            "CSV sent to admin {} ({})",
+                                            admin.user_id,
+                                            admin.username.as_deref().unwrap_or("mommy's_anon")
+                                        );
+                                        file_sent_count += 1;
+                                    }
+                                    Err(e) => {
+                                        error!(
+                                            "Failed to send CSV to admin {}: {}",
+                                            admin.user_id, e
+                                        );
+                                    }
+                                }
+                            }
+
+                            bot.send_message(
+                                msg.chat.id,
+                                format!(
+                                    "{}:Offer sent: {} participants, {} CSV files for chat: {}",
+                                    report_response_prefix,
+                                    sent_count,
+                                    file_sent_count,
+                                    chat_info.chat_title,
+                                ),
+                            )
+                            .await?;
+                        } else {
+                            error!(
+                                "Failed to send messages to any admin for chat {}",
+                                reported_chat_id
+                            );
+                            bot.send_message(msg.chat.id,
+                                             format!("{}:Error sending offers to chat administration (probably personal messaging is turned-off)", report_response_prefix)
+                            ).await?;
+                        }
+                    }
+                    Err(e) => {
+                        error!(
+                            "Invalid chat_id in agent report: {}. Error: {}",
+                            parts[1], e
+                        );
+                        bot.send_message(
+                            msg.chat.id,
+                            format!(
+                                "report_response:{}:Got invalid chat_id: {}",
+                                parts[1], parts[1]
+                            ),
+                        )
+                        .await?;
+                    }
+                }
+            } else {
+                error!("Agent report command missing chat_id argument");
+                bot.send_message(
+                    msg.chat.id,
+                    "report_response:unknown:Got invalid cmd format",
+                )
+                .await?;
+            }
+        }
+        GrootBotCommands::ChatAdminsRequest => {
+            let message_text = msg.text().unwrap_or("");
+            let parts: Vec<&str> = message_text.split_whitespace().collect();
+
+            if parts.len() >= 2 {
+                match parts[1].parse::<i64>() {
+                    Ok(requested_chat_id) => {
+                        info!(
+                            "Processing chat admins request for chat: {}",
+                            requested_chat_id
+                        );
+
+                        let chat_info = match ReportedChatInfo::new(&bot, requested_chat_id).await {
+                            Ok(info) => info,
+                            Err(e) => {
+                                error!("Failed to get chat info: {}", e);
+                                bot.send_message(
+                                    msg.chat.id,
+                                    format!(
+                                        "chat_admins_response:{}:error:Failed to get chat info",
+                                        requested_chat_id
+                                    ),
+                                )
+                                .await?;
+                                return Ok(());
+                            }
+                        };
+
+                        let admin_ids: Vec<i64> = chat_info
+                            .administrators
+                            .iter()
+                            .filter(|admin| admin.role == MemberRole::Administrator)
+                            .map(|admin| admin.user_id)
+                            .collect();
+
+                        let response_json = serde_json::json!({
+                            "owner": chat_info.owner.user_id,
+                            "admins": admin_ids,
+                            "linked": chat_info.linked_channel_id
+                        });
+
+                        let response = format!(
+                            "chat_admins_response:{}:{}",
+                            requested_chat_id, response_json
+                        );
+
+                        bot.send_message(msg.chat.id, response).await?;
+                        info!("Sent admins list for chat {}", requested_chat_id);
+                    }
+                    Err(_e) => {
+                        error!("Invalid chat_id in admins request: {}", parts[1]);
+                        bot.send_message(
+                            msg.chat.id,
+                            "chat_admins_response:invalid:error:Invalid chat_id",
+                        )
+                        .await?;
+                    }
+                }
+            } else {
+                error!("Chat admins request missing chat_id argument");
+                bot.send_message(
+                    msg.chat.id,
+                    "chat_admins_response:missing:error:Missing chat_id",
+                )
+                .await?;
+            }
         }
     }
 
