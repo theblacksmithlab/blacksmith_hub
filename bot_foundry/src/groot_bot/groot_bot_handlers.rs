@@ -568,11 +568,10 @@ pub async fn groot_bot_command_handler(
                                 return Ok(());
                             }
                         };
-
-                        info!(
-                            "Chat dosier compiled: {} (@{}) - Owner: {} {} (@{})",
-                            &chat_info.chat_title
-                            chat_info.username
+                        
+                        info!("Chat dosier compiled: {} (@{}) - Owner: {} {} (@{})",
+                            &chat_info.chat_title,
+                            chat_info.username,
                             chat_info.owner.first_name,
                             chat_info.owner.last_name.as_deref().unwrap_or(""),
                             chat_info
