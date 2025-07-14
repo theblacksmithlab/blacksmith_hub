@@ -191,7 +191,7 @@ impl TelegramAgent {
             };
 
             if user_message_count >= 20 {
-                info!("Skipping message from active user {} ({}+ messages) in chat {}", 
+                info!("Skipping message from active user {} ({}+ messages) in chat {}",
               sender.id(), user_message_count, chat.id());
                 self.update_chat_stats(&chat, &app_state.db_pool, false, &groot_bot_alias).await?;
                 return Ok(());
@@ -925,8 +925,37 @@ impl TelegramAgent {
         chat: &Chat,
         app_state: &Arc<AgentAppState>,
     ) -> Result<()> {
+        const MAX_RETRIES: u32 = 3;
+
+        for attempt in 0..MAX_RETRIES {
+            match self.fetch_chat_message_stats_internal(chat, app_state).await {
+                Ok(()) => return Ok(()),
+                Err(e) if attempt < MAX_RETRIES - 1 => {
+                    warn!(
+                    "Attempt {}/{}: Failed to fetch stats for chat {}: {}. Retrying...", 
+                    attempt + 1, MAX_RETRIES, chat.id(), e
+                );
+                    tokio::time::sleep(Duration::from_secs(2_u64.pow(attempt))).await;
+                }
+                Err(e) => {
+                    error!(
+                    "Failed to fetch stats for chat {} after {} attempts: {}", 
+                    chat.id(), MAX_RETRIES, e
+                );
+                    return Err(e);
+                }
+            }
+        }
+        unreachable!()
+    }
+    
+    async fn fetch_chat_message_stats_internal(
+        &self,
+        chat: &Chat,
+        app_state: &Arc<AgentAppState>,
+    ) -> Result<()> {
         let mut user_counts: HashMap<i64, u32> = HashMap::new();
-        
+
         let mut msgs = self.client.iter_messages(chat.pack()).limit(5000);
 
         while let Some(msg) = msgs.next().await? {
@@ -934,7 +963,7 @@ impl TelegramAgent {
                 *user_counts.entry(sender.id()).or_insert(0) += 1;
             }
         }
-        
+
         {
             let mut stats = app_state.chat_message_stats.lock().await;
             stats.chat_message_counts.insert(chat.id(), user_counts.clone());

@@ -31,11 +31,6 @@ impl GrootBotAlias {
             return Ok(false);
         }
 
-        // if self.check_bot_presence(telegram_agent, chat).await? {
-        //     info!("Bot already present in chat {}, skipping", chat.id());
-        //     return Ok(false);
-        // }
-
         info!(
             "Chat {} is public (got username), processing",
             chat.id()
