@@ -183,8 +183,10 @@ fn get_handlers(
         AppName::GrootBot => Ok((
             Update::filter_message()
                 .filter_command::<GrootBotCommands>()
-                .endpoint(groot_bot_command_handler),
-            Update::filter_message().endpoint(groot_bot_message_handler),
+                .endpoint(groot_bot_command_handler)
+                .branch(Update::filter_message().endpoint(groot_bot_message_handler))
+                .branch(Update::filter_edited_message().endpoint(groot_bot_message_handler)),
+            dptree::entry().endpoint(|_: Bot| async { Ok(()) }),
             Some(Update::filter_callback_query().endpoint(groot_bot_callback_query_handler)),
         )),
         AppName::TheViperRoom

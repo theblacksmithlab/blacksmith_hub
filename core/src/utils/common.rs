@@ -133,6 +133,10 @@ pub async fn get_message(message_enum: AppsSystemMessages) -> Result<String> {
             Path::new("common_res/w3a").to_path_buf(),
             msg.as_str().to_string(),
         ),
+        AppsSystemMessages::AgentDavon(msg) => (
+            Path::new("common_res/messages/agent_davon").to_path_buf(),
+            msg.as_str().to_string(),
+        ),
     };
 
     let path = base_path.join(format!("{}.txt", message_name));

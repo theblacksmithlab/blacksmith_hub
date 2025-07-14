@@ -1,7 +1,7 @@
 use crate::ai::common::common::raw_llm_processing_json;
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
-use crate::models::common::system_roles::GrootRoleType;
+use crate::models::common::system_roles::{AgentDavonRoleType, GrootRoleType};
 use crate::models::tg_agent::bot_alias::GrootBotAlias;
 use crate::state::tg_agent::app_state::AgentAppState;
 use crate::utils::common::{build_resource_file_path, get_system_role_or_fallback};
@@ -155,6 +155,18 @@ impl TelegramAgent {
                 return Ok(());
             }
 
+            if sender.id() == groot_bot_alias.bot_id && chat.id() == me.id() {
+                let text = message.text();
+                return if let Some((chat_id, response_details)) = self.parse_report_response(&text).await? {
+                    info!("Received report response for chat {}: {}", chat_id, response_details);
+                    self.process_report_response(chat_id, response_details, &app_state.db_pool).await?;
+                    Ok(())
+                } else {
+                    info!("Message from bot but not a report response, ignoring");
+                    Ok(())
+                }
+            }
+            
             if sender.id() == groot_bot_alias.bot_id {
                 info!("Skipping message from Groot Bot Alias writing to chat");
                 return Ok(());
@@ -192,6 +204,13 @@ impl TelegramAgent {
             }
         }
 
+        if let Ok(status) = self.get_chat_status(chat.id(), &app_state.db_pool).await {
+            if status == "not_relevant" {
+                info!("Skipping message from chat {} - marked as not_relevant", chat.id());
+                return Ok(());
+            }
+        }
+        
         let text = message.text();
         if text.is_empty() {
             return Ok(());
@@ -224,7 +243,7 @@ impl TelegramAgent {
         app_state: Arc<AgentAppState>,
     ) -> Result<AnalysisResult> {
         let system_role =
-            get_system_role_or_fallback(&AppName::GrootBot, GrootRoleType::MessageCheck, None);
+            get_system_role_or_fallback(&AppName::GrootBot, AgentDavonRoleType::MessageCheck, None);
 
         let scam_detection_result =
             raw_llm_processing_json(&system_role, text, app_state, LlmModel::Light).await?;
@@ -423,9 +442,9 @@ impl TelegramAgent {
         let first_time = DateTime::parse_from_rfc3339(first_time_str)?;
         let elapsed = Utc::now() - first_time.with_timezone(&Utc);
 
-        if elapsed.num_hours() >= 5 {
+        if elapsed.num_minutes() >= 10 {
             // if elapsed.num_days() >= 1 {
-            if spam_count >= 5 {
+            if spam_count >= 2 {
                 info!(
                     "Sending report for chat {}: {} spam messages in {} days",
                     chat_id,
@@ -859,5 +878,20 @@ impl TelegramAgent {
         }
 
         Ok(())
+    }
+
+    async fn get_chat_status(&self, chat_id: i64, db_pool: &SqlitePool) -> Result<String> {
+        let result = sqlx::query("SELECT status FROM chat_monitoring WHERE chat_id = ?")
+            .bind(chat_id)
+            .fetch_optional(db_pool)
+            .await?;
+
+        match result {
+            Some(row) => {
+                let status: String = row.get("status");
+                Ok(status)
+            }
+            None => Ok("collecting".to_string())
+        }
     }
 }

@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use core::local_db::tg_bot::groot_bot::subscription_management::check_chat_payment;
 use core::local_db::tg_bot::groot_bot::subscription_management::create_subscription;
 use core::local_db::tg_bot::groot_bot::subscription_management::get_subscription_info;
-use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
+use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages, AgentDavonMessages};
 use core::models::tg_agent::agent_davon::MemberRole;
 use core::models::tg_agent::agent_davon::ReportedChatInfo;
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
@@ -548,7 +548,7 @@ pub async fn groot_bot_command_handler(
                     Ok(reported_chat_id) => {
                         let report_response_prefix =
                             format!("report_response:{}", reported_chat_id);
-                        info!("Processing agent report for chat: {}... Reading admin data from CSV", reported_chat_id);
+                        info!("Processing new agent report for chat: {}... Reading admin data from CSV", reported_chat_id);
 
                         let admins_csv_path = format!("common_res/agent_davon/reports/{}_admins.csv", reported_chat_id);
 
@@ -564,12 +564,14 @@ pub async fn groot_bot_command_handler(
                             }
                         };
 
-                        info!("Admin data loaded: chat '{}' (@{}) with {} admins", chat_title, chat_username, admins.len());
+                        info!("Admin data loaded from CSV: chat '{}' (@{}) [id: {}] with {} admins", chat_title, chat_username, chat_id, admins.len());
 
-                        let offer = format!(
-                            "Добрый день! Я распарсил ваш чат: {} (@{}) [id: {}] и мы нашли ряд спам сообщений, о которых отправляем вам отчёт в прикрепленном файле.",
-                            chat_title, chat_username, reported_chat_id
-                        );
+                        let template = get_message(AppsSystemMessages::AgentDavon(AgentDavonMessages::Offer)).await?;;
+
+                        let offer = template
+                            .replace("{chat_title}", &chat_title)
+                            .replace("{chat_username}", &chat_username)
+                            .replace("{chat_id}", &reported_chat_id.to_string());
 
                         let mut sent_count = 0;
 
