@@ -673,6 +673,7 @@ impl TelegramAgent {
     async fn get_linked_channel_id(&self, chat: &Chat) -> Result<i64> {
         match chat {
             Chat::Channel(channel) => {
+                info!("we are in get_linked_channel_id");
                 use grammers_client::grammers_tl_types as tl;
 
                 let input_channel = tl::types::InputChannel {
@@ -690,10 +691,12 @@ impl TelegramAgent {
                     tl::enums::messages::ChatFull::Full(chat_full_data) => {
                         match &chat_full_data.full_chat {
                             tl::enums::ChatFull::ChannelFull(channel_full) => {
+                                info!("Channel has no linked discussion group");
                                 channel_full.linked_chat_id
                                     .ok_or_else(|| anyhow::anyhow!("Channel has no linked discussion group"))
                             },
                             tl::enums::ChatFull::Full(_) => {
+                                info!("This is a regular group, not a channel");
                                 Err(anyhow::anyhow!("This is a regular group, not a channel"))
                             },
                         }
@@ -701,9 +704,11 @@ impl TelegramAgent {
                 }
             },
             Chat::Group(_) => {
+                info!("Regular groups don't have linked channels");
                 Err(anyhow::anyhow!("Regular groups don't have linked channels"))
             },
             Chat::User(_) => {
+                info!("Private chats don't have linked channels");
                 Err(anyhow::anyhow!("Private chats don't have linked channels"))
             },
         }
