@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::utils::tg_bot::groot_bot::groot_bot_utils::get_linked_channel_id;
 use anyhow::Result;
 use teloxide::prelude::Requester;
@@ -98,19 +99,36 @@ impl ReportedChatInfo {
     pub fn get_all_admins(&self) -> Vec<&ChatMember> {
         self.administrators.iter().collect()
     }
+}
 
-    // pub fn get_owner_with_username(&self) -> Option<&ChatMember> {
-    //     if self.owner.username.is_some() {
-    //         Some(&self.owner)
-    //     } else {
-    //         None
-    //     }
-    // }
+#[derive(Debug, Clone)]
+pub struct UserMessageCount {
+    pub user_id: i64,
+    pub username: Option<String>,
+    pub message_count: u32,
+}
 
-    // pub fn get_admins_with_username(&self) -> Vec<&ChatMember> {
-    //     self.administrators
-    //         .iter()
-    //         .filter(|admin| admin.role == MemberRole::Administrator && admin.username.is_some())
-    //         .collect()
-    // }
+#[derive(Debug)]
+pub struct ChatMessageStats {
+    pub chat_message_counts: HashMap<i64, HashMap<i64, u32>>,
+}
+
+impl ChatMessageStats {
+    pub fn new() -> Self {
+        Self {
+            chat_message_counts: HashMap::new(),
+        }
+    }
+
+    pub fn get_user_message_count(&self, chat_id: i64, user_id: i64) -> u32 {
+        self.chat_message_counts
+            .get(&chat_id)
+            .and_then(|users| users.get(&user_id))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    pub fn is_chat_stats_fetched(&self, chat_id: i64) -> bool {
+        self.chat_message_counts.contains_key(&chat_id)
+    }
 }

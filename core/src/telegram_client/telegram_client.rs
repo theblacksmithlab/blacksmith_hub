@@ -16,6 +16,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, fs};
+use std::collections::HashMap;
 use tracing::log::warn;
 use tracing::{error, info};
 use crate::models::tg_agent::agent_davon::{ChatMember, MemberRole};
@@ -169,6 +170,32 @@ impl TelegramAgent {
             
             if sender.id() == groot_bot_alias.bot_id {
                 info!("Skipping message from Groot Bot Alias writing to chat");
+                return Ok(());
+            }
+
+            let stats_fetched = {
+                let stats = app_state.chat_message_stats.lock().await;
+                stats.is_chat_stats_fetched(chat.id())
+            };
+
+            if !stats_fetched {
+                info!("Message stats not fetched for chat {} ({}), fetching...", chat.id(), chat.name());
+                if let Err(e) = self.fetch_chat_message_stats(&chat, &app_state).await {
+                    warn!("Failed to fetch message stats for chat {}: {}", chat.id(), e);
+                } else {
+                    info!("Successfully fetched message stats for chat {}", chat.id());
+                }
+            }
+
+            let user_message_count = {
+                let stats = app_state.chat_message_stats.lock().await;
+                stats.get_user_message_count(chat.id(), sender.id())
+            };
+
+            if user_message_count >= 5 {
+                info!("Skipping message from active user {} ({}+ messages) in chat {}", 
+              sender.id(), user_message_count, chat.id());
+                self.update_chat_stats(&chat, &app_state.db_pool, false, &groot_bot_alias).await?;
                 return Ok(());
             }
         } else {
@@ -893,5 +920,29 @@ impl TelegramAgent {
             }
             None => Ok("collecting".to_string())
         }
+    }
+
+    async fn fetch_chat_message_stats(
+        &self,
+        chat: &Chat,
+        app_state: &Arc<AgentAppState>,
+    ) -> Result<()> {
+        let mut user_counts: HashMap<i64, u32> = HashMap::new();
+        
+        let mut msgs = self.client.iter_messages(chat.pack()).limit(5000);
+
+        while let Some(msg) = msgs.next().await? {
+            if let Some(sender) = msg.sender() {
+                *user_counts.entry(sender.id()).or_insert(0) += 1;
+            }
+        }
+        
+        {
+            let mut stats = app_state.chat_message_stats.lock().await;
+            stats.chat_message_counts.insert(chat.id(), user_counts.clone());
+        }
+
+        info!("Fetched message stats for chat {}: {} unique users", chat.id(), user_counts.len());
+        Ok(())
     }
 }
