@@ -566,7 +566,7 @@ pub async fn groot_bot_command_handler(
 
                         info!("Admin data loaded from CSV: chat '{}' (@{}) [id: {}] with {} admins", chat_title, chat_username, chat_id, admins.len());
 
-                        let template = get_message(AppsSystemMessages::AgentDavon(AgentDavonMessages::Offer)).await?;;
+                        let template = get_message(AppsSystemMessages::AgentDavon(AgentDavonMessages::Offer)).await?;
 
                         let offer = template
                             .replace("{chat_title}", &chat_title)

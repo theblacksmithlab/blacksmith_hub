@@ -113,9 +113,10 @@ async fn start_bot_with_handlers(
         UpdateHandler<anyhow::Error>,
         UpdateHandler<anyhow::Error>,
         Option<UpdateHandler<anyhow::Error>>,
+        Option<UpdateHandler<anyhow::Error>>,
     ),
 ) -> Result<()> {
-    let (command_handler, message_handler, callback_query_handler) = handlers;
+    let (command_handler, message_handler, callback_query_handler, edited_handler) = handlers;
     let bot = match app_state.app_name {
         AppName::ProbiotBot => Bot::new(env::var("TELOXIDE_TOKEN_PROBIOT")?),
         AppName::TheViperRoomBot => Bot::new(env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM")?),
@@ -135,9 +136,13 @@ async fn start_bot_with_handlers(
         app_state.app_name.as_str()
     );
 
-    let main_handler = dptree::entry()
+    let mut main_handler = dptree::entry()
         .branch(command_handler)
         .branch(message_handler);
+
+    if let Some(edited) = edited_handler {
+        main_handler = main_handler.branch(edited);
+    }
 
     run_bot_dispatcher(bot, main_handler, app_state.clone(), callback_query_handler).await?;
 
@@ -150,6 +155,7 @@ fn get_handlers(
     UpdateHandler<anyhow::Error>,
     UpdateHandler<anyhow::Error>,
     Option<UpdateHandler<anyhow::Error>>,
+    Option<UpdateHandler<anyhow::Error>>,
 )> {
     match app_name {
         AppName::ProbiotBot => Ok((
@@ -158,12 +164,14 @@ fn get_handlers(
                 .endpoint(probiot_command_handler),
             Update::filter_message().endpoint(default_message_handler),
             Some(Update::filter_callback_query().endpoint(probiot_callback_query_handler)),
+            None,
         )),
         AppName::TheViperRoomBot => Ok((
             Update::filter_message()
                 .filter_command::<TheViperRoomBotCommands>()
                 .endpoint(the_viper_room_command_handler),
             Update::filter_message().endpoint(the_viper_room_message_handler),
+            None,
             None,
         )),
         AppName::TesterBot => Ok((
@@ -172,6 +180,7 @@ fn get_handlers(
                 .endpoint(tester_bot_command_handler),
             Update::filter_message().endpoint(tester_bot_message_handler),
             None,
+            None,
         )),
         AppName::W3ABot => Ok((
             Update::filter_message()
@@ -179,15 +188,15 @@ fn get_handlers(
                 .endpoint(w3a_bot_command_handler),
             Update::filter_message().endpoint(default_message_handler),
             None,
+            None,
         )),
         AppName::GrootBot => Ok((
             Update::filter_message()
                 .filter_command::<GrootBotCommands>()
-                .endpoint(groot_bot_command_handler)
-                .branch(Update::filter_message().endpoint(groot_bot_message_handler))
-                .branch(Update::filter_edited_message().endpoint(groot_bot_message_handler)),
-            dptree::entry().endpoint(|_: Bot| async { Ok(()) }),
+                .endpoint(groot_bot_command_handler),
+            Update::filter_message().endpoint(groot_bot_message_handler),
             Some(Update::filter_callback_query().endpoint(groot_bot_callback_query_handler)),
+            Some(Update::filter_edited_message().endpoint(groot_bot_message_handler)),
         )),
         AppName::TheViperRoom
         | AppName::W3AWeb
