@@ -703,9 +703,42 @@ impl TelegramAgent {
                     },
                 }
             },
-            Chat::Group(_) => {
-                info!("Regular groups don't have linked channels");
-                Err(anyhow::anyhow!("Regular groups don't have linked channels"))
+            Chat::Group(group) => {
+                info!("Processing group to find linked channel");
+                use grammers_client::grammers_tl_types as tl;
+                
+                if let tl::enums::Chat::Channel(channel) = &group.raw {
+                    let input_channel = tl::types::InputChannel {
+                        channel_id: channel.id,
+                        access_hash: channel.access_hash.unwrap_or(0),
+                    };
+
+                    let request = tl::functions::channels::GetFullChannel {
+                        channel: input_channel.into(),
+                    };
+
+                    let result = self.client.invoke(&request).await?;
+
+                    match result {
+                        tl::enums::messages::ChatFull::Full(chat_full_data) => {
+                            match &chat_full_data.full_chat {
+                                tl::enums::ChatFull::ChannelFull(channel_full) => {
+                                    channel_full.linked_chat_id.ok_or_else(|| {
+                                        info!("1: {:?}", channel_full.linked_chat_id);
+                                        anyhow::anyhow!("Megagroup has no linked channel")
+                                    })
+                                }
+                                tl::enums::ChatFull::Full(_) => {
+                                    info!("2-2");
+                                    Err(anyhow::anyhow!("This is a regular group, not a channel"))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    info!("Regular groups don't have linked channels");
+                    Err(anyhow::anyhow!("Regular groups don't have linked channels"))
+                }
             },
             Chat::User(_) => {
                 info!("Private chats don't have linked channels");
