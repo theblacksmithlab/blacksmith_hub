@@ -150,8 +150,18 @@ impl TelegramAgent {
         app_state: Arc<AgentAppState>,
         me: &User,
     ) -> Result<()> {
+        let chat = message.chat();
+        
         if let Some(sender) = message.sender() {
             info!("Sender: {}", sender.id());
+
+            if sender.id() == chat.id() {
+                info!(
+                    "Skipping message from chat {} writing to itself",
+                    chat.id()
+                );
+                return Ok(());
+            }
             
             if sender.id() == me.id() {
                 return Ok(());
@@ -163,8 +173,6 @@ impl TelegramAgent {
         } else {
             return Ok(());
         }
-        
-        let chat = message.chat();
 
         if !groot_bot_alias.should_process_chat(self, &chat).await? {
             return Ok(());
@@ -622,14 +630,17 @@ impl TelegramAgent {
             }
         }
 
-        let owner = owner.ok_or_else(|| anyhow::anyhow!("No owner found in chat"))?;
-
         let linked_channel_id = self.get_linked_channel_id(chat).await.ok();
+        
+        self.save_chat_admins_to_db(chat.id(), owner.as_ref(), &administrators, linked_channel_id, db_pool).await?;
 
-        self.save_chat_admins_to_db(chat.id(), &owner, &administrators, linked_channel_id, db_pool).await?;
-
-        info!("Fetched and saved admins for chat {}: owner={}, admins count={}, linked_channel={:?}", 
-          chat.id(), owner.user_id, administrators.len(), linked_channel_id);
+        if owner.is_some() {
+            info!("Fetched and saved admins for chat {}: owner={}, admins count={}, linked_channel={:?}", 
+          chat.id(), owner.as_ref().unwrap().user_id, administrators.len(), linked_channel_id);
+        } else {
+            warn!("No owner found in chat {}, saved only {} admins, linked_channel={:?}", 
+          chat.id(), administrators.len(), linked_channel_id);
+        }
 
         Ok(())
     }
@@ -774,7 +785,7 @@ impl TelegramAgent {
     async fn save_chat_admins_to_db(
         &self,
         chat_id: i64,
-        owner: &ChatMember,
+        owner: Option<&ChatMember>,
         administrators: &[ChatMember],
         linked_channel_id: Option<i64>,
         db_pool: &SqlitePool,
@@ -786,12 +797,14 @@ impl TelegramAgent {
 
         let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
-        sqlx::query("INSERT INTO chat_admins (chat_id, user_id, role, fetched_at) VALUES (?, ?, 'owner', ?)")
-            .bind(chat_id)
-            .bind(owner.user_id)
-            .bind(&timestamp)
-            .execute(db_pool)
-            .await?;
+        if let Some(owner) = owner {
+            sqlx::query("INSERT INTO chat_admins (chat_id, user_id, role, fetched_at) VALUES (?, ?, 'owner', ?)")
+                .bind(chat_id)
+                .bind(owner.user_id)
+                .bind(&timestamp)
+                .execute(db_pool)
+                .await?;
+        }
 
         for admin in administrators {
             sqlx::query("INSERT INTO chat_admins (chat_id, user_id, role, fetched_at) VALUES (?, ?, 'admin', ?)")
