@@ -74,7 +74,6 @@ impl GrootBotAlias {
 
     pub async fn should_process_chat(
         &self,
-        telegram_agent: &TelegramAgent,
         chat: &Chat,
     ) -> Result<bool> {
         let has_username = match chat {
@@ -94,7 +93,7 @@ impl GrootBotAlias {
         // }
 
         info!(
-            "Chat {} is public and bot not present, processing",
+            "Chat {} is public, processing",
             chat.id()
         );
         Ok(true)

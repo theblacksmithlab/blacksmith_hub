@@ -171,10 +171,11 @@ impl TelegramAgent {
                 return Ok(());
             }
         } else {
+            info!("No sender in message.sender()!");
             return Ok(());
         }
 
-        if !groot_bot_alias.should_process_chat(self, &chat).await? {
+        if !groot_bot_alias.should_process_chat(&chat).await? {
             return Ok(());
         }
 
