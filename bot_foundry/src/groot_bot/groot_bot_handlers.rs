@@ -603,7 +603,7 @@ pub async fn groot_bot_command_handler(
                                 match bot
                                     // .send_document(ChatId(admin.user_id), document)
                                     .send_document(ChatId(lord_admin_id as i64), document)
-                                    .caption("Отчет о спам-сообщениях:")
+                                    .caption("Отчет о спам-сообщениях ☝️")
                                     .await
                                 {
                                     Ok(_) => {
