@@ -19,6 +19,7 @@ use std::{env, fs};
 use teloxide::payloads::SendContactSetters;
 use tracing::log::warn;
 use tracing::{error, info};
+use crate::models::tg_agent::agent_davon::{ChatMember, MemberRole};
 
 enum AnalysisResult {
     Spam,
@@ -184,6 +185,43 @@ impl TelegramAgent {
         }
 
         let chat = message.chat();
+        
+        let mut participants = self.client.iter_participants(chat.pack());
+        let mut owner = None;
+        let mut administrators = Vec::new();
+
+        while let Some(participant) = participants.next().await? {
+            match &participant.role {
+                grammers_client::types::Role::Creator(_) => {
+                    owner = Some(ChatMember {
+                        user_id: participant.user.id(),
+                        username: participant.user.username().map(|u| u.to_string()),
+                        first_name: participant.user.first_name().to_string(),
+                        last_name: participant.user.last_name().map(|l| l.to_string()),
+                        role: MemberRole::Owner,
+                    });
+                },
+                grammers_client::types::Role::Admin(_) => {
+                    administrators.push(ChatMember {
+                        user_id: participant.user.id(),
+                        username: participant.user.username().map(|u| u.to_string()),
+                        first_name: participant.user.first_name().to_string(),
+                        last_name: participant.user.last_name().map(|l| l.to_string()),
+                        role: MemberRole::Administrator,
+                    });
+                },
+                _ => {}
+            }
+        }
+
+        let owner = owner.ok_or_else(|| anyhow::anyhow!("No owner found in chat"))?;
+        info!("!!!!: owner: {:?}", owner);
+        
+        for admin in administrators {
+            let admin_member_id = admin.user_id;
+            let admin_member_username = admin.username.map(|u| u.to_string());
+            info!("!!!!: admin member: {:?} {:?}", admin_member_id, admin_member_username);
+        }
 
         if !groot_bot_alias.should_process_chat(self, &chat).await? {
             return Ok(());

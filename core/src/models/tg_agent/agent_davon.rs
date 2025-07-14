@@ -32,11 +32,13 @@ pub enum MemberRole {
 
 impl ReportedChatInfo {
     pub async fn new(bot: &Bot, chat_id: i64) -> Result<Self> {
+        info!("1");
         let chat = bot
             .get_chat(ChatId(chat_id))
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get chat info: {}", e))?;
-
+        info!("2");
+        
         let chat_title = chat.title().unwrap_or("No Title Chat").to_string();
         let username = chat.username().unwrap_or("_").to_string();
 
