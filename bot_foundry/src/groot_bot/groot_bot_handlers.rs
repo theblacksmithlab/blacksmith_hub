@@ -14,7 +14,7 @@ use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
     auto_delete_message, get_chat_title, get_chat_username, get_username,
-    is_message_from_linked_channel, load_super_admins,
+    is_message_from_linked_channel, load_super_admins, read_admins_from_csv
 };
 use core::utils::tg_bot::groot_bot::subscription_utils::{
     show_plan_selection, PaymentProcess, SubscriptionState,
@@ -548,77 +548,40 @@ pub async fn groot_bot_command_handler(
                     Ok(reported_chat_id) => {
                         let report_response_prefix =
                             format!("report_response:{}", reported_chat_id);
-                        info!(
-                            "Processing agent report for chat: {}... Compiling chat dosier",
-                            reported_chat_id
-                        );
+                        info!("Processing agent report for chat: {}... Reading admin data from CSV", reported_chat_id);
 
-                        let chat_info = match ReportedChatInfo::new(&bot, reported_chat_id).await {
-                            Ok(info) => info,
+                        let admins_csv_path = format!("common_res/agent_davon/reports/{}_admins.csv", reported_chat_id);
+
+                        let (chat_title, chat_username, admins) = match read_admins_from_csv(&admins_csv_path).await {
+                            Ok(data) => data,
                             Err(e) => {
-                                error!("Failed to get chat info: {}", e);
+                                error!("Failed to read admin data from CSV: {}", e);
                                 bot.send_message(
                                     msg.chat.id,
-                                    format!(
-                                        "{}:Error compiling chat dosier: {}",
-                                        report_response_prefix, e
-                                    ),
-                                )
-                                .await?;
+                                    format!("{}:Error reading admin data: {}", report_response_prefix, e),
+                                ).await?;
                                 return Ok(());
                             }
                         };
-                        
-                        info!("Chat dosier compiled: {} (@{}) - Owner: {} {} (@{})",
-                            &chat_info.chat_title,
-                            chat_info.username,
-                            chat_info.owner.first_name,
-                            chat_info.owner.last_name.as_deref().unwrap_or(""),
-                            chat_info
-                                .owner
-                                .username
-                                .as_deref()
-                                .unwrap_or("mommy's_anon")
-                        );
 
-                        // Just for debug
-                        let chat_dosier = format!(
-                            "{}\n{}\n{}\n{}\n{}",
-                            chat_info.chat_title,
-                            chat_info.username,
-                            chat_info.owner.first_name,
-                            chat_info.owner.last_name.as_deref().unwrap_or(""),
-                            chat_info
-                                .owner
-                                .username
-                                .as_deref()
-                                .unwrap_or("mommy's_anon")
-                        );
+                        info!("Admin data loaded: chat '{}' (@{}) with {} admins", chat_title, chat_username, admins.len());
 
                         let offer = format!(
-                            "Добрый день! Я распарсил ваш чат: {} (@{}) [id: {}] и мы нашли ряд спам сообщений, о которых отправляем вам отчёт в прикрепленном файле.\n\nDEBUG:\n{}",
-                            chat_info.chat_title,
-                            chat_info.username,
-                            reported_chat_id,
-                            chat_dosier
+                            "Добрый день! Я распарсил ваш чат: {} (@{}) [id: {}] и мы нашли ряд спам сообщений, о которых отправляем вам отчёт в прикрепленном файле.",
+                            chat_title, chat_username, reported_chat_id
                         );
 
-                        let admins = chat_info.get_all_admins();
                         let mut sent_count = 0;
 
-                        for admin in admins.clone() {
+                        for admin in &admins {
                             match bot.send_message(ChatId(lord_admin_id as i64), &offer).await {
                                 // match bot.send_message(ChatId(admin.user_id), &offer).await {
                                 Ok(_) => {
-                                    info!(
-                                        "Message sent to admin {} [id: {}]",
-                                        admin.user_id,
-                                        admin.username.as_deref().unwrap_or("mommy's_anon")
-                                    );
+                                    info!("Message sent to {} {} [id: {}]", admin.role, admin.user_id, admin.user_id);
                                     sent_count += 1;
                                 }
                                 Err(e) => {
-                                    error!("Failed to send to admin {}: {}", admin.user_id, e);
+                                    error!("Failed to send to {} {}: {}", admin.role, admin.user_id, e);
                                 }
                             }
                         }
@@ -642,18 +605,11 @@ pub async fn groot_bot_command_handler(
                                     .await
                                 {
                                     Ok(_) => {
-                                        info!(
-                                            "CSV sent to admin {} ({})",
-                                            admin.user_id,
-                                            admin.username.as_deref().unwrap_or("mommy's_anon")
-                                        );
+                                        info!("CSV sent to {} {} [id: {}]", admin.role, admin.user_id, admin.user_id);
                                         file_sent_count += 1;
                                     }
                                     Err(e) => {
-                                        error!(
-                                            "Failed to send CSV to admin {}: {}",
-                                            admin.user_id, e
-                                        );
+                                        error!("Failed to send CSV to {} {}: {}", admin.role, admin.user_id, e);
                                     }
                                 }
                             }
@@ -662,20 +618,17 @@ pub async fn groot_bot_command_handler(
                                 msg.chat.id,
                                 format!(
                                     "{}:Offer sent: {} participants, {} CSV files for chat: {}",
-                                    report_response_prefix,
-                                    sent_count,
-                                    file_sent_count,
-                                    chat_info.chat_title,
+                                    report_response_prefix, sent_count, file_sent_count, chat_title
                                 ),
-                            )
-                            .await?;
+                            ).await?;
                         } else {
                             error!(
                                 "Failed to send messages to any admin for chat {}",
                                 reported_chat_id
                             );
-                            bot.send_message(msg.chat.id,
-                                             format!("{}:Error sending offers to chat administration (probably personal messaging is turned-off)", report_response_prefix)
+                            bot.send_message(
+                                msg.chat.id,
+                                format!("{}:Error sending offers to chat administration (probably personal messaging is turned-off)", report_response_prefix)
                             ).await?;
                         }
                     }

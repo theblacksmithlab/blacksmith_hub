@@ -1,7 +1,7 @@
 use crate::telegram_client::telegram_client::TelegramAgent;
 use anyhow::Result;
 use grammers_client::types::Chat;
-use tracing::{info, warn};
+use tracing::info;
 
 pub struct GrootBotAlias {
     pub bot_id: i64,
@@ -14,62 +14,6 @@ impl GrootBotAlias {
             bot_id,
             bot_username,
         }
-    }
-
-    pub async fn check_bot_presence(
-        &self,
-        telegram_agent: &TelegramAgent,
-        chat: &Chat,
-    ) -> Result<bool> {
-        let packed_chat = chat.pack();
-        let mut participants = telegram_agent.client.iter_participants(packed_chat);
-
-        match participants.next().await {
-            Ok(Some(participant)) => {
-                if participant.user.id() == self.bot_id {
-                    info!("Bot {} found in chat {}", self.bot_id, chat.id());
-                    return Ok(true);
-                }
-            }
-            Ok(None) => {
-                info!(
-                    "No participants in chat {} - assuming bot not present",
-                    chat.id()
-                );
-                return Ok(false);
-            }
-            Err(e) => {
-                warn!(
-                    "Cannot access participants in chat {} ({}): {} - assuming bot not present",
-                    chat.id(),
-                    chat.name(),
-                    e
-                );
-                return Ok(false);
-            }
-        }
-
-        loop {
-            match participants.next().await {
-                Ok(Some(participant)) => {
-                    if participant.user.id() == self.bot_id {
-                        info!("Bot {} found in chat {}", self.bot_id, chat.id());
-                        return Ok(true);
-                    }
-                }
-                Ok(None) => break,
-                Err(e) => {
-                    warn!(
-                        "Error while checking participants: {} - assuming bot not present",
-                        e
-                    );
-                    return Ok(false);
-                }
-            }
-        }
-
-        info!("Bot {} not found in chat {}", self.bot_id, chat.id());
-        Ok(false)
     }
 
     pub async fn should_process_chat(
@@ -93,30 +37,10 @@ impl GrootBotAlias {
         // }
 
         info!(
-            "Chat {} is public, processing",
+            "Chat {} is public (got username), processing",
             chat.id()
         );
         Ok(true)
-    }
-
-    pub async fn get_chat_info_by_username(
-        &self,
-        telegram_agent: &TelegramAgent,
-        chat_username: &str,
-    ) -> Result<Option<(String, i64)>> {
-        match telegram_agent.client.resolve_username(chat_username).await {
-            Ok(Some(chat)) => {
-                let title = chat.name().to_string();
-                let chat_id = chat.id();
-                Ok(Some((title, chat_id)))
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(anyhow::anyhow!(
-                "Could not get chat info for {}: {}",
-                chat_username,
-                e
-            )),
-        }
     }
 
     pub async fn send_message_to_bot(

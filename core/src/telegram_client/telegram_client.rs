@@ -93,20 +93,9 @@ impl TelegramAgent {
         info!("Agent Davon is starting monitoring updates...");
 
         let me = self.client.get_me().await?;
+        let last_name = me.last_name().unwrap_or("");
 
-        match me.last_name().is_some() {
-            true => {
-                info!(
-                    "Monitoring as: {} {:?} ({})",
-                    me.first_name(),
-                    me.last_name(),
-                    me.id()
-                );
-            }
-            false => {
-                info!("Monitoring as: {} ({})", me.first_name(), me.id());
-            }
-        }
+        info!("Monitoring as: {} {} [id: {}]", me.first_name(), last_name, me.id());
 
         loop {
             match self.client.next_update().await {
@@ -153,8 +142,6 @@ impl TelegramAgent {
         let chat = message.chat();
         
         if let Some(sender) = message.sender() {
-            info!("Sender: {}", sender.id());
-
             if sender.id() == chat.id() {
                 info!(
                     "Skipping message from chat {} writing to itself",
@@ -164,14 +151,16 @@ impl TelegramAgent {
             }
             
             if sender.id() == me.id() {
+                info!("Skipping message from Telegram Agent writing to the chat");
                 return Ok(());
             }
 
             if sender.id() == groot_bot_alias.bot_id {
+                info!("Skipping message from Groot Bot Alias writing to chat");
                 return Ok(());
             }
         } else {
-            info!("No sender in message.sender()!");
+            info!("No sender in message.sender(), probably got message from chat writing to itself");
             return Ok(());
         }
 
@@ -184,8 +173,9 @@ impl TelegramAgent {
             .await?;
 
         if !admins_fetched {
-            self.fetch_chat_admins_grammers(&chat, &app_state.db_pool).await?;
-            info!("Successfully fetched admins for chat {} via grammers", chat.id());
+            if let Err(e) = self.fetch_chat_admins_grammers(&chat, &app_state.db_pool).await {
+                warn!("Failed to fetch admins for chat {}: {}", chat.id(), e);
+            }
         }
 
         if let Some(sender) = message.sender() {
@@ -433,7 +423,7 @@ impl TelegramAgent {
         let first_time = DateTime::parse_from_rfc3339(first_time_str)?;
         let elapsed = Utc::now() - first_time.with_timezone(&Utc);
 
-        if elapsed.num_hours() >= 10 {
+        if elapsed.num_hours() >= 5 {
             // if elapsed.num_days() >= 1 {
             if spam_count >= 5 {
                 info!(
@@ -563,6 +553,54 @@ impl TelegramAgent {
 
         info!("CSV report created: {}", csv_path);
 
+        let admins = sqlx::query("SELECT user_id, role FROM chat_admins WHERE chat_id = ?")
+            .bind(chat_id)
+            .fetch_all(db_pool)
+            .await?;
+
+        let admins_filename = format!("{}_admins.csv", bot_api_chat_id);
+        let admins_path = format!("common_res/agent_davon/reports/{}", admins_filename);
+
+        match fs::File::create(&admins_path) {
+            Ok(mut file) => {
+                info!("Created admins CSV file: {}", admins_path);
+
+                if let Err(e) = file.write_all(b"\xEF\xBB\xBF") {
+                    error!("Failed to write BOM to admins CSV: {}. Continuing.", e);
+                } else {
+                    let mut admins_wtr = csv::WriterBuilder::new().from_writer(file);
+
+                    if let Err(e) = admins_wtr.write_record(&["chat_title", "chat_username", "user_id", "role"]) {
+                        error!("Failed to write admins CSV headers: {}. Continuing.", e);
+                    } else {
+                        for admin in admins {
+                            let user_id: i64 = admin.get("user_id");
+                            let role: String = admin.get("role");
+
+                            if let Err(e) = admins_wtr.write_record(&[
+                                &chat_title,
+                                &chat_username.clone().unwrap_or_else(|| "_".to_string()),
+                                &user_id.to_string(),
+                                &role,
+                            ]) {
+                                error!("Failed to write admin record: {}. Continuing with next record.", e);
+                                continue;
+                            }
+                        }
+
+                        if let Err(e) = admins_wtr.flush() {
+                            error!("Failed to flush admins CSV file: {}. File may be incomplete.", e);
+                        } else {
+                            info!("Admins CSV report created: {}", admins_path);
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Failed to create admins CSV file {}: {}. Continuing without admin data.", admins_path, e);
+            }
+        }
+        
         let command = format!("/agent_report {}", bot_api_chat_id);
         match groot_bot_alias.send_message_to_bot(self, &command).await {
             Ok(_) => info!(
@@ -645,44 +683,6 @@ impl TelegramAgent {
 
         Ok(())
     }
-
-    // async fn get_linked_channel_id_simple(&self, chat: &Chat) -> Result<i64> {
-    //     match chat {
-    //         grammers_client::types::Chat::Channel(channel) => {
-    //             use grammers_client::grammers_tl_types as tl;
-    // 
-    //             let input_channel = tl::types::InputChannel {
-    //                 channel_id: channel.id(),
-    //                 access_hash: channel.raw.access_hash.unwrap_or(0),
-    //             };
-    // 
-    //             let request = tl::functions::channels::GetFullChannel {
-    //                 channel: input_channel.into(),
-    //             };
-    // 
-    //             let result = self.client.invoke(&request).await?;
-    // 
-    //             // Если messages::ChatFull имеет только вариант Full, 
-    //             // то можем сразу извлечь данные
-    //             let chat_full_data = match result {
-    //                 tl::enums::messages::ChatFull::Full(data) => data,
-    //                 // Если есть другие варианты, добавить их здесь
-    //             };
-    // 
-    //             // Теперь у нас есть доступ к full_chat
-    //             match &chat_full_data.full_chat {
-    //                 tl::enums::ChatFull::ChannelFull(channel_full) => {
-    //                     channel_full.linked_chat_id
-    //                         .ok_or_else(|| anyhow::anyhow!("Channel has no linked discussion group"))
-    //                 },
-    //                 tl::enums::ChatFull::Full(_) => {
-    //                     Err(anyhow::anyhow!("This is a regular group, not a channel"))
-    //                 },
-    //             }
-    //         },
-    //         _ => Err(anyhow::anyhow!("Not a channel")),
-    //     }
-    // }
     
     async fn get_linked_channel_id(&self, chat: &Chat) -> Result<i64> {
         match chat {

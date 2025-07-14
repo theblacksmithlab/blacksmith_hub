@@ -549,3 +549,35 @@ pub fn get_chat_username(msg: &Message) -> String {
         .map(|username| username.to_string())
         .unwrap_or_else(|| "_".to_string())
 }
+
+#[derive(Debug)]
+pub struct AdminInfo {
+    pub user_id: i64,
+    pub role: String,
+}
+
+pub async fn read_admins_from_csv(csv_path: &str) -> Result<(String, String, Vec<AdminInfo>)> {
+    let mut reader = csv::Reader::from_path(csv_path)
+        .map_err(|e| anyhow::anyhow!("Failed to open CSV file: {}", e))?;
+
+    let mut admins = Vec::new();
+    let mut chat_title = String::new();
+    let mut chat_username = String::new();
+
+    for result in reader.records() {
+        let record = result
+            .map_err(|e| anyhow::anyhow!("Failed to read CSV record: {}", e))?;
+
+        if record.len() >= 4 {
+            chat_title = record[0].to_string();
+            chat_username = record[1].to_string();
+            let user_id: i64 = record[2].parse()
+                .map_err(|e| anyhow::anyhow!("Failed to parse user_id: {}", e))?;
+            let role = record[3].to_string();
+
+            admins.push(AdminInfo { user_id, role });
+        }
+    }
+
+    Ok((chat_title, chat_username, admins))
+}
