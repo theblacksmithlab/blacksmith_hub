@@ -190,7 +190,7 @@ impl TelegramAgent {
                 stats.get_user_message_count(chat.id(), sender.id())
             };
 
-            if user_message_count >= 20 {
+            if user_message_count >= 40 {
                 info!("Skipping message from active user {} ({}+ messages) in chat {}",
               sender.id(), user_message_count, chat.id());
                 self.update_chat_stats(&chat, &app_state.db_pool, false, &groot_bot_alias).await?;
