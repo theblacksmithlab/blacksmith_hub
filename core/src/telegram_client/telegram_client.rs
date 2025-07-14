@@ -16,7 +16,6 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, fs};
-use teloxide::payloads::SendContactSetters;
 use tracing::log::warn;
 use tracing::{error, info};
 use crate::models::tg_agent::agent_davon::{ChatMember, MemberRole};
@@ -157,27 +156,6 @@ impl TelegramAgent {
             }
 
             if sender.id() == groot_bot_alias.bot_id {
-                if let Some((chat_id, json_data)) =
-                    self.parse_chat_admins_response(&message.text()).await?
-                {
-                    self.process_chat_admins_response(chat_id, json_data, &app_state.db_pool)
-                        .await?;
-                    return Ok(());
-                }
-
-                if let Some((chat_id, response)) =
-                    self.parse_report_response(&message.text()).await?
-                {
-                    self.process_report_response(chat_id, response, &app_state.db_pool)
-                        .await?;
-                    return Ok(());
-                }
-
-                info!(
-                    "Got message from bot: {}: {}",
-                    groot_bot_alias.bot_username,
-                    message.text()
-                );
                 return Ok(());
             }
         } else {
@@ -185,43 +163,6 @@ impl TelegramAgent {
         }
 
         let chat = message.chat();
-        
-        let mut participants = self.client.iter_participants(chat.pack());
-        let mut owner = None;
-        let mut administrators = Vec::new();
-
-        while let Some(participant) = participants.next().await? {
-            match &participant.role {
-                grammers_client::types::Role::Creator(_) => {
-                    owner = Some(ChatMember {
-                        user_id: participant.user.id(),
-                        username: participant.user.username().map(|u| u.to_string()),
-                        first_name: participant.user.first_name().to_string(),
-                        last_name: participant.user.last_name().map(|l| l.to_string()),
-                        role: MemberRole::Owner,
-                    });
-                },
-                grammers_client::types::Role::Admin(_) => {
-                    administrators.push(ChatMember {
-                        user_id: participant.user.id(),
-                        username: participant.user.username().map(|u| u.to_string()),
-                        first_name: participant.user.first_name().to_string(),
-                        last_name: participant.user.last_name().map(|l| l.to_string()),
-                        role: MemberRole::Administrator,
-                    });
-                },
-                _ => {}
-            }
-        }
-
-        let owner = owner.ok_or_else(|| anyhow::anyhow!("No owner found in chat"))?;
-        info!("!!!!: owner: {:?}", owner);
-        
-        for admin in administrators {
-            let admin_member_id = admin.user_id;
-            let admin_member_username = admin.username.map(|u| u.to_string());
-            info!("!!!!: admin member: {:?} {:?}", admin_member_id, admin_member_username);
-        }
 
         if !groot_bot_alias.should_process_chat(self, &chat).await? {
             return Ok(());
@@ -232,23 +173,21 @@ impl TelegramAgent {
             .await?;
 
         if !admins_fetched {
-            self.request_chat_admins(chat.id(), groot_bot_alias).await?;
-            info!("Requested admins list for chat {}", chat.id());
+            self.fetch_chat_admins_grammers(&chat, &app_state.db_pool).await?;
+            info!("Successfully fetched admins for chat {} via grammers", chat.id());
         }
 
-        if admins_fetched {
-            if let Some(sender) = message.sender() {
-                if self
-                    .is_sender_admin(sender.id(), chat.id(), &app_state.db_pool)
-                    .await?
-                {
-                    info!(
-                        "Skipping message from admin {} in chat {}",
-                        sender.id(),
-                        chat.id()
-                    );
-                    return Ok(());
-                }
+        if let Some(sender) = message.sender() {
+            if self
+                .is_sender_admin(sender.id(), chat.id(), &app_state.db_pool)
+                .await?
+            {
+                info!(
+                "Skipping message from admin {} in chat {}",
+                sender.id(),
+                chat.id()
+            );
+                return Ok(());
             }
         }
 
@@ -652,60 +591,154 @@ impl TelegramAgent {
         Ok(admin_count > 0)
     }
 
-    async fn request_chat_admins(
-        &self,
-        chat_id: i64,
-        groot_bot_alias: &GrootBotAlias,
-    ) -> Result<()> {
-        let bot_api_chat_id = -(1000000000000 + chat_id);
-        let command = format!("/chat_admins_request {}", bot_api_chat_id);
-        groot_bot_alias.send_message_to_bot(self, &command).await?;
+    async fn fetch_chat_admins_grammers(&self, chat: &Chat, db_pool: &SqlitePool) -> Result<()> {
+        let mut participants = self.client.iter_participants(chat.pack());
+        let mut owner = None;
+        let mut administrators = Vec::new();
+
+        while let Some(participant) = participants.next().await? {
+            match &participant.role {
+                grammers_client::types::Role::Creator(_) => {
+                    owner = Some(ChatMember {
+                        user_id: participant.user.id(),
+                        username: participant.user.username().map(|u| u.to_string()),
+                        first_name: participant.user.first_name().to_string(),
+                        last_name: participant.user.last_name().map(|l| l.to_string()),
+                        role: MemberRole::Owner,
+                    });
+                },
+                grammers_client::types::Role::Admin(_) => {
+                    administrators.push(ChatMember {
+                        user_id: participant.user.id(),
+                        username: participant.user.username().map(|u| u.to_string()),
+                        first_name: participant.user.first_name().to_string(),
+                        last_name: participant.user.last_name().map(|l| l.to_string()),
+                        role: MemberRole::Administrator,
+                    });
+                },
+                _ => {}
+            }
+        }
+
+        let owner = owner.ok_or_else(|| anyhow::anyhow!("No owner found in chat"))?;
+
+        let linked_channel_id = self.get_linked_channel_id(chat).await.ok();
+
+        self.save_chat_admins_to_db(chat.id(), &owner, &administrators, linked_channel_id, db_pool).await?;
+
+        info!("Fetched and saved admins for chat {}: owner={}, admins count={}, linked_channel={:?}", 
+          chat.id(), owner.user_id, administrators.len(), linked_channel_id);
+
         Ok(())
     }
 
-    async fn is_sender_admin(
-        &self,
-        sender_id: i64,
-        chat_id: i64,
-        db_pool: &SqlitePool,
-    ) -> Result<bool> {
-        let admin_exists =
-            sqlx::query("SELECT 1 FROM chat_admins WHERE chat_id = ? AND user_id = ?")
-                .bind(chat_id)
-                .bind(sender_id)
-                .fetch_optional(db_pool)
-                .await?;
+    // async fn get_linked_channel_id_simple(&self, chat: &Chat) -> Result<i64> {
+    //     match chat {
+    //         grammers_client::types::Chat::Channel(channel) => {
+    //             use grammers_client::grammers_tl_types as tl;
+    // 
+    //             let input_channel = tl::types::InputChannel {
+    //                 channel_id: channel.id(),
+    //                 access_hash: channel.raw.access_hash.unwrap_or(0),
+    //             };
+    // 
+    //             let request = tl::functions::channels::GetFullChannel {
+    //                 channel: input_channel.into(),
+    //             };
+    // 
+    //             let result = self.client.invoke(&request).await?;
+    // 
+    //             // Если messages::ChatFull имеет только вариант Full, 
+    //             // то можем сразу извлечь данные
+    //             let chat_full_data = match result {
+    //                 tl::enums::messages::ChatFull::Full(data) => data,
+    //                 // Если есть другие варианты, добавить их здесь
+    //             };
+    // 
+    //             // Теперь у нас есть доступ к full_chat
+    //             match &chat_full_data.full_chat {
+    //                 tl::enums::ChatFull::ChannelFull(channel_full) => {
+    //                     channel_full.linked_chat_id
+    //                         .ok_or_else(|| anyhow::anyhow!("Channel has no linked discussion group"))
+    //                 },
+    //                 tl::enums::ChatFull::Full(_) => {
+    //                     Err(anyhow::anyhow!("This is a regular group, not a channel"))
+    //                 },
+    //             }
+    //         },
+    //         _ => Err(anyhow::anyhow!("Not a channel")),
+    //     }
+    // }
+    
+    async fn get_linked_channel_id(&self, chat: &Chat) -> Result<i64> {
+        match chat {
+            Chat::Channel(channel) => {
+                use grammers_client::grammers_tl_types as tl;
 
-        Ok(admin_exists.is_some())
+                let input_channel = tl::types::InputChannel {
+                    channel_id: channel.id(),
+                    access_hash: channel.raw.access_hash.unwrap_or(0),
+                };
+
+                let request = tl::functions::channels::GetFullChannel {
+                    channel: input_channel.into(),
+                };
+
+                let result = self.client.invoke(&request).await?;
+                
+                match result {
+                    tl::enums::messages::ChatFull::Full(chat_full_data) => {
+                        match &chat_full_data.full_chat {
+                            tl::enums::ChatFull::ChannelFull(channel_full) => {
+                                channel_full.linked_chat_id
+                                    .ok_or_else(|| anyhow::anyhow!("Channel has no linked discussion group"))
+                            },
+                            tl::enums::ChatFull::Full(_) => {
+                                Err(anyhow::anyhow!("This is a regular group, not a channel"))
+                            },
+                        }
+                    },
+                }
+            },
+            Chat::Group(_) => {
+                Err(anyhow::anyhow!("Regular groups don't have linked channels"))
+            },
+            Chat::User(_) => {
+                Err(anyhow::anyhow!("Private chats don't have linked channels"))
+            },
+        }
     }
 
-    async fn parse_chat_admins_response(
-        &self,
-        text: &str,
-    ) -> Result<Option<(i64, serde_json::Value)>> {
-        if !text.starts_with("chat_admins_response:") {
-            return Ok(None);
-        }
+    // async fn is_sender_admin(
+    //     &self,
+    //     sender_id: i64,
+    //     chat_id: i64,
+    //     db_pool: &SqlitePool,
+    // ) -> Result<bool> {
+    //     let admin_exists =
+    //         sqlx::query("SELECT 1 FROM chat_admins WHERE chat_id = ? AND user_id = ?")
+    //             .bind(chat_id)
+    //             .bind(sender_id)
+    //             .fetch_optional(db_pool)
+    //             .await?;
+    // 
+    //     Ok(admin_exists.is_some())
+    // }
 
-        let parts: Vec<&str> = text.splitn(3, ':').collect();
-        if parts.len() != 3 {
-            return Ok(None);
-        }
+    async fn is_sender_admin(&self, sender_id: i64, chat_id: i64, db_pool: &SqlitePool) -> Result<bool> {
+        let count = sqlx::query(
+            "SELECT COUNT(*) as count FROM chat_admins 
+         WHERE chat_id = ? AND user_id = ? AND role IN ('owner', 'admin', 'linked_channel')"
+        )
+            .bind(chat_id)
+            .bind(sender_id)
+            .fetch_one(db_pool)
+            .await?;
 
-        if parts[2].starts_with("error:") {
-            warn!(
-                "Received error response for chat {}: {}",
-                parts[1], parts[2]
-            );
-            return Ok(None);
-        }
-
-        let chat_id: i64 = parts[1].parse()?;
-        let json_data: serde_json::Value = serde_json::from_str(parts[2])?;
-
-        Ok(Some((chat_id, json_data)))
+        let admin_count: i64 = count.get("count");
+        Ok(admin_count > 0)
     }
-
+    
     async fn parse_report_response(&self, text: &str) -> Result<Option<(i64, String)>> {
         if !text.starts_with("report_response:") {
             return Ok(None);
@@ -727,10 +760,12 @@ impl TelegramAgent {
         Ok(None)
     }
 
-    async fn process_chat_admins_response(
+    async fn save_chat_admins_to_db(
         &self,
         chat_id: i64,
-        json_data: serde_json::Value,
+        owner: &ChatMember,
+        administrators: &[ChatMember],
+        linked_channel_id: Option<i64>,
         db_pool: &SqlitePool,
     ) -> Result<()> {
         sqlx::query("DELETE FROM chat_admins WHERE chat_id = ?")
@@ -738,26 +773,19 @@ impl TelegramAgent {
             .execute(db_pool)
             .await?;
 
-        let owner_id = json_data["owner"].as_i64().unwrap_or(0);
-        let admin_ids = json_data["admins"]
-            .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_i64()).collect::<Vec<i64>>())
-            .unwrap_or_default();
-        let linked_channel_id = json_data["linked"].as_i64();
-
         let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
         sqlx::query("INSERT INTO chat_admins (chat_id, user_id, role, fetched_at) VALUES (?, ?, 'owner', ?)")
             .bind(chat_id)
-            .bind(owner_id)
+            .bind(owner.user_id)
             .bind(&timestamp)
             .execute(db_pool)
             .await?;
 
-        for admin_id in &admin_ids {
+        for admin in administrators {
             sqlx::query("INSERT INTO chat_admins (chat_id, user_id, role, fetched_at) VALUES (?, ?, 'admin', ?)")
                 .bind(chat_id)
-                .bind(admin_id)
+                .bind(admin.user_id)
                 .bind(&timestamp)
                 .execute(db_pool)
                 .await?;
@@ -772,12 +800,9 @@ impl TelegramAgent {
                 .await?;
         }
 
-        info!(
-            "Saved admins for chat {}: owner={}, admins={:?}, linked={:?}",
-            chat_id, owner_id, admin_ids, linked_channel_id
-        );
         Ok(())
     }
+
 
     async fn process_report_response(
         &self,
