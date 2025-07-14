@@ -1,7 +1,7 @@
 use crate::ai::common::common::raw_llm_processing_json;
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
-use crate::models::common::system_roles::{AgentDavonRoleType, GrootRoleType};
+use crate::models::common::system_roles::AgentDavonRoleType;
 use crate::models::tg_agent::bot_alias::GrootBotAlias;
 use crate::state::tg_agent::app_state::AgentAppState;
 use crate::utils::common::{build_resource_file_path, get_system_role_or_fallback};
@@ -91,8 +91,6 @@ impl TelegramAgent {
         groot_bot_alias: GrootBotAlias,
         app_state: Arc<AgentAppState>,
     ) -> Result<()> {
-        info!("Agent Davon is starting monitoring updates...");
-
         let me = self.client.get_me().await?;
         let last_name = me.last_name().unwrap_or("");
 
@@ -163,13 +161,13 @@ impl TelegramAgent {
                     self.process_report_response(chat_id, response_details, &app_state.db_pool).await?;
                     Ok(())
                 } else {
-                    info!("Message from bot but not a report response, ignoring");
+                    info!("Got message from Groot Bot but not a report response, ignoring");
                     Ok(())
                 }
             }
             
             if sender.id() == groot_bot_alias.bot_id {
-                info!("Skipping message from Groot Bot Alias writing to chat");
+                info!("Skipping message from Groot Bot writing to chat");
                 return Ok(());
             }
 
@@ -192,7 +190,7 @@ impl TelegramAgent {
                 stats.get_user_message_count(chat.id(), sender.id())
             };
 
-            if user_message_count >= 5 {
+            if user_message_count >= 20 {
                 info!("Skipping message from active user {} ({}+ messages) in chat {}", 
               sender.id(), user_message_count, chat.id());
                 self.update_chat_stats(&chat, &app_state.db_pool, false, &groot_bot_alias).await?;
@@ -270,7 +268,7 @@ impl TelegramAgent {
         app_state: Arc<AgentAppState>,
     ) -> Result<AnalysisResult> {
         let system_role =
-            get_system_role_or_fallback(&AppName::GrootBot, AgentDavonRoleType::MessageCheck, None);
+            get_system_role_or_fallback(&AppName::AgentDavon, AgentDavonRoleType::MessageCheck, None);
 
         let scam_detection_result =
             raw_llm_processing_json(&system_role, text, app_state, LlmModel::Light).await?;
