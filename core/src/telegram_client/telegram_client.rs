@@ -190,7 +190,7 @@ impl TelegramAgent {
                 stats.get_user_message_count(chat.id(), sender.id())
             };
 
-            if user_message_count >= 40 {
+            if user_message_count >= 100 {
                 info!("Skipping message from active user {} ({}+ messages) in chat {}",
               sender.id(), user_message_count, chat.id());
                 self.update_chat_stats(&chat, &app_state.db_pool, false, &groot_bot_alias).await?;
@@ -813,14 +813,20 @@ impl TelegramAgent {
 
         let parts: Vec<&str> = text.splitn(3, ':').collect();
         if parts.len() >= 2 {
-            if let Ok(chat_id) = parts[1].parse::<i64>() {
+            if let Ok(bot_api_chat_id) = parts[1].parse::<i64>() {
                 let response_details = if parts.len() >= 3 {
                     parts[2].to_string()
                 } else {
                     "Unknown response".to_string()
                 };
 
-                return Ok(Some((chat_id, response_details)));
+                let grammers_chat_id = if bot_api_chat_id < 0 {
+                    -(bot_api_chat_id + 1000000000000)
+                } else {
+                    bot_api_chat_id
+                };
+
+                return Ok(Some((grammers_chat_id, response_details)));
             }
         }
 
