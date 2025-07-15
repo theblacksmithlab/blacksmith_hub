@@ -149,7 +149,7 @@ impl TelegramAgent {
         let _chat_username = chat.username().map(|u| u.to_string());
 
         if let Some(sender) = message.sender() {
-            if sender.id() == groot_bot_alias.bot_id && chat.id() == me.id() {
+            if sender.id() == groot_bot_alias.bot_id && chat.id() == groot_bot_alias.bot_id {
                 let text = message.text();
                 return if let Some((chat_id, response_details)) =
                     self.parse_report_response(&text).await?
