@@ -1209,10 +1209,10 @@ impl TelegramAgent {
             }
 
             processed_count += 1;
-            
+
             if processed_count % 1000 == 0 {
                 info!("Processed {} messages, taking 1s break...", processed_count);
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_secs(2)).await;
             }
         }
 
