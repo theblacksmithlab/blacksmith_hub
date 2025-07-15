@@ -780,30 +780,72 @@ impl TelegramAgent {
         let mut participants = self.client.iter_participants(chat.pack());
         let mut owner = None;
         let mut administrators = Vec::new();
+        
+        // TEMP
+        for attempt in 1..=3 {
+            let mut participants = self.client.iter_participants(chat.pack());
+            let mut temp_owner = None;
+            let mut temp_administrators = Vec::new();
 
-        while let Some(participant) = participants.next().await? {
-            match &participant.role {
-                grammers_client::types::Role::Creator(_) => {
-                    owner = Some(ChatMember {
-                        user_id: participant.user.id(),
-                        username: participant.user.username().map(|u| u.to_string()),
-                        first_name: participant.user.first_name().to_string(),
-                        last_name: participant.user.last_name().map(|l| l.to_string()),
-                        role: MemberRole::Owner,
-                    });
+            while let Some(participant) = participants.next().await? {
+                match &participant.role {
+                    grammers_client::types::Role::Creator(_) => {
+                        temp_owner = Some(ChatMember {
+                            user_id: participant.user.id(),
+                            username: participant.user.username().map(|u| u.to_string()),
+                            first_name: participant.user.first_name().to_string(),
+                            last_name: participant.user.last_name().map(|l| l.to_string()),
+                            role: MemberRole::Owner,
+                        });
+                    }
+                    grammers_client::types::Role::Admin(_) => {
+                        temp_administrators.push(ChatMember {
+                            user_id: participant.user.id(),
+                            username: participant.user.username().map(|u| u.to_string()),
+                            first_name: participant.user.first_name().to_string(),
+                            last_name: participant.user.last_name().map(|l| l.to_string()),
+                            role: MemberRole::Administrator,
+                        });
+                    }
+                    _ => {}
                 }
-                grammers_client::types::Role::Admin(_) => {
-                    administrators.push(ChatMember {
-                        user_id: participant.user.id(),
-                        username: participant.user.username().map(|u| u.to_string()),
-                        first_name: participant.user.first_name().to_string(),
-                        last_name: participant.user.last_name().map(|l| l.to_string()),
-                        role: MemberRole::Administrator,
-                    });
-                }
-                _ => {}
+            }
+            
+            administrators = temp_administrators;
+            if temp_owner.is_some() {
+                owner = temp_owner;
+                info!("Owner found on attempt {} for chat {}", attempt, chat.id());
+                break;
+            } else if attempt < 3 {
+                warn!("Owner not found on attempt {} for chat {}, retrying...", attempt, chat.id());
+                tokio::time::sleep(Duration::from_secs(2)).await;
             }
         }
+        // TEMP
+        
+        // while let Some(participant) = participants.next().await? {
+        //     match &participant.role {
+        //         grammers_client::types::Role::Creator(_) => {
+        //             owner = Some(ChatMember {
+        //                 user_id: participant.user.id(),
+        //                 username: participant.user.username().map(|u| u.to_string()),
+        //                 first_name: participant.user.first_name().to_string(),
+        //                 last_name: participant.user.last_name().map(|l| l.to_string()),
+        //                 role: MemberRole::Owner,
+        //             });
+        //         }
+        //         grammers_client::types::Role::Admin(_) => {
+        //             administrators.push(ChatMember {
+        //                 user_id: participant.user.id(),
+        //                 username: participant.user.username().map(|u| u.to_string()),
+        //                 first_name: participant.user.first_name().to_string(),
+        //                 last_name: participant.user.last_name().map(|l| l.to_string()),
+        //                 role: MemberRole::Administrator,
+        //             });
+        //         }
+        //         _ => {}
+        //     }
+        // }
 
         let linked_channel_id = self.get_linked_channel_id(chat).await.ok();
 
