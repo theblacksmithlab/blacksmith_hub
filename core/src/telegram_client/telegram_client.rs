@@ -1195,16 +1195,58 @@ impl TelegramAgent {
     //     Ok(())
     // }
 
+    // async fn fetch_chat_message_stats_internal(
+    //     &self,
+    //     chat: &Chat,
+    //     app_state: &Arc<AgentAppState>,
+    // ) -> Result<()> {
+    // 
+    //     let mut user_counts: HashMap<i64, u32> = HashMap::new();
+    //     
+    //     let batch_size = 1000;
+    //     let total_messages = 6000;
+    //     let mut processed = 0;
+    // 
+    //     let mut msgs = self.client.iter_messages(chat.pack()).limit(total_messages);
+    // 
+    //     while let Some(msg) = msgs.next().await? {
+    //         if let Some(sender) = msg.sender() {
+    //             *user_counts.entry(sender.id()).or_insert(0) += 1;
+    //         }
+    // 
+    //         processed += 1;
+    //         
+    //         if processed % batch_size == 0 {
+    //             let mut rng = rand::rng();
+    //             let delay = rng.random_range(1500..3000);
+    //             info!("Processed {} messages, pausing {}ms...", processed, delay);
+    //             tokio::time::sleep(Duration::from_millis(delay)).await;
+    //         }
+    //     }
+    // 
+    //     {
+    //         let mut stats = app_state.chat_message_stats.lock().await;
+    //         stats.chat_message_counts.insert(chat.id(), user_counts.clone());
+    //     }
+    // 
+    //     info!(
+    //     "Fetched message stats for chat {}: {} unique users from {} messages",
+    //     chat.id(), user_counts.len(), processed
+    // );
+    //     Ok(())
+    // }
+
     async fn fetch_chat_message_stats_internal(
         &self,
         chat: &Chat,
         app_state: &Arc<AgentAppState>,
     ) -> Result<()> {
+        use rand::Rng;
 
         let mut user_counts: HashMap<i64, u32> = HashMap::new();
-        
-        let batch_size = 600;
-        let total_messages = 4800;
+
+        let batch_size = 1000;
+        let total_messages = 6000;
         let mut processed = 0;
 
         let mut msgs = self.client.iter_messages(chat.pack()).limit(total_messages);
@@ -1215,12 +1257,17 @@ impl TelegramAgent {
             }
 
             processed += 1;
-            
+
             if processed % batch_size == 0 {
-                let mut rng = rand::rng();
-                let delay = rng.random_range(1500..3000);
-                info!("Processed {} messages, pausing {}ms...", processed, delay);
-                tokio::time::sleep(Duration::from_millis(delay)).await;
+                if processed == 3000 {
+                    info!("Processed {} messages - FLOOD_WAIT protection: pausing 5 seconds...", processed);
+                    tokio::time::sleep(Duration::from_secs(7)).await;
+                } else {
+                    let mut rng = rand::rng();
+                    let delay = rng.random_range(1500..3000);
+                    info!("Processed {} messages, pausing {}ms...", processed, delay);
+                    tokio::time::sleep(Duration::from_millis(delay)).await;
+                }
             }
         }
 
