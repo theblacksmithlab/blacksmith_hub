@@ -1316,7 +1316,7 @@ impl TelegramAgent {
             if processed % batch_size == 0 {
                 if processed == 3000 {
                     info!("Processed {} messages - FLOOD_WAIT protection: pausing 7 seconds...", processed);
-                    tokio::time::sleep(Duration::from_secs(7)).await;
+                    tokio::time::sleep(Duration::from_secs(10)).await;
                 } else {
                     let mut rng = rand::rng();
                     let delay = rng.random_range(1500..3000);
