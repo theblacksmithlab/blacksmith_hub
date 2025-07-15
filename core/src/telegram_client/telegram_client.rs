@@ -166,7 +166,7 @@ impl TelegramAgent {
                     Ok(())
                 };
             }
-            
+
             if sender.id() == chat.id() {
                 info!(
                     "Skipping message from chat {} [id: {}] writing to itself",
@@ -780,7 +780,7 @@ impl TelegramAgent {
         let mut owner = None;
         let mut administrators: Vec<ChatMember> = Vec::new();
         let chat_title = chat.name().to_string();
-        
+
         for attempt in 1..=3 {
             let mut participants = self.client.iter_participants(chat.pack());
             let mut found_new_owner = false;
@@ -798,7 +798,12 @@ impl TelegramAgent {
                                 role: MemberRole::Owner,
                             });
                             found_new_owner = true;
-                            info!("Owner found on attempt {} for chat {} [id: {}]", attempt, chat_title, chat.id());
+                            info!(
+                                "Owner found on attempt {} for chat {} [id: {}]",
+                                attempt,
+                                chat_title,
+                                chat.id()
+                            );
                         }
                     }
                     grammers_client::types::Role::Admin(_) => {
@@ -819,24 +824,36 @@ impl TelegramAgent {
             }
 
             if found_new_owner && found_new_admins {
-                info!("Found owner + {} new admins on attempt {}", administrators.len(), attempt);
+                info!(
+                    "Found owner + {} new admins on attempt {}",
+                    administrators.len(),
+                    attempt
+                );
             } else if found_new_owner {
                 info!("Found owner on attempt {}", attempt);
             } else if found_new_admins {
-                info!("Found {} admins on attempt {}", administrators.len(), attempt);
+                info!(
+                    "Found {} admins on attempt {}",
+                    administrators.len(),
+                    attempt
+                );
             }
 
             if owner.is_some() && !administrators.is_empty() {
-                info!("Both owner and admins collected, stopping at attempt {}", attempt);
+                info!(
+                    "Both owner and admins collected, stopping at attempt {}",
+                    attempt
+                );
                 break;
             }
 
-
             if attempt < 3 {
-                warn!("Attempt {}: owner={}, admins={}. Retrying...", 
-              attempt, 
-              if owner.is_some() { "found" } else { "missing" },
-              administrators.len());
+                warn!(
+                    "Attempt {}: owner={}, admins={}. Retrying...",
+                    attempt,
+                    if owner.is_some() { "found" } else { "missing" },
+                    administrators.len()
+                );
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
         }
@@ -856,14 +873,25 @@ impl TelegramAgent {
             info!("Fetched and saved admins for chat {}: owner={}, admins count={}, linked_channel={:?}", 
           chat.id(), owner.as_ref().unwrap().user_id, administrators.len(), linked_channel_id);
         } else if owner.is_some() {
-            warn!("Fetched owner but no admins for chat {}: owner={}, linked_channel={:?}", 
-          chat.id(), owner.as_ref().unwrap().user_id, linked_channel_id);
+            warn!(
+                "Fetched owner but no admins for chat {}: owner={}, linked_channel={:?}",
+                chat.id(),
+                owner.as_ref().unwrap().user_id,
+                linked_channel_id
+            );
         } else if !administrators.is_empty() {
-            warn!("No owner found but {} admins saved for chat {}, linked_channel={:?}", 
-          administrators.len(), chat.id(), linked_channel_id);
+            warn!(
+                "No owner found but {} admins saved for chat {}, linked_channel={:?}",
+                administrators.len(),
+                chat.id(),
+                linked_channel_id
+            );
         } else {
-            error!("No owner or admins found for chat {}, only linked_channel={:?}", 
-           chat.id(), linked_channel_id);
+            error!(
+                "No owner or admins found for chat {}, only linked_channel={:?}",
+                chat.id(),
+                linked_channel_id
+            );
         }
 
         Ok(())
@@ -1136,18 +1164,55 @@ impl TelegramAgent {
         unreachable!()
     }
 
+    // async fn fetch_chat_message_stats_internal(
+    //     &self,
+    //     chat: &Chat,
+    //     app_state: &Arc<AgentAppState>,
+    // ) -> Result<()> {
+    //     let mut user_counts: HashMap<i64, u32> = HashMap::new();
+    //
+    //     let mut msgs = self.client.iter_messages(chat.pack()).limit(5000);
+    //
+    //     while let Some(msg) = msgs.next().await? {
+    //         if let Some(sender) = msg.sender() {
+    //             *user_counts.entry(sender.id()).or_insert(0) += 1;
+    //         }
+    //     }
+    //
+    //     {
+    //         let mut stats = app_state.chat_message_stats.lock().await;
+    //         stats
+    //             .chat_message_counts
+    //             .insert(chat.id(), user_counts.clone());
+    //     }
+    //
+    //     info!(
+    //         "Fetched message stats for chat {}: {} unique users",
+    //         chat.id(),
+    //         user_counts.len()
+    //     );
+    //     Ok(())
+    // }
+
     async fn fetch_chat_message_stats_internal(
         &self,
         chat: &Chat,
         app_state: &Arc<AgentAppState>,
     ) -> Result<()> {
         let mut user_counts: HashMap<i64, u32> = HashMap::new();
-
         let mut msgs = self.client.iter_messages(chat.pack()).limit(5000);
+        let mut processed_count = 0;
 
         while let Some(msg) = msgs.next().await? {
             if let Some(sender) = msg.sender() {
                 *user_counts.entry(sender.id()).or_insert(0) += 1;
+            }
+
+            processed_count += 1;
+            
+            if processed_count % 1000 == 0 {
+                info!("Processed {} messages, taking 1s break...", processed_count);
+                tokio::time::sleep(Duration::from_secs(1)).await;
             }
         }
 
@@ -1159,9 +1224,10 @@ impl TelegramAgent {
         }
 
         info!(
-            "Fetched message stats for chat {}: {} unique users",
+            "Fetched message stats for chat {}: {} unique users from {} messages",
             chat.id(),
-            user_counts.len()
+            user_counts.len(),
+            processed_count
         );
         Ok(())
     }
