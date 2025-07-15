@@ -18,6 +18,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, fs};
+use rand::Rng;
 use tracing::log::warn;
 use tracing::{error, info};
 
@@ -1199,36 +1200,39 @@ impl TelegramAgent {
         chat: &Chat,
         app_state: &Arc<AgentAppState>,
     ) -> Result<()> {
+
         let mut user_counts: HashMap<i64, u32> = HashMap::new();
-        let mut msgs = self.client.iter_messages(chat.pack()).limit(5000);
-        let mut processed_count = 0;
+        
+        let batch_size = 1000;
+        let total_messages = 5000;
+        let mut processed = 0;
+
+        let mut msgs = self.client.iter_messages(chat.pack()).limit(total_messages);
 
         while let Some(msg) = msgs.next().await? {
             if let Some(sender) = msg.sender() {
                 *user_counts.entry(sender.id()).or_insert(0) += 1;
             }
 
-            processed_count += 1;
-
-            if processed_count % 1000 == 0 {
-                info!("Processed {} messages, taking 1s break...", processed_count);
-                tokio::time::sleep(Duration::from_secs(2)).await;
+            processed += 1;
+            
+            if processed % batch_size == 0 {
+                let mut rng = rand::rng();
+                let delay = rng.random_range(1500..3000);
+                info!("Processed {} messages, pausing {}ms...", processed, delay);
+                tokio::time::sleep(Duration::from_millis(delay)).await;
             }
         }
 
         {
             let mut stats = app_state.chat_message_stats.lock().await;
-            stats
-                .chat_message_counts
-                .insert(chat.id(), user_counts.clone());
+            stats.chat_message_counts.insert(chat.id(), user_counts.clone());
         }
 
         info!(
-            "Fetched message stats for chat {}: {} unique users from {} messages",
-            chat.id(),
-            user_counts.len(),
-            processed_count
-        );
+        "Fetched message stats for chat {}: {} unique users from {} messages",
+        chat.id(), user_counts.len(), processed
+    );
         Ok(())
     }
 }

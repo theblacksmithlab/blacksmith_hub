@@ -34,3 +34,4 @@ unicode-segmentation.workspace = true
 emojis.workspace = true
 url.workspace = true
 csv.workspace = true
+rand.workspace = true
