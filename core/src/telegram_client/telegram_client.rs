@@ -552,9 +552,9 @@ impl TelegramAgent {
         let first_time = DateTime::parse_from_rfc3339(first_time_str)?;
         let elapsed = Utc::now() - first_time.with_timezone(&Utc);
 
-        if elapsed.num_minutes() >= 10 {
+        if elapsed.num_hours() >= 3 {
             // if elapsed.num_days() >= 1 {
-            if spam_count >= 2 {
+            if spam_count >= 3 {
                 info!(
                     "Sending report for chat {}: {} spam messages in {} days",
                     chat_id,
@@ -1260,7 +1260,7 @@ impl TelegramAgent {
 
             if processed % batch_size == 0 {
                 if processed == 3000 {
-                    info!("Processed {} messages - FLOOD_WAIT protection: pausing 5 seconds...", processed);
+                    info!("Processed {} messages - FLOOD_WAIT protection: pausing 7 seconds...", processed);
                     tokio::time::sleep(Duration::from_secs(7)).await;
                 } else {
                     let mut rng = rand::rng();
