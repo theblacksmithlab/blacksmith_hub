@@ -149,20 +149,6 @@ impl TelegramAgent {
         let _chat_username = chat.username().map(|u| u.to_string());
 
         if let Some(sender) = message.sender() {
-            if sender.id() == chat.id() {
-                info!(
-                    "Skipping message from chat {} [id: {}] writing to itself",
-                    chat_title,
-                    chat.id()
-                );
-                return Ok(());
-            }
-
-            if sender.id() == me.id() {
-                info!("Skipping message from Telegram Agent writing to the chat");
-                return Ok(());
-            }
-
             if sender.id() == groot_bot_alias.bot_id && chat.id() == me.id() {
                 let text = message.text();
                 return if let Some((chat_id, response_details)) =
@@ -179,6 +165,20 @@ impl TelegramAgent {
                     info!("Got message from Groot Bot but not a report response, ignoring");
                     Ok(())
                 };
+            }
+            
+            if sender.id() == chat.id() {
+                info!(
+                    "Skipping message from chat {} [id: {}] writing to itself",
+                    chat_title,
+                    chat.id()
+                );
+                return Ok(());
+            }
+
+            if sender.id() == me.id() {
+                info!("Skipping message from Telegram Agent writing to the chat");
+                return Ok(());
             }
 
             if sender.id() == groot_bot_alias.bot_id {
