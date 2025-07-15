@@ -591,8 +591,7 @@ pub async fn groot_bot_command_handler(
                         let mut sent_count = 0;
 
                         for admin in &admins {
-                            match bot.send_message(ChatId(lord_admin_id as i64), &offer).await {
-                                // match bot.send_message(ChatId(admin.user_id), &offer).await {
+                            match bot.send_message(ChatId(admin.user_id), &offer).await {
                                 Ok(_) => {
                                     info!(
                                         "Offer {} sent to {} [id: {}]",
@@ -623,8 +622,8 @@ pub async fn groot_bot_command_handler(
                                 let document = teloxide::types::InputFile::file(&csv_path);
 
                                 match bot
-                                    // .send_document(ChatId(admin.user_id), document)
-                                    .send_document(ChatId(lord_admin_id as i64), document)
+                                    .send_document(ChatId(admin.user_id), document)
+                                    // .send_document(ChatId(lord_admin_id as i64), document)
                                     .caption("Отчет о спам-сообщениях ☝️")
                                     .await
                                 {

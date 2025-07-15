@@ -18,7 +18,6 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, fs};
-use rand::Rng;
 use tracing::log::warn;
 use tracing::{error, info};
 
@@ -190,7 +189,7 @@ impl TelegramAgent {
                 );
                 return Ok(());
             }
-            
+
             // TEMP
             use grammers_client::grammers_tl_types as tl;
 
@@ -207,37 +206,41 @@ impl TelegramAgent {
                     };
 
                     match self.client.invoke(&request).await {
-                        Ok(result) => {
-                            match result {
-                                tl::enums::users::UserFull::Full(user_full_wrapper) => {
-                                    let full_user = &user_full_wrapper.full_user;
+                        Ok(result) => match result {
+                            tl::enums::users::UserFull::Full(user_full_wrapper) => {
+                                let full_user = &user_full_wrapper.full_user;
 
-                                    match full_user {
-                                        tl::enums::UserFull::Full(actual_user_full) => {
-                                            info!("User ID: {}", actual_user_full.id);
-                                            
-                                            if let Some(photo) = actual_user_full.profile_photo.clone() {
-                                                info!("Has profile photo: {:?}", photo);
-                                            }
-                                            
-                                            if let Some(about) = &actual_user_full.about {
-                                                info!("User bio: {}", about);
-                                            }
+                                match full_user {
+                                    tl::enums::UserFull::Full(actual_user_full) => {
+                                        info!("User ID: {}", actual_user_full.id);
 
-                                            if let Some(bot_info) = &actual_user_full.bot_info {
-                                                info!("Bot info available: {:?}", bot_info);
-                                            }
-
-                                            if let Some(personal_channel_id) = actual_user_full.personal_channel_id {
-                                                info!("Personal channel ID: {}", personal_channel_id);
-                                            }
-
-                                            info!("Common chats count: {}", actual_user_full.common_chats_count);
+                                        if let Some(photo) = actual_user_full.profile_photo.clone()
+                                        {
+                                            info!("Has profile photo: {:?}", photo);
                                         }
+
+                                        if let Some(about) = &actual_user_full.about {
+                                            info!("User bio: {}", about);
+                                        }
+
+                                        if let Some(bot_info) = &actual_user_full.bot_info {
+                                            info!("Bot info available: {:?}", bot_info);
+                                        }
+
+                                        if let Some(personal_channel_id) =
+                                            actual_user_full.personal_channel_id
+                                        {
+                                            info!("Personal channel ID: {}", personal_channel_id);
+                                        }
+
+                                        info!(
+                                            "Common chats count: {}",
+                                            actual_user_full.common_chats_count
+                                        );
                                     }
                                 }
                             }
-                        }
+                        },
                         Err(e) => {
                             warn!("Failed to get full user info: {}", e);
                         }
@@ -257,7 +260,10 @@ impl TelegramAgent {
                     chat_title,
                     chat.id(),
                 );
-                if let Err(e) = self.fetch_chat_message_stats(&chat, &app_state).await {
+                if let Err(e) = self
+                    .fetch_chat_message_stats(&chat, &app_state, &chat_title)
+                    .await
+                {
                     warn!(
                         "Failed to fetch message stats for chat {} [id: {}]: {}",
                         chat_title,
@@ -334,7 +340,8 @@ impl TelegramAgent {
         if let Ok(status) = self.get_chat_status(chat.id(), &app_state.db_pool).await {
             if status == "not_relevant" {
                 info!(
-                    "Skipping message from chat {} - marked as not_relevant",
+                    "Skipping message from chat {} [id: {}] - marked as not_relevant",
+                    chat_title,
                     chat.id()
                 );
                 return Ok(());
@@ -411,7 +418,7 @@ impl TelegramAgent {
         );
 
         let scam_detection_result =
-            raw_llm_processing_json(&system_role, text, app_state, LlmModel::Light).await?;
+            raw_llm_processing_json(&system_role, text, app_state, LlmModel::Complex2).await?;
 
         let is_scam: bool = match serde_json::from_str::<serde_json::Value>(&scam_detection_result)
         {
@@ -564,7 +571,7 @@ impl TelegramAgent {
             None => {
                 let spam_count = if is_spam { 1 } else { 0 };
                 let total_count = 1;
-                let first_time = Utc::now().to_rfc3339();
+                let first_time = Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
                 (spam_count, total_count, Some(first_time), true)
             }
         };
@@ -572,7 +579,7 @@ impl TelegramAgent {
         if should_update {
             sqlx::query("INSERT OR REPLACE INTO chat_monitoring (chat_id, chat_title, chat_username, first_message_time, spam_count, total_messages, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
                 .bind(chat_id)
-                .bind(chat_title)
+                .bind(chat_title.clone())
                 .bind(chat_username)
                 .bind(&first_time)
                 .bind(new_spam_count)
@@ -584,6 +591,7 @@ impl TelegramAgent {
             if let Some(first_time_str) = first_time {
                 self.check_report_ready(
                     chat_id,
+                    &chat_title,
                     &first_time_str,
                     new_spam_count,
                     db_pool,
@@ -599,6 +607,7 @@ impl TelegramAgent {
     async fn check_report_ready(
         &self,
         chat_id: i64,
+        chat_title: &str,
         first_time_str: &str,
         spam_count: i32,
         db_pool: &SqlitePool,
@@ -607,11 +616,11 @@ impl TelegramAgent {
         let first_time = DateTime::parse_from_rfc3339(first_time_str)?;
         let elapsed = Utc::now() - first_time.with_timezone(&Utc);
 
-        if elapsed.num_hours() >= 3 {
-            // if elapsed.num_days() >= 1 {
-            if spam_count >= 3 {
+        if elapsed.num_days() >= 3 {
+            if spam_count >= 10 {
                 info!(
-                    "Sending report for chat {}: {} spam messages in {} days",
+                    "Sending report for chat {} [id: {}]: {} spam messages in {} days",
+                    chat_title,
                     chat_id,
                     spam_count,
                     elapsed.num_days()
@@ -620,7 +629,8 @@ impl TelegramAgent {
                 self.send_report(chat_id, db_pool, groot_bot).await?;
             } else {
                 info!(
-                    "Chat {} not relevant: only {} spam messages in {} days",
+                    "Chat {} [id: {}] not relevant: only {} spam messages in {} days",
+                    chat_title,
                     chat_id,
                     spam_count,
                     elapsed.num_days()
@@ -802,7 +812,10 @@ impl TelegramAgent {
             Err(e) => error!("Failed to send report command to bot: {}", e),
         }
 
-        info!("Report command sent to bot for chat {}", chat_id);
+        info!(
+            "Report command sent to bot for chat {} [id: {}]",
+            chat_title, chat_id
+        );
 
         match sqlx::query(
             "UPDATE chat_monitoring SET status = 'silence', last_report_sent = ? WHERE chat_id = ?",
@@ -813,8 +826,8 @@ impl TelegramAgent {
         .await
         {
             Ok(_) => info!(
-                "Updated chat {} status to 'silence' - monitoring suspended",
-                chat_id
+                "Updated chat {} [id: {}] status to 'silence' - monitoring suspended",
+                chat_title, chat_id
             ),
             Err(e) => error!("Database update failed for chat {}: {}", chat_id, e),
         }
@@ -1001,22 +1014,6 @@ impl TelegramAgent {
         }
     }
 
-    // async fn is_sender_admin(
-    //     &self,
-    //     sender_id: i64,
-    //     chat_id: i64,
-    //     db_pool: &SqlitePool,
-    // ) -> Result<bool> {
-    //     let admin_exists =
-    //         sqlx::query("SELECT 1 FROM chat_admins WHERE chat_id = ? AND user_id = ?")
-    //             .bind(chat_id)
-    //             .bind(sender_id)
-    //             .fetch_optional(db_pool)
-    //             .await?;
-    //
-    //     Ok(admin_exists.is_some())
-    // }
-
     async fn is_sender_admin(
         &self,
         sender_id: i64,
@@ -1187,12 +1184,13 @@ impl TelegramAgent {
         &self,
         chat: &Chat,
         app_state: &Arc<AgentAppState>,
+        chat_title: &str,
     ) -> Result<()> {
         const MAX_RETRIES: u32 = 3;
 
         for attempt in 0..MAX_RETRIES {
             match self
-                .fetch_chat_message_stats_internal(chat, app_state)
+                .fetch_chat_message_stats_internal(chat, app_state, &chat_title)
                 .await
             {
                 Ok(()) => return Ok(()),
@@ -1220,35 +1218,37 @@ impl TelegramAgent {
         unreachable!()
     }
 
-    // async fn fetch_chat_message_stats_internal(
-    //     &self,
-    //     chat: &Chat,
-    //     app_state: &Arc<AgentAppState>,
-    // ) -> Result<()> {
-    //     let mut user_counts: HashMap<i64, u32> = HashMap::new();
-    //
-    //     let mut msgs = self.client.iter_messages(chat.pack()).limit(5000);
-    //
-    //     while let Some(msg) = msgs.next().await? {
-    //         if let Some(sender) = msg.sender() {
-    //             *user_counts.entry(sender.id()).or_insert(0) += 1;
-    //         }
-    //     }
-    //
-    //     {
-    //         let mut stats = app_state.chat_message_stats.lock().await;
-    //         stats
-    //             .chat_message_counts
-    //             .insert(chat.id(), user_counts.clone());
-    //     }
-    //
-    //     info!(
-    //         "Fetched message stats for chat {}: {} unique users",
-    //         chat.id(),
-    //         user_counts.len()
-    //     );
-    //     Ok(())
-    // }
+    async fn fetch_chat_message_stats_internal(
+        &self,
+        chat: &Chat,
+        app_state: &Arc<AgentAppState>,
+        chat_title: &str,
+    ) -> Result<()> {
+        let mut user_counts: HashMap<i64, u32> = HashMap::new();
+
+        let mut msgs = self.client.iter_messages(chat.pack()).limit(5000);
+
+        while let Some(msg) = msgs.next().await? {
+            if let Some(sender) = msg.sender() {
+                *user_counts.entry(sender.id()).or_insert(0) += 1;
+            }
+        }
+
+        {
+            let mut stats = app_state.chat_message_stats.lock().await;
+            stats
+                .chat_message_counts
+                .insert(chat.id(), user_counts.clone());
+        }
+
+        info!(
+            "Fetched message stats for chat {} [id: {}]: {} unique users",
+            chat_title,
+            chat.id(),
+            user_counts.len()
+        );
+        Ok(())
+    }
 
     // async fn fetch_chat_message_stats_internal(
     //     &self,
@@ -1291,50 +1291,50 @@ impl TelegramAgent {
     //     Ok(())
     // }
 
-    async fn fetch_chat_message_stats_internal(
-        &self,
-        chat: &Chat,
-        app_state: &Arc<AgentAppState>,
-    ) -> Result<()> {
-        use rand::Rng;
-
-        let mut user_counts: HashMap<i64, u32> = HashMap::new();
-
-        let batch_size = 1000;
-        let total_messages = 6000;
-        let mut processed = 0;
-
-        let mut msgs = self.client.iter_messages(chat.pack()).limit(total_messages);
-
-        while let Some(msg) = msgs.next().await? {
-            if let Some(sender) = msg.sender() {
-                *user_counts.entry(sender.id()).or_insert(0) += 1;
-            }
-
-            processed += 1;
-
-            if processed % batch_size == 0 {
-                if processed == 3000 {
-                    info!("Processed {} messages - FLOOD_WAIT protection: pausing 7 seconds...", processed);
-                    tokio::time::sleep(Duration::from_secs(10)).await;
-                } else {
-                    let mut rng = rand::rng();
-                    let delay = rng.random_range(1500..3000);
-                    info!("Processed {} messages, pausing {}ms...", processed, delay);
-                    tokio::time::sleep(Duration::from_millis(delay)).await;
-                }
-            }
-        }
-
-        {
-            let mut stats = app_state.chat_message_stats.lock().await;
-            stats.chat_message_counts.insert(chat.id(), user_counts.clone());
-        }
-
-        info!(
-        "Fetched message stats for chat {}: {} unique users from {} messages",
-        chat.id(), user_counts.len(), processed
-    );
-        Ok(())
-    }
+    // async fn fetch_chat_message_stats_internal(
+    //     &self,
+    //     chat: &Chat,
+    //     app_state: &Arc<AgentAppState>,
+    // ) -> Result<()> {
+    //     use rand::Rng;
+    //
+    //     let mut user_counts: HashMap<i64, u32> = HashMap::new();
+    //
+    //     let batch_size = 1000;
+    //     let total_messages = 5000;
+    //     let mut processed = 0;
+    //
+    //     let mut msgs = self.client.iter_messages(chat.pack()).limit(total_messages);
+    //
+    //     while let Some(msg) = msgs.next().await? {
+    //         if let Some(sender) = msg.sender() {
+    //             *user_counts.entry(sender.id()).or_insert(0) += 1;
+    //         }
+    //
+    //         processed += 1;
+    //
+    //         if processed % batch_size == 0 {
+    //             if processed == 3000 {
+    //                 info!("Processed {} messages - FLOOD_WAIT protection: pausing 7 seconds...", processed);
+    //                 tokio::time::sleep(Duration::from_secs(10)).await;
+    //             } else {
+    //                 let mut rng = rand::rng();
+    //                 let delay = rng.random_range(1500..3000);
+    //                 info!("Processed {} messages, pausing {}ms...", processed, delay);
+    //                 tokio::time::sleep(Duration::from_millis(delay)).await;
+    //             }
+    //         }
+    //     }
+    //
+    //     {
+    //         let mut stats = app_state.chat_message_stats.lock().await;
+    //         stats.chat_message_counts.insert(chat.id(), user_counts.clone());
+    //     }
+    //
+    //     info!(
+    //     "Fetched message stats for chat {}: {} unique users from {} messages",
+    //     chat.id(), user_counts.len(), processed
+    // );
+    //     Ok(())
+    // }
 }
