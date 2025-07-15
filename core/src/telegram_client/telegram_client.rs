@@ -777,96 +777,69 @@ impl TelegramAgent {
     }
 
     async fn fetch_chat_admins_grammers(&self, chat: &Chat, db_pool: &SqlitePool) -> Result<()> {
-        let mut participants = self.client.iter_participants(chat.pack());
         let mut owner = None;
-        let mut administrators = Vec::new();
+        let mut administrators: Vec<ChatMember> = Vec::new();
+        let chat_title = chat.name().to_string();
         
-        // TEMP
         for attempt in 1..=3 {
             let mut participants = self.client.iter_participants(chat.pack());
-            let mut temp_owner = None;
-            let mut temp_administrators = Vec::new();
+            let mut found_new_owner = false;
+            let mut found_new_admins = false;
 
             while let Some(participant) = participants.next().await? {
                 match &participant.role {
                     grammers_client::types::Role::Creator(_) => {
-                        temp_owner = Some(ChatMember {
-                            user_id: participant.user.id(),
-                            username: participant.user.username().map(|u| u.to_string()),
-                            first_name: participant.user.first_name().to_string(),
-                            last_name: participant.user.last_name().map(|l| l.to_string()),
-                            role: MemberRole::Owner,
-                        });
+                        if owner.is_none() {
+                            owner = Some(ChatMember {
+                                user_id: participant.user.id(),
+                                username: participant.user.username().map(|u| u.to_string()),
+                                first_name: participant.user.first_name().to_string(),
+                                last_name: participant.user.last_name().map(|l| l.to_string()),
+                                role: MemberRole::Owner,
+                            });
+                            found_new_owner = true;
+                            info!("Owner found on attempt {} for chat {} [id: {}]", attempt, chat_title, chat.id());
+                        }
                     }
                     grammers_client::types::Role::Admin(_) => {
-                        temp_administrators.push(ChatMember {
-                            user_id: participant.user.id(),
-                            username: participant.user.username().map(|u| u.to_string()),
-                            first_name: participant.user.first_name().to_string(),
-                            last_name: participant.user.last_name().map(|l| l.to_string()),
-                            role: MemberRole::Administrator,
-                        });
+                        let admin_id = participant.user.id();
+                        if !administrators.iter().any(|a| a.user_id == admin_id) {
+                            administrators.push(ChatMember {
+                                user_id: admin_id,
+                                username: participant.user.username().map(|u| u.to_string()),
+                                first_name: participant.user.first_name().to_string(),
+                                last_name: participant.user.last_name().map(|l| l.to_string()),
+                                role: MemberRole::Administrator,
+                            });
+                            found_new_admins = true;
+                        }
                     }
                     _ => {}
                 }
             }
-            
-            administrators = temp_administrators;
 
-            let owner_found = temp_owner.is_some();
-            let admins_found = !administrators.is_empty();
-
-            if temp_owner.is_some() {
-                owner = temp_owner;
+            if found_new_owner && found_new_admins {
+                info!("Found owner + {} new admins on attempt {}", administrators.len(), attempt);
+            } else if found_new_owner {
+                info!("Found owner on attempt {}", attempt);
+            } else if found_new_admins {
+                info!("Found {} admins on attempt {}", administrators.len(), attempt);
             }
 
-            if owner_found && admins_found {
-                info!("Owner and admins found on attempt {} for chat {}", attempt, chat.id());
+            if owner.is_some() && !administrators.is_empty() {
+                info!("Both owner and admins collected, stopping at attempt {}", attempt);
                 break;
-            } else if owner_found && !admins_found {
-                info!("Only owner found on attempt {} for chat {}, but no admins", attempt, chat.id());
-                break;
-            } else if !owner_found && admins_found {
-                if attempt < 3 {
-                    warn!("Only {} admins found on attempt {}, owner missing. Retrying...", administrators.len(), attempt);
-                    tokio::time::sleep(Duration::from_secs(2)).await;
-                } else {
-                    warn!("Owner not found after {} attempts, but {} admins found", attempt, administrators.len());
-                }
-            } else {
-                if attempt < 3 {
-                    warn!("No owner or admins found on attempt {} for chat {}, retrying...", attempt, chat.id());
-                    tokio::time::sleep(Duration::from_secs(2)).await;
-                } else {
-                    warn!("No owner or admins found after {} attempts for chat {}", attempt, chat.id());
-                }
+            }
+
+
+            if attempt < 3 {
+                warn!("Attempt {}: owner={}, admins={}. Retrying...", 
+              attempt, 
+              if owner.is_some() { "found" } else { "missing" },
+              administrators.len());
+                tokio::time::sleep(Duration::from_secs(2)).await;
             }
         }
-        // TEMP
-        
-        // while let Some(participant) = participants.next().await? {
-        //     match &participant.role {
-        //         grammers_client::types::Role::Creator(_) => {
-        //             owner = Some(ChatMember {
-        //                 user_id: participant.user.id(),
-        //                 username: participant.user.username().map(|u| u.to_string()),
-        //                 first_name: participant.user.first_name().to_string(),
-        //                 last_name: participant.user.last_name().map(|l| l.to_string()),
-        //                 role: MemberRole::Owner,
-        //             });
-        //         }
-        //         grammers_client::types::Role::Admin(_) => {
-        //             administrators.push(ChatMember {
-        //                 user_id: participant.user.id(),
-        //                 username: participant.user.username().map(|u| u.to_string()),
-        //                 first_name: participant.user.first_name().to_string(),
-        //                 last_name: participant.user.last_name().map(|l| l.to_string()),
-        //                 role: MemberRole::Administrator,
-        //             });
-        //         }
-        //         _ => {}
-        //     }
-        // }
 
         let linked_channel_id = self.get_linked_channel_id(chat).await.ok();
 
