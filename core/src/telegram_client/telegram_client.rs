@@ -812,13 +812,34 @@ impl TelegramAgent {
             }
             
             administrators = temp_administrators;
+
+            let owner_found = temp_owner.is_some();
+            let admins_found = !administrators.is_empty();
+
             if temp_owner.is_some() {
                 owner = temp_owner;
-                info!("Owner found on attempt {} for chat {}", attempt, chat.id());
+            }
+
+            if owner_found && admins_found {
+                info!("Owner and admins found on attempt {} for chat {}", attempt, chat.id());
                 break;
-            } else if attempt < 3 {
-                warn!("Owner not found on attempt {} for chat {}, retrying...", attempt, chat.id());
-                tokio::time::sleep(Duration::from_secs(2)).await;
+            } else if owner_found && !admins_found {
+                info!("Only owner found on attempt {} for chat {}, but no admins", attempt, chat.id());
+                break;
+            } else if !owner_found && admins_found {
+                if attempt < 3 {
+                    warn!("Only {} admins found on attempt {}, owner missing. Retrying...", administrators.len(), attempt);
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                } else {
+                    warn!("Owner not found after {} attempts, but {} admins found", attempt, administrators.len());
+                }
+            } else {
+                if attempt < 3 {
+                    warn!("No owner or admins found on attempt {} for chat {}, retrying...", attempt, chat.id());
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                } else {
+                    warn!("No owner or admins found after {} attempts for chat {}", attempt, chat.id());
+                }
             }
         }
         // TEMP
@@ -858,16 +879,18 @@ impl TelegramAgent {
         )
         .await?;
 
-        if owner.is_some() {
+        if owner.is_some() && !administrators.is_empty() {
             info!("Fetched and saved admins for chat {}: owner={}, admins count={}, linked_channel={:?}", 
           chat.id(), owner.as_ref().unwrap().user_id, administrators.len(), linked_channel_id);
+        } else if owner.is_some() {
+            warn!("Fetched owner but no admins for chat {}: owner={}, linked_channel={:?}", 
+          chat.id(), owner.as_ref().unwrap().user_id, linked_channel_id);
+        } else if !administrators.is_empty() {
+            warn!("No owner found but {} admins saved for chat {}, linked_channel={:?}", 
+          administrators.len(), chat.id(), linked_channel_id);
         } else {
-            warn!(
-                "No owner found in chat {}, saved only {} admins, linked_channel={:?}",
-                chat.id(),
-                administrators.len(),
-                linked_channel_id
-            );
+            error!("No owner or admins found for chat {}, only linked_channel={:?}", 
+           chat.id(), linked_channel_id);
         }
 
         Ok(())
