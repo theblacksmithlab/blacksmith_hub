@@ -16,10 +16,7 @@ impl GrootBotAlias {
         }
     }
 
-    pub async fn should_process_chat(
-        &self,
-        chat: &Chat,
-    ) -> Result<bool> {
+    pub async fn should_process_chat(&self, chat: &Chat) -> Result<bool> {
         let has_username = match chat {
             Chat::User(_) => false,
             Chat::Group(group) => group.username().is_some(),
@@ -31,10 +28,7 @@ impl GrootBotAlias {
             return Ok(false);
         }
 
-        info!(
-            "Chat {} is public (got username), processing",
-            chat.id()
-        );
+        info!("Chat {} is public (got username), processing", chat.id());
         Ok(true)
     }
 

@@ -300,6 +300,4 @@ pub enum GrootBotCommands {
     ForceSubscription,
     #[command(rename = "agent_report")]
     DavonReport,
-    #[command(rename = "chat_admins_request")]
-    ChatAdminsRequest,
 }

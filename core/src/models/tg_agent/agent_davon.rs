@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use crate::utils::tg_bot::groot_bot::groot_bot_utils::get_linked_channel_id;
 use anyhow::Result;
+use std::collections::HashMap;
 use teloxide::prelude::Requester;
 use teloxide::types::ChatId;
 use teloxide::Bot;
@@ -37,7 +37,7 @@ impl ReportedChatInfo {
             .get_chat(ChatId(chat_id))
             .await
             .map_err(|e| anyhow::anyhow!("Failed to get chat info: {}", e))?;
-        
+
         let chat_title = chat.title().unwrap_or("No Title Chat").to_string();
         let username = chat.username().unwrap_or("_").to_string();
 

@@ -2,6 +2,7 @@ use crate::ai::common::common::raw_llm_processing_json;
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::AgentDavonRoleType;
+use crate::models::tg_agent::agent_davon::{ChatMember, MemberRole};
 use crate::models::tg_agent::bot_alias::GrootBotAlias;
 use crate::state::tg_agent::app_state::AgentAppState;
 use crate::utils::common::{build_resource_file_path, get_system_role_or_fallback};
@@ -11,15 +12,14 @@ use grammers_client::types::{Chat, Message, Update, User};
 use grammers_client::{Client as g_Client, Config as g_Config};
 use grammers_session::Session;
 use sqlx::{Row, SqlitePool};
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, fs};
-use std::collections::HashMap;
 use tracing::log::warn;
 use tracing::{error, info};
-use crate::models::tg_agent::agent_davon::{ChatMember, MemberRole};
 
 enum AnalysisResult {
     Spam,
@@ -42,6 +42,7 @@ impl TelegramAgent {
         }
 
         info!("TelegramAgent initialized successfully");
+
         Ok(Self { client })
     }
 
@@ -94,7 +95,12 @@ impl TelegramAgent {
         let me = self.client.get_me().await?;
         let last_name = me.last_name().unwrap_or("");
 
-        info!("Monitoring as: {} {} [id: {}]", me.first_name(), last_name, me.id());
+        info!(
+            "Monitoring as: {} {} [id: {}]",
+            me.first_name(),
+            last_name,
+            me.id()
+        );
 
         loop {
             match self.client.next_update().await {
@@ -139,16 +145,19 @@ impl TelegramAgent {
         me: &User,
     ) -> Result<()> {
         let chat = message.chat();
-        
+        let chat_title = chat.name().to_string();
+        let _chat_username = chat.username().map(|u| u.to_string());
+
         if let Some(sender) = message.sender() {
             if sender.id() == chat.id() {
                 info!(
-                    "Skipping message from chat {} writing to itself",
+                    "Skipping message from chat {} [id: {}] writing to itself",
+                    chat_title,
                     chat.id()
                 );
                 return Ok(());
             }
-            
+
             if sender.id() == me.id() {
                 info!("Skipping message from Telegram Agent writing to the chat");
                 return Ok(());
@@ -156,18 +165,28 @@ impl TelegramAgent {
 
             if sender.id() == groot_bot_alias.bot_id && chat.id() == me.id() {
                 let text = message.text();
-                return if let Some((chat_id, response_details)) = self.parse_report_response(&text).await? {
-                    info!("Received report response for chat {}: {}", chat_id, response_details);
-                    self.process_report_response(chat_id, response_details, &app_state.db_pool).await?;
+                return if let Some((chat_id, response_details)) =
+                    self.parse_report_response(&text).await?
+                {
+                    info!(
+                        "Received report response for chat [id: {}]: {}",
+                        chat_id, response_details
+                    );
+                    self.process_report_response(chat_id, response_details, &app_state.db_pool)
+                        .await?;
                     Ok(())
                 } else {
                     info!("Got message from Groot Bot but not a report response, ignoring");
                     Ok(())
-                }
+                };
             }
-            
+
             if sender.id() == groot_bot_alias.bot_id {
-                info!("Skipping message from Groot Bot writing to chat");
+                info!(
+                    "Skipping message from Groot Bot writing to chat {} [id: {}]",
+                    chat_title,
+                    chat.id()
+                );
                 return Ok(());
             }
 
@@ -177,11 +196,24 @@ impl TelegramAgent {
             };
 
             if !stats_fetched {
-                info!("Message stats not fetched for chat {} ({}), fetching...", chat.id(), chat.name());
+                info!(
+                    "Message stats not fetched for chat {} [id: {}], fetching...",
+                    chat_title,
+                    chat.id(),
+                );
                 if let Err(e) = self.fetch_chat_message_stats(&chat, &app_state).await {
-                    warn!("Failed to fetch message stats for chat {}: {}", chat.id(), e);
+                    warn!(
+                        "Failed to fetch message stats for chat {} [id: {}]: {}",
+                        chat_title,
+                        chat.id(),
+                        e
+                    );
                 } else {
-                    info!("Successfully fetched message stats for chat {}", chat.id());
+                    info!(
+                        "Successfully fetched message stats for chat {} [id: {}]",
+                        chat_title,
+                        chat.id()
+                    );
                 }
             }
 
@@ -191,13 +223,23 @@ impl TelegramAgent {
             };
 
             if user_message_count >= 100 {
-                info!("Skipping message from active user {} ({}+ messages) in chat {}",
-              sender.id(), user_message_count, chat.id());
-                self.update_chat_stats(&chat, &app_state.db_pool, false, &groot_bot_alias).await?;
+                info!(
+                    "Skipping message from active user {} ({}+ messages) in chat {} [id: {}]",
+                    sender.id(),
+                    user_message_count,
+                    chat_title,
+                    chat.id()
+                );
+                self.update_chat_stats(&chat, &app_state.db_pool, false, &groot_bot_alias)
+                    .await?;
                 return Ok(());
             }
         } else {
-            info!("No sender in message.sender(), probably got message from chat writing to itself");
+            info!(
+                "No sender in message.sender(), probably got message from chat: {:?} writing to itself: {}",
+                message.sender(),
+                chat.id()
+            );
             return Ok(());
         }
 
@@ -210,7 +252,10 @@ impl TelegramAgent {
             .await?;
 
         if !admins_fetched {
-            if let Err(e) = self.fetch_chat_admins_grammers(&chat, &app_state.db_pool).await {
+            if let Err(e) = self
+                .fetch_chat_admins_grammers(&chat, &app_state.db_pool)
+                .await
+            {
                 warn!("Failed to fetch admins for chat {}: {}", chat.id(), e);
             }
         }
@@ -221,21 +266,57 @@ impl TelegramAgent {
                 .await?
             {
                 info!(
-                "Skipping message from admin {} in chat {}",
-                sender.id(),
-                chat.id()
-            );
+                    "Skipping message from admin {} in chat {} [id: {}]",
+                    sender.id(),
+                    chat_title,
+                    chat.id()
+                );
                 return Ok(());
             }
         }
 
         if let Ok(status) = self.get_chat_status(chat.id(), &app_state.db_pool).await {
             if status == "not_relevant" {
-                info!("Skipping message from chat {} - marked as not_relevant", chat.id());
+                info!(
+                    "Skipping message from chat {} - marked as not_relevant",
+                    chat.id()
+                );
                 return Ok(());
             }
+            if status == "silence" {
+                if let Ok(should_resume) = self
+                    .should_resume_monitoring(chat.id(), &app_state.db_pool)
+                    .await
+                {
+                    if should_resume {
+                        info!(
+                            "Resuming monitoring for chat {} - silence period expired",
+                            chat.id()
+                        );
+                        sqlx::query("UPDATE chat_monitoring SET status = 'collecting', spam_count = 0, total_messages = 0, first_message_time = ? WHERE chat_id = ?")
+                            .bind(Utc::now().to_rfc3339())
+                            .bind(chat.id())
+                            .execute(app_state.db_pool.as_ref())
+                            .await?;
+                    } else {
+                        info!(
+                            "Skipping message from chat {} [id: {}] - still in silence period",
+                            chat_title,
+                            chat.id()
+                        );
+                        return Ok(());
+                    }
+                } else {
+                    info!(
+                        "Skipping message from chat {} [id: {}] in silence period",
+                        chat_title,
+                        chat.id()
+                    );
+                    return Ok(());
+                }
+            }
         }
-        
+
         let text = message.text();
         if text.is_empty() {
             return Ok(());
@@ -267,8 +348,11 @@ impl TelegramAgent {
         text: &str,
         app_state: Arc<AgentAppState>,
     ) -> Result<AnalysisResult> {
-        let system_role =
-            get_system_role_or_fallback(&AppName::AgentDavon, AgentDavonRoleType::MessageCheck, None);
+        let system_role = get_system_role_or_fallback(
+            &AppName::AgentDavon,
+            AgentDavonRoleType::MessageCheck,
+            None,
+        );
 
         let scam_detection_result =
             raw_llm_processing_json(&system_role, text, app_state, LlmModel::Light).await?;
@@ -339,7 +423,7 @@ impl TelegramAgent {
                 "mommy's_anon".to_string()
             }
         } else {
-            sender.name().to_string()
+            sender.username().as_deref().unwrap_or("_").to_string()
         };
 
         sqlx::query("INSERT INTO spam_messages (chat_id, user_id, username, message_text, detected_at) VALUES (?, ?, ?, ?, ?)")
@@ -614,7 +698,9 @@ impl TelegramAgent {
                 } else {
                     let mut admins_wtr = csv::WriterBuilder::new().from_writer(file);
 
-                    if let Err(e) = admins_wtr.write_record(&["chat_title", "chat_username", "user_id", "role"]) {
+                    if let Err(e) =
+                        admins_wtr.write_record(&["chat_title", "chat_username", "user_id", "role"])
+                    {
                         error!("Failed to write admins CSV headers: {}. Continuing.", e);
                     } else {
                         for admin in admins {
@@ -633,7 +719,10 @@ impl TelegramAgent {
                         }
 
                         if let Err(e) = admins_wtr.flush() {
-                            error!("Failed to flush admins CSV file: {}. File may be incomplete.", e);
+                            error!(
+                                "Failed to flush admins CSV file: {}. File may be incomplete.",
+                                e
+                            );
                         } else {
                             info!("Admins CSV report created: {}", admins_path);
                         }
@@ -641,10 +730,13 @@ impl TelegramAgent {
                 }
             }
             Err(e) => {
-                error!("Failed to create admins CSV file {}: {}. Continuing without admin data.", admins_path, e);
+                error!(
+                    "Failed to create admins CSV file {}: {}. Continuing without admin data.",
+                    admins_path, e
+                );
             }
         }
-        
+
         let command = format!("/agent_report {}", bot_api_chat_id);
         match groot_bot_alias.send_message_to_bot(self, &command).await {
             Ok(_) => info!(
@@ -699,7 +791,7 @@ impl TelegramAgent {
                         last_name: participant.user.last_name().map(|l| l.to_string()),
                         role: MemberRole::Owner,
                     });
-                },
+                }
                 grammers_client::types::Role::Admin(_) => {
                     administrators.push(ChatMember {
                         user_id: participant.user.id(),
@@ -708,26 +800,37 @@ impl TelegramAgent {
                         last_name: participant.user.last_name().map(|l| l.to_string()),
                         role: MemberRole::Administrator,
                     });
-                },
+                }
                 _ => {}
             }
         }
 
         let linked_channel_id = self.get_linked_channel_id(chat).await.ok();
-        
-        self.save_chat_admins_to_db(chat.id(), owner.as_ref(), &administrators, linked_channel_id, db_pool).await?;
+
+        self.save_chat_admins_to_db(
+            chat.id(),
+            owner.as_ref(),
+            &administrators,
+            linked_channel_id,
+            db_pool,
+        )
+        .await?;
 
         if owner.is_some() {
             info!("Fetched and saved admins for chat {}: owner={}, admins count={}, linked_channel={:?}", 
           chat.id(), owner.as_ref().unwrap().user_id, administrators.len(), linked_channel_id);
         } else {
-            warn!("No owner found in chat {}, saved only {} admins, linked_channel={:?}", 
-          chat.id(), administrators.len(), linked_channel_id);
+            warn!(
+                "No owner found in chat {}, saved only {} admins, linked_channel={:?}",
+                chat.id(),
+                administrators.len(),
+                linked_channel_id
+            );
         }
 
         Ok(())
     }
-    
+
     async fn get_linked_channel_id(&self, chat: &Chat) -> Result<i64> {
         match chat {
             Chat::Group(group) => {
@@ -788,24 +891,29 @@ impl TelegramAgent {
     //             .bind(sender_id)
     //             .fetch_optional(db_pool)
     //             .await?;
-    // 
+    //
     //     Ok(admin_exists.is_some())
     // }
 
-    async fn is_sender_admin(&self, sender_id: i64, chat_id: i64, db_pool: &SqlitePool) -> Result<bool> {
+    async fn is_sender_admin(
+        &self,
+        sender_id: i64,
+        chat_id: i64,
+        db_pool: &SqlitePool,
+    ) -> Result<bool> {
         let count = sqlx::query(
             "SELECT COUNT(*) as count FROM chat_admins 
-         WHERE chat_id = ? AND user_id = ? AND role IN ('owner', 'admin', 'linked_channel')"
+         WHERE chat_id = ? AND user_id = ? AND role IN ('owner', 'admin', 'linked_channel')",
         )
-            .bind(chat_id)
-            .bind(sender_id)
-            .fetch_one(db_pool)
-            .await?;
+        .bind(chat_id)
+        .bind(sender_id)
+        .fetch_one(db_pool)
+        .await?;
 
         let admin_count: i64 = count.get("count");
         Ok(admin_count > 0)
     }
-    
+
     async fn parse_report_response(&self, text: &str) -> Result<Option<(i64, String)>> {
         if !text.starts_with("report_response:") {
             return Ok(None);
@@ -825,6 +933,11 @@ impl TelegramAgent {
                 } else {
                     bot_api_chat_id
                 };
+
+                info!(
+                    "Bot api chat_id parsed from {} to {}",
+                    bot_api_chat_id, grammers_chat_id
+                );
 
                 return Ok(Some((grammers_chat_id, response_details)));
             }
@@ -878,7 +991,6 @@ impl TelegramAgent {
         Ok(())
     }
 
-
     async fn process_report_response(
         &self,
         chat_id: i64,
@@ -922,7 +1034,30 @@ impl TelegramAgent {
                 let status: String = row.get("status");
                 Ok(status)
             }
-            None => Ok("collecting".to_string())
+            None => Ok("collecting".to_string()),
+        }
+    }
+
+    async fn should_resume_monitoring(&self, chat_id: i64, db_pool: &SqlitePool) -> Result<bool> {
+        let result = sqlx::query("SELECT last_report_sent FROM chat_monitoring WHERE chat_id = ?")
+            .bind(chat_id)
+            .fetch_optional(db_pool)
+            .await?;
+
+        match result {
+            Some(row) => {
+                if let Some(last_sent_str) = row.get::<Option<String>, _>("last_report_sent") {
+                    if let Ok(last_sent_time) = DateTime::parse_from_rfc3339(&last_sent_str) {
+                        let elapsed = Utc::now() - last_sent_time.with_timezone(&Utc);
+                        Ok(elapsed.num_days() >= 11)
+                    } else {
+                        Ok(false)
+                    }
+                } else {
+                    Ok(false)
+                }
+            }
+            None => Ok(false),
         }
     }
 
@@ -934,27 +1069,35 @@ impl TelegramAgent {
         const MAX_RETRIES: u32 = 3;
 
         for attempt in 0..MAX_RETRIES {
-            match self.fetch_chat_message_stats_internal(chat, app_state).await {
+            match self
+                .fetch_chat_message_stats_internal(chat, app_state)
+                .await
+            {
                 Ok(()) => return Ok(()),
                 Err(e) if attempt < MAX_RETRIES - 1 => {
                     warn!(
-                    "Attempt {}/{}: Failed to fetch stats for chat {}: {}. Retrying...", 
-                    attempt + 1, MAX_RETRIES, chat.id(), e
-                );
+                        "Attempt {}/{}: Failed to fetch stats for chat {}: {}. Retrying...",
+                        attempt + 1,
+                        MAX_RETRIES,
+                        chat.id(),
+                        e
+                    );
                     tokio::time::sleep(Duration::from_secs(2_u64.pow(attempt))).await;
                 }
                 Err(e) => {
                     error!(
-                    "Failed to fetch stats for chat {} after {} attempts: {}", 
-                    chat.id(), MAX_RETRIES, e
-                );
+                        "Failed to fetch stats for chat {} after {} attempts: {}",
+                        chat.id(),
+                        MAX_RETRIES,
+                        e
+                    );
                     return Err(e);
                 }
             }
         }
         unreachable!()
     }
-    
+
     async fn fetch_chat_message_stats_internal(
         &self,
         chat: &Chat,
@@ -972,10 +1115,16 @@ impl TelegramAgent {
 
         {
             let mut stats = app_state.chat_message_stats.lock().await;
-            stats.chat_message_counts.insert(chat.id(), user_counts.clone());
+            stats
+                .chat_message_counts
+                .insert(chat.id(), user_counts.clone());
         }
 
-        info!("Fetched message stats for chat {}: {} unique users", chat.id(), user_counts.len());
+        info!(
+            "Fetched message stats for chat {}: {} unique users",
+            chat.id(),
+            user_counts.len()
+        );
         Ok(())
     }
 }

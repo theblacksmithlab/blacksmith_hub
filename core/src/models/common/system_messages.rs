@@ -91,7 +91,7 @@ pub enum AgentDavonMessages {
 impl AgentDavonMessages {
     pub fn as_str(&self) -> &str {
         match self {
-        AgentDavonMessages::Offer => "offer", 
+            AgentDavonMessages::Offer => "offer",
         }
     }
 }

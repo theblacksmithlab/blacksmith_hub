@@ -101,7 +101,7 @@ pub async fn chat_moderation(
     // paid_chats.contains(&msg.chat.id.0);
     let white_listed_users = load_white_listed_users(app_name);
     let black_listed_users = load_black_listed_users(app_name);
-    
+
     // let message_to_check = if let Some(text) = msg.text() {
     //     text.to_lowercase()
     // } else if let Some(caption) = msg.caption() {
@@ -122,7 +122,7 @@ pub async fn chat_moderation(
     } else {
         "Empty text".to_string()
     };
-    
+
     let truncated_message: String = message_to_check
         .char_indices()
         .nth(100)

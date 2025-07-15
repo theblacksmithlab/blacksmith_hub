@@ -5,16 +5,16 @@ use chrono::{DateTime, Utc};
 use core::local_db::tg_bot::groot_bot::subscription_management::check_chat_payment;
 use core::local_db::tg_bot::groot_bot::subscription_management::create_subscription;
 use core::local_db::tg_bot::groot_bot::subscription_management::get_subscription_info;
-use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages, AgentDavonMessages};
-use core::models::tg_agent::agent_davon::MemberRole;
-use core::models::tg_agent::agent_davon::ReportedChatInfo;
+use core::models::common::system_messages::{
+    AgentDavonMessages, AppsSystemMessages, GrootBotMessages,
+};
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState, ShowType};
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
     auto_delete_message, get_chat_title, get_chat_username, get_username,
-    is_message_from_linked_channel, load_super_admins, read_admins_from_csv
+    is_message_from_linked_channel, load_super_admins, read_admins_from_csv,
 };
 use core::utils::tg_bot::groot_bot::subscription_utils::{
     show_plan_selection, PaymentProcess, SubscriptionState,
@@ -546,29 +546,44 @@ pub async fn groot_bot_command_handler(
             if parts.len() >= 2 {
                 match parts[1].parse::<i64>() {
                     Ok(reported_chat_id) => {
+                        info!("Processing new agent report for chat: {}... Reading admin data from CSV", reported_chat_id);
                         let report_response_prefix =
                             format!("report_response:{}", reported_chat_id);
-                        info!("Processing new agent report for chat: {}... Reading admin data from CSV", reported_chat_id);
+                        let admins_csv_path = format!(
+                            "common_res/agent_davon/reports/{}_admins.csv",
+                            reported_chat_id
+                        );
 
-                        let admins_csv_path = format!("common_res/agent_davon/reports/{}_admins.csv", reported_chat_id);
+                        let (chat_title, chat_username, admins) =
+                            match read_admins_from_csv(&admins_csv_path).await {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    error!("Failed to read admin data from CSV: {}", e);
+                                    bot.send_message(
+                                        msg.chat.id,
+                                        format!(
+                                            "{}:Error reading admin data: {}",
+                                            report_response_prefix, e
+                                        ),
+                                    )
+                                    .await?;
+                                    return Ok(());
+                                }
+                            };
 
-                        let (chat_title, chat_username, admins) = match read_admins_from_csv(&admins_csv_path).await {
-                            Ok(data) => data,
-                            Err(e) => {
-                                error!("Failed to read admin data from CSV: {}", e);
-                                bot.send_message(
-                                    msg.chat.id,
-                                    format!("{}:Error reading admin data: {}", report_response_prefix, e),
-                                ).await?;
-                                return Ok(());
-                            }
-                        };
+                        info!(
+                            "Loaded admin data from CSV: chat '{}' (@{}) [id: {}] contains {} admins",
+                            chat_title,
+                            chat_username,
+                            reported_chat_id,
+                            admins.len()
+                        );
 
-                        info!("Admin data loaded from CSV: chat '{}' (@{}) [id: {}] with {} admins", chat_title, chat_username, reported_chat_id, admins.len());
+                        let offer_template =
+                            get_message(AppsSystemMessages::AgentDavon(AgentDavonMessages::Offer))
+                                .await?;
 
-                        let template = get_message(AppsSystemMessages::AgentDavon(AgentDavonMessages::Offer)).await?;
-
-                        let offer = template
+                        let offer = offer_template
                             .replace("{chat_title}", &chat_title)
                             .replace("{chat_username}", &chat_username)
                             .replace("{chat_id}", &reported_chat_id.to_string());
@@ -579,22 +594,29 @@ pub async fn groot_bot_command_handler(
                             match bot.send_message(ChatId(lord_admin_id as i64), &offer).await {
                                 // match bot.send_message(ChatId(admin.user_id), &offer).await {
                                 Ok(_) => {
-                                    info!("Message sent to {} {} [id: {}]", admin.role, admin.user_id, admin.user_id);
+                                    info!(
+                                        "Offer {} sent to {} [id: {}]",
+                                        sent_count, admin.role, admin.user_id
+                                    );
                                     sent_count += 1;
                                 }
                                 Err(e) => {
-                                    error!("Failed to send to {} {}: {}", admin.role, admin.user_id, e);
+                                    error!(
+                                        "Failed to send offer {} to {} [id: {}]: {}",
+                                        sent_count, admin.role, admin.user_id, e
+                                    );
                                 }
                             }
                         }
 
                         if sent_count > 0 {
-                            info!("Messages sent to {}/{} admins", sent_count, admins.len());
+                            info!("Offer sent to {}/{} admins", sent_count, admins.len());
 
                             let csv_path = format!(
                                 "common_res/agent_davon/reports/{}_report.csv",
                                 reported_chat_id
                             );
+
                             let mut file_sent_count = 0;
 
                             for admin in admins {
@@ -607,11 +629,17 @@ pub async fn groot_bot_command_handler(
                                     .await
                                 {
                                     Ok(_) => {
-                                        info!("CSV sent to {} {} [id: {}]", admin.role, admin.user_id, admin.user_id);
+                                        info!(
+                                            "CSV sent to {} {} [id: {}]",
+                                            admin.role, admin.user_id, admin.user_id
+                                        );
                                         file_sent_count += 1;
                                     }
                                     Err(e) => {
-                                        error!("Failed to send CSV to {} {}: {}", admin.role, admin.user_id, e);
+                                        error!(
+                                            "Failed to send CSV to {} {}: {}",
+                                            admin.role, admin.user_id, e
+                                        );
                                     }
                                 }
                             }
@@ -622,15 +650,13 @@ pub async fn groot_bot_command_handler(
                                     "{}:Offer sent: {} participants, {} CSV files for chat: {}",
                                     report_response_prefix, sent_count, file_sent_count, chat_title
                                 ),
-                            ).await?;
+                            )
+                            .await?;
                         } else {
-                            error!(
-                                "Failed to send messages to any admin for chat {}",
-                                reported_chat_id
-                            );
+                            error!("Failed to send offer to any admin for chat: {}", chat_title);
                             bot.send_message(
                                 msg.chat.id,
-                                format!("{}:Error sending offers to chat administration (probably personal messaging is turned-off)", report_response_prefix)
+                                format!("{}: Failed to send offers to chat admins (possibly due to disabled personal messaging)", report_response_prefix)
                             ).await?;
                         }
                     }
@@ -654,73 +680,6 @@ pub async fn groot_bot_command_handler(
                 bot.send_message(
                     msg.chat.id,
                     "report_response:unknown:Got invalid cmd format",
-                )
-                .await?;
-            }
-        }
-        GrootBotCommands::ChatAdminsRequest => {
-            let message_text = msg.text().unwrap_or("");
-            let parts: Vec<&str> = message_text.split_whitespace().collect();
-
-            if parts.len() >= 2 {
-                match parts[1].parse::<i64>() {
-                    Ok(requested_chat_id) => {
-                        info!(
-                            "Processing chat admins request for chat: {}",
-                            requested_chat_id
-                        );
-
-                        let chat_info = match ReportedChatInfo::new(&bot, requested_chat_id).await {
-                            Ok(info) => info,
-                            Err(e) => {
-                                error!("Failed to get chat info: {}", e);
-                                bot.send_message(
-                                    msg.chat.id,
-                                    format!(
-                                        "chat_admins_response:{}:error:Failed to get chat info",
-                                        requested_chat_id
-                                    ),
-                                )
-                                .await?;
-                                return Ok(());
-                            }
-                        };
-
-                        let admin_ids: Vec<i64> = chat_info
-                            .administrators
-                            .iter()
-                            .filter(|admin| admin.role == MemberRole::Administrator)
-                            .map(|admin| admin.user_id)
-                            .collect();
-
-                        let response_json = serde_json::json!({
-                            "owner": chat_info.owner.user_id,
-                            "admins": admin_ids,
-                            "linked": chat_info.linked_channel_id
-                        });
-
-                        let response = format!(
-                            "chat_admins_response:{}:{}",
-                            requested_chat_id, response_json
-                        );
-
-                        bot.send_message(msg.chat.id, response).await?;
-                        info!("Sent admins list for chat {}", requested_chat_id);
-                    }
-                    Err(_e) => {
-                        error!("Invalid chat_id in admins request: {}", parts[1]);
-                        bot.send_message(
-                            msg.chat.id,
-                            "chat_admins_response:invalid:error:Invalid chat_id",
-                        )
-                        .await?;
-                    }
-                }
-            } else {
-                error!("Chat admins request missing chat_id argument");
-                bot.send_message(
-                    msg.chat.id,
-                    "chat_admins_response:missing:error:Missing chat_id",
                 )
                 .await?;
             }

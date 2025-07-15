@@ -565,13 +565,13 @@ pub async fn read_admins_from_csv(csv_path: &str) -> Result<(String, String, Vec
     let mut chat_username = String::new();
 
     for result in reader.records() {
-        let record = result
-            .map_err(|e| anyhow::anyhow!("Failed to read CSV record: {}", e))?;
+        let record = result.map_err(|e| anyhow::anyhow!("Failed to read CSV record: {}", e))?;
 
         if record.len() >= 4 {
             chat_title = record[0].to_string();
             chat_username = record[1].to_string();
-            let user_id: i64 = record[2].parse()
+            let user_id: i64 = record[2]
+                .parse()
                 .map_err(|e| anyhow::anyhow!("Failed to parse user_id: {}", e))?;
             let role = record[3].to_string();
 

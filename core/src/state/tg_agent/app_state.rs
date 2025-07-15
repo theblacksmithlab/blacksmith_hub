@@ -1,12 +1,12 @@
 use crate::local_db::tg_bot::tg_bot_local_db::setup_localdb_pool;
 use crate::models::common::app_name::AppName;
+use crate::models::tg_agent::agent_davon::ChatMessageStats;
 use anyhow::Result;
 use async_openai::config::OpenAIConfig;
 use async_openai::Client as LLM_Client;
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::models::tg_agent::agent_davon::ChatMessageStats;
 
 pub struct AgentAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,
