@@ -190,6 +190,61 @@ impl TelegramAgent {
                 );
                 return Ok(());
             }
+            
+            // TEMP
+            use grammers_client::grammers_tl_types as tl;
+
+            if let Some(sender) = message.sender() {
+                if let Chat::User(user) = sender {
+                    let access_hash = user.raw.access_hash.unwrap_or_default();
+                    let input_user = tl::types::InputUser {
+                        user_id: user.id(),
+                        access_hash,
+                    };
+
+                    let request = tl::functions::users::GetFullUser {
+                        id: input_user.into(),
+                    };
+
+                    match self.client.invoke(&request).await {
+                        Ok(result) => {
+                            match result {
+                                tl::enums::users::UserFull::Full(user_full_wrapper) => {
+                                    let full_user = &user_full_wrapper.full_user;
+
+                                    match full_user {
+                                        tl::enums::UserFull::Full(actual_user_full) => {
+                                            info!("User ID: {}", actual_user_full.id);
+                                            
+                                            if let Some(photo) = actual_user_full.profile_photo.clone() {
+                                                info!("Has profile photo: {:?}", photo);
+                                            }
+                                            
+                                            if let Some(about) = &actual_user_full.about {
+                                                info!("User bio: {}", about);
+                                            }
+
+                                            if let Some(bot_info) = &actual_user_full.bot_info {
+                                                info!("Bot info available: {:?}", bot_info);
+                                            }
+
+                                            if let Some(personal_channel_id) = actual_user_full.personal_channel_id {
+                                                info!("Personal channel ID: {}", personal_channel_id);
+                                            }
+
+                                            info!("Common chats count: {}", actual_user_full.common_chats_count);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Failed to get full user info: {}", e);
+                        }
+                    }
+                }
+            }
+            // TEMP
 
             let stats_fetched = {
                 let stats = app_state.chat_message_stats.lock().await;
@@ -223,7 +278,7 @@ impl TelegramAgent {
                 stats.get_user_message_count(chat.id(), sender.id())
             };
 
-            if user_message_count >= 100 {
+            if user_message_count >= 500 {
                 info!(
                     "Skipping message from active user {} ({}+ messages) in chat {} [id: {}]",
                     sender.id(),
@@ -1200,22 +1255,22 @@ impl TelegramAgent {
     //     chat: &Chat,
     //     app_state: &Arc<AgentAppState>,
     // ) -> Result<()> {
-    // 
+    //
     //     let mut user_counts: HashMap<i64, u32> = HashMap::new();
-    //     
+    //
     //     let batch_size = 1000;
     //     let total_messages = 6000;
     //     let mut processed = 0;
-    // 
+    //
     //     let mut msgs = self.client.iter_messages(chat.pack()).limit(total_messages);
-    // 
+    //
     //     while let Some(msg) = msgs.next().await? {
     //         if let Some(sender) = msg.sender() {
     //             *user_counts.entry(sender.id()).or_insert(0) += 1;
     //         }
-    // 
+    //
     //         processed += 1;
-    //         
+    //
     //         if processed % batch_size == 0 {
     //             let mut rng = rand::rng();
     //             let delay = rng.random_range(1500..3000);
@@ -1223,12 +1278,12 @@ impl TelegramAgent {
     //             tokio::time::sleep(Duration::from_millis(delay)).await;
     //         }
     //     }
-    // 
+    //
     //     {
     //         let mut stats = app_state.chat_message_stats.lock().await;
     //         stats.chat_message_counts.insert(chat.id(), user_counts.clone());
     //     }
-    // 
+    //
     //     info!(
     //     "Fetched message stats for chat {}: {} unique users from {} messages",
     //     chat.id(), user_counts.len(), processed
