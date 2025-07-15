@@ -1203,8 +1203,8 @@ impl TelegramAgent {
 
         let mut user_counts: HashMap<i64, u32> = HashMap::new();
         
-        let batch_size = 1000;
-        let total_messages = 5000;
+        let batch_size = 600;
+        let total_messages = 4800;
         let mut processed = 0;
 
         let mut msgs = self.client.iter_messages(chat.pack()).limit(total_messages);
