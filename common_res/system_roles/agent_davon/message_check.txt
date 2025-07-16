@@ -63,7 +63,7 @@ CLEAR SPAM EXAMPLES (FLAG THESE):
 
 DECISION CRITERIA:
 
-Flag as SPAM only if message contains:**
+Flag as SPAM only if message contains:
 1. Clear promotional intent AND call to action
 2. Direct solicitation for private contact
 3. Job offers or financial opportunities

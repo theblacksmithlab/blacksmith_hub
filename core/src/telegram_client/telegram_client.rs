@@ -190,64 +190,64 @@ impl TelegramAgent {
                 return Ok(());
             }
 
-            // TEMP
-            use grammers_client::grammers_tl_types as tl;
-
-            if let Some(sender) = message.sender() {
-                if let Chat::User(user) = sender {
-                    let access_hash = user.raw.access_hash.unwrap_or_default();
-                    let input_user = tl::types::InputUser {
-                        user_id: user.id(),
-                        access_hash,
-                    };
-
-                    let request = tl::functions::users::GetFullUser {
-                        id: input_user.into(),
-                    };
-
-                    match self.client.invoke(&request).await {
-                        Ok(result) => match result {
-                            tl::enums::users::UserFull::Full(user_full_wrapper) => {
-                                let full_user = &user_full_wrapper.full_user;
-
-                                match full_user {
-                                    tl::enums::UserFull::Full(actual_user_full) => {
-                                        info!("User ID: {}", actual_user_full.id);
-
-                                        if let Some(photo) = actual_user_full.profile_photo.clone()
-                                        {
-                                            info!("Has profile photo: {:?}", photo);
-                                        }
-
-                                        if let Some(about) = &actual_user_full.about {
-                                            info!("User bio: {}", about);
-                                        }
-
-                                        if let Some(bot_info) = &actual_user_full.bot_info {
-                                            info!("Bot info available: {:?}", bot_info);
-                                        }
-
-                                        if let Some(personal_channel_id) =
-                                            actual_user_full.personal_channel_id
-                                        {
-                                            info!("Personal channel ID: {}", personal_channel_id);
-                                        }
-
-                                        info!(
-                                            "Common chats count: {}",
-                                            actual_user_full.common_chats_count
-                                        );
-                                    }
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            warn!("Failed to get full user info: {}", e);
-                        }
-                    }
-                }
-            }
-            // TEMP
+            // // TEMP
+            // use grammers_client::grammers_tl_types as tl;
+            // 
+            // if let Some(sender) = message.sender() {
+            //     if let Chat::User(user) = sender {
+            //         let access_hash = user.raw.access_hash.unwrap_or_default();
+            //         let input_user = tl::types::InputUser {
+            //             user_id: user.id(),
+            //             access_hash,
+            //         };
+            // 
+            //         let request = tl::functions::users::GetFullUser {
+            //             id: input_user.into(),
+            //         };
+            // 
+            //         match self.client.invoke(&request).await {
+            //             Ok(result) => match result {
+            //                 tl::enums::users::UserFull::Full(user_full_wrapper) => {
+            //                     let full_user = &user_full_wrapper.full_user;
+            // 
+            //                     match full_user {
+            //                         tl::enums::UserFull::Full(actual_user_full) => {
+            //                             info!("User ID: {}", actual_user_full.id);
+            // 
+            //                             if let Some(photo) = actual_user_full.profile_photo.clone()
+            //                             {
+            //                                 info!("Has profile photo: {:?}", photo);
+            //                             }
+            // 
+            //                             if let Some(about) = &actual_user_full.about {
+            //                                 info!("User bio: {}", about);
+            //                             }
+            // 
+            //                             if let Some(bot_info) = &actual_user_full.bot_info {
+            //                                 info!("Bot info available: {:?}", bot_info);
+            //                             }
+            // 
+            //                             if let Some(personal_channel_id) =
+            //                                 actual_user_full.personal_channel_id
+            //                             {
+            //                                 info!("Personal channel ID: {}", personal_channel_id);
+            //                             }
+            // 
+            //                             info!(
+            //                                 "Common chats count: {}",
+            //                                 actual_user_full.common_chats_count
+            //                             );
+            //                         }
+            //                     }
+            //                 }
+            //             },
+            //             Err(e) => {
+            //                 warn!("Failed to get full user info: {}", e);
+            //             }
+            //         }
+            //     }
+            // }
+            // // TEMP
 
             let stats_fetched = {
                 let stats = app_state.chat_message_stats.lock().await;
