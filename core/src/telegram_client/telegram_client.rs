@@ -381,6 +381,10 @@ impl TelegramAgent {
         }
 
         let text = message.text();
+
+        info!("Raw message text: {:?}", text);
+        info!("Text bytes: {:?}", text.as_bytes());
+        
         if text.is_empty() {
             return Ok(());
         }
