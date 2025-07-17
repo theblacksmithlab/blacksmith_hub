@@ -634,7 +634,11 @@ impl TelegramAgent {
         db_pool: &SqlitePool,
         groot_bot: &GrootBotAlias,
     ) -> Result<()> {
+        debug!("check_report_ready START: chat_title='{}', first_time_str='{}'", chat_title, first_time_str);
+
+        debug!("Parsing RFC3339 time...");
         let first_time = DateTime::parse_from_rfc3339(first_time_str)?;
+        debug!("RFC3339 parsed successfully");
         let elapsed = Utc::now() - first_time.with_timezone(&Utc);
 
         if elapsed.num_days() >= 3 {
