@@ -524,14 +524,19 @@ impl TelegramAgent {
         let chat_id = chat.id();
         let chat_title = chat.name().to_string();
         let chat_username = chat.username().map(|u| u.to_string());
-
+        
+        debug!("debugging update_chat_stats 1");
+        
         let existing = sqlx::query("SELECT spam_count, total_messages, first_message_time, status, last_report_sent FROM chat_monitoring WHERE chat_id = ?")
             .bind(chat_id)
             .fetch_optional(db_pool)
             .await?;
 
+        debug!("debugging update_chat_stats 2");
+        
         let (new_spam_count, new_total_messages, first_time, should_update) = match existing {
             Some(record) => {
+                debug!("debugging update_chat_stats 3");
                 let status: String = record.get("status");
                 let last_report_sent: Option<String> = record.get("last_report_sent");
 
@@ -587,7 +592,7 @@ impl TelegramAgent {
                 (spam_count, total_count, Some(first_time), true)
             }
         };
-
+        debug!("debugging update_chat_stats 4");
         if should_update {
             sqlx::query("INSERT OR REPLACE INTO chat_monitoring (chat_id, chat_title, chat_username, first_message_time, spam_count, total_messages, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
                 .bind(chat_id)
@@ -600,6 +605,8 @@ impl TelegramAgent {
                 .execute(db_pool)
                 .await?;
 
+            debug!("debugging update_chat_stats 5");
+            
             if let Some(first_time_str) = first_time {
                 self.check_report_ready(
                     chat_id,
@@ -613,7 +620,7 @@ impl TelegramAgent {
             }
         }
 
-        debug!("debugging analyze_message 5");
+        debug!("debugging update_chat_stats 6");
         
         Ok(())
     }
