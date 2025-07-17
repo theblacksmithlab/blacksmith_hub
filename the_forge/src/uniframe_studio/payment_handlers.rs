@@ -8,6 +8,7 @@ use http::StatusCode;
 use md5::{Digest, Md5};
 use serde::Deserialize;
 use std::sync::Arc;
+use tracing::{error, info, warn};
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -153,7 +154,7 @@ async fn process_payment_webhook(
 
     match webhook_data.status.as_str() {
         "paid" | "paid_over" => {
-            println!(
+            info!(
                 "Processing successful payment for order_id: {}",
                 webhook_data.order_id
             );
@@ -169,19 +170,19 @@ async fn process_payment_webhook(
                 )
                 .await?;
 
-            println!(
+            info!(
                 "Successfully added ${} to user {} balance",
                 amount_usd, user_id
             );
         }
         "fail" | "wrong_amount" | "cancel" | "system_fail" => {
-            println!(
+            error!(
                 "Payment failed for order_id: {}, status: {}",
                 webhook_data.order_id, webhook_data.status
             );
         }
         _ => {
-            println!("Received intermediate status: {}", webhook_data.status);
+            warn!("Received intermediate status: {}", webhook_data.status);
         }
     }
 
