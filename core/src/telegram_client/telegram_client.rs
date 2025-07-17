@@ -1243,8 +1243,9 @@ impl TelegramAgent {
             return Ok(dt.with_timezone(&Utc));
         }
         
-        DateTime::parse_from_str(time_str, "%Y-%m-%d %H:%M:%S UTC")
-            .map(|dt| dt.with_timezone(&Utc))
+        let time_without_utc = time_str.trim_end_matches(" UTC");
+        chrono::NaiveDateTime::parse_from_str(time_without_utc, "%Y-%m-%d %H:%M:%S")
+            .map(|naive_dt| DateTime::from_naive_utc_and_offset(naive_dt, Utc))
             .map_err(|e| anyhow::anyhow!("Failed to parse datetime '{}': {}", time_str, e))
     }
 
