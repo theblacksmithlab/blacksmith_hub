@@ -444,10 +444,10 @@ pub async fn create_payment_invoice(
         ));
     }
 
-    if request.amount_usd < 10.0 {
+    if request.amount_usd < 1.0 {
         return Err((
             StatusCode::BAD_REQUEST,
-            "Minimum top-up amount is $10.00".to_string(),
+            "Minimum top-up amount is $1.00".to_string(),
         ));
     }
 
