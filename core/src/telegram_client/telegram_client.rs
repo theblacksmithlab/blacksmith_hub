@@ -1251,7 +1251,7 @@ impl TelegramAgent {
     ) -> Result<()> {
         let mut user_counts: HashMap<i64, u32> = HashMap::new();
 
-        let mut msgs = self.client.iter_messages(chat.pack()).limit(5000);
+        let mut msgs = self.client.iter_messages(chat.pack()).limit(1000);
 
         while let Some(msg) = msgs.next().await? {
             if let Some(sender) = msg.sender() {
