@@ -391,17 +391,21 @@ impl TelegramAgent {
 
         match self.analyze_message(&text, app_state.clone()).await {
             Ok(AnalysisResult::Spam) => {
+                debug!("debugging analyze_message 1");
                 self.update_chat_stats(&chat, &app_state.db_pool, true, &groot_bot_alias)
                     .await?;
+                debug!("debugging analyze_message 2");
                 self.save_spam_message(&message, &chat, &app_state.db_pool)
                     .await?;
             }
             Ok(AnalysisResult::Clear) => {
+                debug!("debugging analyze_message 3");
                 self.update_chat_stats(&chat, &app_state.db_pool, false, &groot_bot_alias)
                     .await?;
             }
             Err(e) => {
                 warn!("Failed to analyze message: {}", e);
+                debug!("debugging analyze_message 4");
                 self.update_chat_stats(&chat, &app_state.db_pool, false, &groot_bot_alias)
                     .await?;
             }
@@ -505,7 +509,7 @@ impl TelegramAgent {
             .bind(Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string())
             .execute(db_pool)
             .await?;
-
+        debug!("debugging analyze_message 6");
         info!("Saved spam message from chat {}", chat.id());
         Ok(())
     }
@@ -609,6 +613,8 @@ impl TelegramAgent {
             }
         }
 
+        debug!("debugging analyze_message 5");
+        
         Ok(())
     }
 
