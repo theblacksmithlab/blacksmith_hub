@@ -19,7 +19,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{env, fs};
 use tracing::log::warn;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 enum AnalysisResult {
     Spam,
@@ -421,6 +421,7 @@ impl TelegramAgent {
             None,
         );
 
+        debug!("analyzing message: {}", text);
         let scam_detection_result =
             raw_llm_processing_json(&system_role, text, app_state, LlmModel::Complex2).await?;
 
@@ -447,7 +448,10 @@ impl TelegramAgent {
                 false
             }
         };
-
+        
+        debug!("LLM response: {}", scam_detection_result);
+        debug!("LLM response result: {}", is_scam);
+        
         if is_scam {
             info!(
                 "🚨 Spam detected in message: {}",
