@@ -81,6 +81,30 @@ pub async fn handle_payment_webhook(
     Ok(StatusCode::OK)
 }
 
+// fn verify_webhook_signature(webhook_data: &PaymentWebhook, raw_body: &str) -> bool {
+//     let api_key = std::env::var("HELEKET_API_KEY").unwrap_or_default();
+// 
+//     let mut data: serde_json::Value = match serde_json::from_str(raw_body) {
+//         Ok(value) => value,
+//         Err(_) => return false,
+//     };
+// 
+//     if let Some(obj) = data.as_object_mut() {
+//         obj.remove("sign");
+//     }
+// 
+//     let json_string = serde_json::to_string(&data).unwrap_or_default();
+//     let data_base64 = general_purpose::STANDARD.encode(json_string);
+//     let data_with_key = format!("{}{}", data_base64, api_key);
+// 
+//     let mut hasher = Md5::new();
+//     hasher.update(data_with_key.as_bytes());
+//     let result = hasher.finalize();
+//     let calculated_signature = format!("{:x}", result);
+// 
+//     calculated_signature == webhook_data.sign
+// }
+
 fn verify_webhook_signature(webhook_data: &PaymentWebhook, raw_body: &str) -> bool {
     let api_key = std::env::var("HELEKET_API_KEY").unwrap_or_default();
 
@@ -94,7 +118,10 @@ fn verify_webhook_signature(webhook_data: &PaymentWebhook, raw_body: &str) -> bo
     }
 
     let json_string = serde_json::to_string(&data).unwrap_or_default();
-    let data_base64 = general_purpose::STANDARD.encode(json_string);
+    
+    let json_with_escaped_slashes = json_string.replace("/", "\\/");
+
+    let data_base64 = general_purpose::STANDARD.encode(json_with_escaped_slashes);
     let data_with_key = format!("{}{}", data_base64, api_key);
 
     let mut hasher = Md5::new();
