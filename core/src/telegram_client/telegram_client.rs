@@ -357,7 +357,7 @@ impl TelegramAgent {
                             chat.id()
                         );
                         sqlx::query("UPDATE chat_monitoring SET status = 'collecting', spam_count = 0, total_messages = 0, first_message_time = ? WHERE chat_id = ?")
-                            .bind(Utc::now().to_rfc3339())
+                            .bind(Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string())
                             .bind(chat.id())
                             .execute(app_state.db_pool.as_ref())
                             .await?;
@@ -525,18 +525,14 @@ impl TelegramAgent {
         let chat_title = chat.name().to_string();
         let chat_username = chat.username().map(|u| u.to_string());
         
-        debug!("debugging update_chat_stats 1");
-        
         let existing = sqlx::query("SELECT spam_count, total_messages, first_message_time, status, last_report_sent FROM chat_monitoring WHERE chat_id = ?")
             .bind(chat_id)
             .fetch_optional(db_pool)
             .await?;
-
-        debug!("debugging update_chat_stats 2");
+        
         
         let (new_spam_count, new_total_messages, first_time, should_update) = match existing {
             Some(record) => {
-                debug!("debugging update_chat_stats 3");
                 let status: String = record.get("status");
                 let last_report_sent: Option<String> = record.get("last_report_sent");
 
@@ -546,9 +542,9 @@ impl TelegramAgent {
                     }
                     "silence" => {
                         if let Some(last_sent_str) = last_report_sent {
-                            if let Ok(last_sent_time) = DateTime::parse_from_rfc3339(&last_sent_str)
+                            if let Ok(last_sent_time) = Self::parse_datetime_flexible(&last_sent_str)
                             {
-                                let elapsed = Utc::now() - last_sent_time.with_timezone(&Utc);
+                                let elapsed = Utc::now() - last_sent_time;
                                 if elapsed.num_days() < 11 {
                                     return Ok(());
                                 } else {
@@ -592,7 +588,7 @@ impl TelegramAgent {
                 (spam_count, total_count, Some(first_time), true)
             }
         };
-        debug!("debugging update_chat_stats 4");
+        
         if should_update {
             sqlx::query("INSERT OR REPLACE INTO chat_monitoring (chat_id, chat_title, chat_username, first_message_time, spam_count, total_messages, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
                 .bind(chat_id)
@@ -604,8 +600,7 @@ impl TelegramAgent {
                 .bind("collecting")
                 .execute(db_pool)
                 .await?;
-
-            debug!("debugging update_chat_stats 5");
+            
             
             if let Some(first_time_str) = first_time {
                 self.check_report_ready(
@@ -637,9 +632,9 @@ impl TelegramAgent {
         debug!("check_report_ready START: chat_title='{}', first_time_str='{}'", chat_title, first_time_str);
 
         debug!("Parsing RFC3339 time...");
-        let first_time = DateTime::parse_from_rfc3339(first_time_str)?;
+        let first_time = Self::parse_datetime_flexible(first_time_str)?;
         debug!("RFC3339 parsed successfully");
-        let elapsed = Utc::now() - first_time.with_timezone(&Utc);
+        let elapsed = Utc::now() - first_time;
 
         if elapsed.num_days() >= 3 {
             if spam_count >= 10 {
@@ -1191,8 +1186,8 @@ impl TelegramAgent {
         match result {
             Some(row) => {
                 if let Some(last_sent_str) = row.get::<Option<String>, _>("last_report_sent") {
-                    if let Ok(last_sent_time) = DateTime::parse_from_rfc3339(&last_sent_str) {
-                        let elapsed = Utc::now() - last_sent_time.with_timezone(&Utc);
+                    if let Ok(last_sent_time) = Self::parse_datetime_flexible(&last_sent_str) {
+                        let elapsed = Utc::now() - last_sent_time;
                         Ok(elapsed.num_days() >= 11)
                     } else {
                         Ok(false)
@@ -1241,6 +1236,16 @@ impl TelegramAgent {
             }
         }
         unreachable!()
+    }
+
+    fn parse_datetime_flexible(time_str: &str) -> Result<DateTime<Utc>> {
+        if let Ok(dt) = DateTime::parse_from_rfc3339(time_str) {
+            return Ok(dt.with_timezone(&Utc));
+        }
+        
+        DateTime::parse_from_str(time_str, "%Y-%m-%d %H:%M:%S UTC")
+            .map(|dt| dt.with_timezone(&Utc))
+            .map_err(|e| anyhow::anyhow!("Failed to parse datetime '{}': {}", time_str, e))
     }
 
     async fn fetch_chat_message_stats_internal(
