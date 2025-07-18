@@ -156,7 +156,9 @@ async fn create_uniframe_studio_tables(pool: &SqlitePool) -> Result<(), sqlx::Er
         CREATE TABLE IF NOT EXISTS processed_webhooks (
             webhook_id TEXT PRIMARY KEY,
             order_id TEXT NOT NULL,
-            processed_at TEXT DEFAULT (datetime('now'))
+            status TEXT NOT NULL,
+            processed_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (webhook_id, status)
         );
     ";
 

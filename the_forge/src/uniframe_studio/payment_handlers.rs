@@ -169,17 +169,21 @@ async fn process_payment_webhook(
     webhook_data: PaymentWebhook,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let webhook_id = &webhook_data.uuid;
+    let webhook_status = &webhook_data.status;
     let user_id = extract_user_id_from_order(&webhook_data.order_id)?;
     let db_pool = app_state.get_db_pool();
 
-    let already_processed = sqlx::query("SELECT 1 FROM processed_webhooks WHERE webhook_id = ?")
+    let already_processed = sqlx::query(
+        "SELECT 1 FROM processed_webhooks WHERE webhook_id = ? AND status = ?"
+    )
         .bind(webhook_id)
+        .bind(webhook_status)
         .fetch_optional(db_pool)
         .await?
         .is_some();
 
     if already_processed {
-        println!("Webhook {} already processed, skipping", webhook_id);
+        println!("Webhook {} with status {} already processed, skipping", webhook_id, webhook_status);
         return Ok(());
     }
 
