@@ -221,9 +221,10 @@ async fn process_payment_webhook(
         }
     }
 
-    sqlx::query("INSERT INTO processed_webhooks (webhook_id, order_id) VALUES (?, ?)")
+    sqlx::query("INSERT INTO processed_webhooks (webhook_id, order_id, status) VALUES (?, ?, ?)")
         .bind(webhook_id)
         .bind(&webhook_data.order_id)
+        .bind(webhook_status)
         .execute(db_pool)
         .await?;
 
