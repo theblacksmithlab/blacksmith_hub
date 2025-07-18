@@ -67,6 +67,7 @@ pub async fn chat_moderation(
 
     let mut is_admin = false;
     let mut is_from_linked_channel = false;
+    let mut is_from_chat_itself = false;
 
     match bot.get_chat_administrators(msg.chat.id).send().await {
         Ok(admins) => {
@@ -86,6 +87,11 @@ pub async fn chat_moderation(
         info!("Message from linked channel detected");
     }
 
+    if msg.chat.id == msg.sender_chat.clone().unwrap().id {
+        is_from_chat_itself = true;
+        info!("Message from chat itself detected");
+    }
+
     if is_admin {
         info!("Message from chat admin - skipping moderation");
         return Ok(());
@@ -94,6 +100,10 @@ pub async fn chat_moderation(
     if is_from_linked_channel {
         info!("Message from linked channel - skipping moderation");
         return Ok(());
+    }
+    
+    if is_from_chat_itself {
+        info!("Message from chat itself - skipping moderation");
     }
 
     let app_name = &app_state.app_name;

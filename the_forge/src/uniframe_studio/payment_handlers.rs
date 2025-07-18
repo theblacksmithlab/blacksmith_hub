@@ -55,19 +55,19 @@ pub async fn handle_payment_webhook(
     body: Bytes,
 ) -> Result<StatusCode, StatusCode> {
     let raw_body = String::from_utf8(body.to_vec()).map_err(|_| {
-        eprintln!("Invalid UTF-8 in webhook body");
+        error!("Invalid UTF-8 in webhook body");
         StatusCode::BAD_REQUEST
     })?;
 
-    println!("Received webhook: {}", raw_body);
+    info!("Received webhook: {}", raw_body);
 
     let webhook_data: PaymentWebhook = serde_json::from_str(&raw_body).map_err(|e| {
-        eprintln!("Failed to parse webhook JSON: {}", e);
+        error!("Failed to parse webhook JSON: {}", e);
         StatusCode::BAD_REQUEST
     })?;
 
     if !verify_webhook_signature(&webhook_data, &raw_body) {
-        eprintln!(
+        error!(
             "Invalid webhook signature for order_id: {}",
             webhook_data.order_id
         );
@@ -75,7 +75,7 @@ pub async fn handle_payment_webhook(
     }
 
     if let Err(e) = process_payment_webhook(&app_state, webhook_data).await {
-        eprintln!("Failed to process webhook: {}", e);
+        error!("Failed to process webhook: {}", e);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
@@ -129,7 +129,7 @@ async fn process_payment_webhook(
             .is_some();
 
     if already_processed {
-        println!(
+        info!(
             "Webhook {} with status {} already processed, skipping",
             webhook_id, webhook_status
         );
@@ -166,7 +166,7 @@ async fn process_payment_webhook(
             );
         }
         _ => {
-            warn!("Received intermediate status: {}", webhook_data.status);
+            info!("Received intermediate status: {}", webhook_data.status);
         }
     }
 
