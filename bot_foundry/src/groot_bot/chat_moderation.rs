@@ -87,9 +87,11 @@ pub async fn chat_moderation(
         info!("Message from linked channel detected");
     }
 
-    if msg.chat.id == msg.sender_chat.clone().unwrap().id {
-        is_from_chat_itself = true;
-        info!("Message from chat itself detected");
+    if let Some(sender_chat) = &msg.sender_chat {
+        if msg.chat.id == sender_chat.id {
+            is_from_chat_itself = true;
+            info!("Message from chat itself detected");
+        }
     }
 
     if is_admin {
