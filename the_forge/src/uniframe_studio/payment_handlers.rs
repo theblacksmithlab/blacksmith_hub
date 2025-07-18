@@ -108,13 +108,8 @@ pub async fn handle_payment_webhook(
 
 fn verify_webhook_signature(webhook_data: &PaymentWebhook, raw_body: &str) -> bool {
     let api_key = std::env::var("HELEKET_API_KEY").unwrap_or_default();
-
-    let data: serde_json::Value = match serde_json::from_str(raw_body) {
-        Ok(value) => value,
-        Err(_) => return false,
-    };
-
-    let json_without_sign = recreate_original_order(&data);
+    
+    let json_without_sign = remove_sign_from_raw_json(raw_body);
 
     let data_base64 = general_purpose::STANDARD.encode(&json_without_sign);
     let data_with_key = format!("{}{}", data_base64, api_key);
@@ -125,6 +120,19 @@ fn verify_webhook_signature(webhook_data: &PaymentWebhook, raw_body: &str) -> bo
     let calculated_signature = format!("{:x}", result);
 
     calculated_signature == webhook_data.sign
+}
+
+fn remove_sign_from_raw_json(raw_body: &str) -> String {
+    if let Some(sign_start) = raw_body.rfind(r#","sign":"#) {
+        let before_sign = &raw_body[..sign_start];
+        let after_sign = &raw_body[sign_start..];
+
+        if let Some(end_pos) = after_sign.find("}") {
+            return format!("{}{}", before_sign, &after_sign[end_pos..]);
+        }
+    }
+
+    raw_body.to_string()
 }
 
 fn recreate_original_order(value: &serde_json::Value) -> String {
