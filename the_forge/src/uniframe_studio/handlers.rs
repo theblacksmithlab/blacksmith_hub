@@ -365,7 +365,6 @@ pub async fn refund_failed_job(
 }
 
 pub async fn handle_submit_idea(
-    // State(_app_state): State<Arc<UniframeStudioAppState>>,
     Json(request): Json<SubmitIdeaRequest>,
 ) -> Result<Json<SubmitIdeaResponse>, (StatusCode, Json<SubmitIdeaResponse>)> {
     if request.idea.trim().is_empty() {
@@ -433,7 +432,6 @@ pub async fn handle_submit_idea(
 }
 
 pub async fn create_payment_invoice(
-    // State(_app_state): State<Arc<UniframeStudioAppState>>,
     Extension(user_id): Extension<String>,
     Json(request): Json<TopUpRequest>,
 ) -> Result<Json<TopUpResponse>, (StatusCode, String)> {
@@ -444,10 +442,10 @@ pub async fn create_payment_invoice(
         ));
     }
 
-    if request.amount_usd < 1.0 {
+    if request.amount_usd < 10.0 {
         return Err((
             StatusCode::BAD_REQUEST,
-            "Minimum top-up amount is $1.00".to_string(),
+            "Minimum top-up amount is $10.00".to_string(),
         ));
     }
 

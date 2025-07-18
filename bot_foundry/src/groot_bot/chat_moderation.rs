@@ -29,7 +29,7 @@ pub async fn chat_moderation(
     let username = get_username(&msg);
     let chat_title = get_chat_title(&msg);
     // let chat_username = get_chat_username(&msg);
-    // let chat_id = msg.chat.id;
+    let chat_id = msg.chat.id;
 
     if let Some(dialog_states_mutex) = &app_state.dialog_states {
         let mut dialog_states = dialog_states_mutex.lock().await;
@@ -61,7 +61,7 @@ pub async fn chat_moderation(
         ))
         .await?;
 
-        bot.send_message(msg.chat.id, bot_msg).await?;
+        bot.send_message(chat_id, bot_msg).await?;
         return Ok(());
     }
 
@@ -69,7 +69,7 @@ pub async fn chat_moderation(
     let mut is_from_linked_channel = false;
     let mut is_from_chat_itself = false;
 
-    match bot.get_chat_administrators(msg.chat.id).send().await {
+    match bot.get_chat_administrators(chat_id).send().await {
         Ok(admins) => {
             is_admin = msg
                 .from
@@ -88,7 +88,7 @@ pub async fn chat_moderation(
     }
 
     if let Some(sender_chat) = &msg.sender_chat {
-        if msg.chat.id == sender_chat.id {
+        if chat_id == sender_chat.id {
             is_from_chat_itself = true;
             info!("Message from chat itself detected");
         }
@@ -110,17 +110,9 @@ pub async fn chat_moderation(
 
     let app_name = &app_state.app_name;
     // let _paid_chats = load_paid_chats(app_name);
-    // paid_chats.contains(&msg.chat.id.0);
+    // paid_chats.contains(&chat_id.0);
     let white_listed_users = load_white_listed_users(app_name);
     let black_listed_users = load_black_listed_users(app_name);
-
-    // let message_to_check = if let Some(text) = msg.text() {
-    //     text.to_lowercase()
-    // } else if let Some(caption) = msg.caption() {
-    //     caption.to_lowercase()
-    // } else {
-    //     "Empty text".to_string()
-    // };
 
     let message_to_check = if let Some(text) = msg.text() {
         text.to_lowercase()
@@ -165,7 +157,7 @@ pub async fn chat_moderation(
 
     if is_user_active(
         app_state.clone(),
-        msg.chat.id.0,
+        chat_id.0,
         user_id,
         &username,
         &chat_title,
@@ -325,7 +317,7 @@ pub async fn chat_moderation(
     update_user_message_count(
         app_state.clone(),
         &chat_title,
-        msg.chat.id.0,
+        chat_id.0,
         user_id,
         &username,
     )

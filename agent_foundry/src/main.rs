@@ -21,7 +21,7 @@ async fn main() -> Result<()> {
     dotenv().ok();
 
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::new("debug"))
+        .with_env_filter(EnvFilter::new("info"))
         .init();
 
     info!("Determining AppName of the Telegram agent being launched...");

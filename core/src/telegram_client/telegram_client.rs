@@ -284,7 +284,7 @@ impl TelegramAgent {
                 stats.get_user_message_count(chat.id(), sender.id())
             };
 
-            if user_message_count >= 500 {
+            if user_message_count >= 10 {
                 info!(
                     "Skipping message from active user {} ({}+ messages) in chat {} [id: {}]",
                     sender.id(),
