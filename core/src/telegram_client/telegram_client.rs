@@ -192,7 +192,7 @@ impl TelegramAgent {
 
             // // TEMP
             // use grammers_client::grammers_tl_types as tl;
-            // 
+            //
             // if let Some(sender) = message.sender() {
             //     if let Chat::User(user) = sender {
             //         let access_hash = user.raw.access_hash.unwrap_or_default();
@@ -200,39 +200,39 @@ impl TelegramAgent {
             //             user_id: user.id(),
             //             access_hash,
             //         };
-            // 
+            //
             //         let request = tl::functions::users::GetFullUser {
             //             id: input_user.into(),
             //         };
-            // 
+            //
             //         match self.client.invoke(&request).await {
             //             Ok(result) => match result {
             //                 tl::enums::users::UserFull::Full(user_full_wrapper) => {
             //                     let full_user = &user_full_wrapper.full_user;
-            // 
+            //
             //                     match full_user {
             //                         tl::enums::UserFull::Full(actual_user_full) => {
             //                             info!("User ID: {}", actual_user_full.id);
-            // 
+            //
             //                             if let Some(photo) = actual_user_full.profile_photo.clone()
             //                             {
             //                                 info!("Has profile photo: {:?}", photo);
             //                             }
-            // 
+            //
             //                             if let Some(about) = &actual_user_full.about {
             //                                 info!("User bio: {}", about);
             //                             }
-            // 
+            //
             //                             if let Some(bot_info) = &actual_user_full.bot_info {
             //                                 info!("Bot info available: {:?}", bot_info);
             //                             }
-            // 
+            //
             //                             if let Some(personal_channel_id) =
             //                                 actual_user_full.personal_channel_id
             //                             {
             //                                 info!("Personal channel ID: {}", personal_channel_id);
             //                             }
-            // 
+            //
             //                             info!(
             //                                 "Common chats count: {}",
             //                                 actual_user_full.common_chats_count
@@ -384,7 +384,7 @@ impl TelegramAgent {
 
         info!("Raw message text: {:?}", text);
         info!("Text bytes: {:?}", text.as_bytes());
-        
+
         if text.is_empty() {
             return Ok(());
         }
@@ -420,7 +420,7 @@ impl TelegramAgent {
             AgentDavonRoleType::MessageCheck,
             None,
         );
-        
+
         let scam_detection_result =
             raw_llm_processing_json(&system_role, text, app_state, LlmModel::Complex2).await?;
 
@@ -447,7 +447,7 @@ impl TelegramAgent {
                 false
             }
         };
-        
+
         if is_scam {
             info!(
                 "🚨 Spam detected in message: {}",
@@ -516,13 +516,12 @@ impl TelegramAgent {
         let chat_id = chat.id();
         let chat_title = chat.name().to_string();
         let chat_username = chat.username().map(|u| u.to_string());
-        
+
         let existing = sqlx::query("SELECT spam_count, total_messages, first_message_time, status, last_report_sent FROM chat_monitoring WHERE chat_id = ?")
             .bind(chat_id)
             .fetch_optional(db_pool)
             .await?;
-        
-        
+
         let (new_spam_count, new_total_messages, first_time, should_update) = match existing {
             Some(record) => {
                 let status: String = record.get("status");
@@ -534,7 +533,8 @@ impl TelegramAgent {
                     }
                     "silence" => {
                         if let Some(last_sent_str) = last_report_sent {
-                            if let Ok(last_sent_time) = Self::parse_datetime_flexible(&last_sent_str)
+                            if let Ok(last_sent_time) =
+                                Self::parse_datetime_flexible(&last_sent_str)
                             {
                                 let elapsed = Utc::now() - last_sent_time;
                                 if elapsed.num_days() < 11 {
@@ -580,7 +580,7 @@ impl TelegramAgent {
                 (spam_count, total_count, Some(first_time), true)
             }
         };
-        
+
         if should_update {
             sqlx::query("INSERT OR REPLACE INTO chat_monitoring (chat_id, chat_title, chat_username, first_message_time, spam_count, total_messages, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
                 .bind(chat_id)
@@ -592,8 +592,7 @@ impl TelegramAgent {
                 .bind("collecting")
                 .execute(db_pool)
                 .await?;
-            
-            
+
             if let Some(first_time_str) = first_time {
                 self.check_report_ready(
                     chat_id,
@@ -608,7 +607,7 @@ impl TelegramAgent {
         }
 
         debug!("debugging update_chat_stats 6");
-        
+
         Ok(())
     }
 
@@ -621,7 +620,10 @@ impl TelegramAgent {
         db_pool: &SqlitePool,
         groot_bot: &GrootBotAlias,
     ) -> Result<()> {
-        debug!("check_report_ready START: chat_title='{}', first_time_str='{}'", chat_title, first_time_str);
+        debug!(
+            "check_report_ready START: chat_title='{}', first_time_str='{}'",
+            chat_title, first_time_str
+        );
 
         debug!("Parsing RFC3339 time...");
         let first_time = Self::parse_datetime_flexible(first_time_str)?;
@@ -1234,7 +1236,7 @@ impl TelegramAgent {
         if let Ok(dt) = DateTime::parse_from_rfc3339(time_str) {
             return Ok(dt.with_timezone(&Utc));
         }
-        
+
         let time_without_utc = time_str.trim_end_matches(" UTC");
         chrono::NaiveDateTime::parse_from_str(time_without_utc, "%Y-%m-%d %H:%M:%S")
             .map(|naive_dt| DateTime::from_naive_utc_and_offset(naive_dt, Utc))
