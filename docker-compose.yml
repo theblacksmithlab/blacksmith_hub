@@ -12,7 +12,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.bot_foundry_base
     image: bot_foundry_base
-    profiles: ["never-start"]
+    profiles: [ "never-start" ]
 
   agent_foundry_base:
     build:
@@ -26,7 +26,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.the_forge_base
     image: the_forge_base
-    profiles: ["never-start"]
+    profiles: [ "never-start" ]
 
   probiot_bot:
     build:

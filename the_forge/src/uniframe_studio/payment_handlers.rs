@@ -8,7 +8,7 @@ use http::StatusCode;
 use md5::{Digest, Md5};
 use serde::Deserialize;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
