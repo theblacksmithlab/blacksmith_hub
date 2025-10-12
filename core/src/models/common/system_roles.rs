@@ -6,6 +6,7 @@ pub enum AppsSystemRoles {
     Groot(GrootRoleType),
     BlacksmithLab(BlacksmithLabRoleType),
     UniframeStudio(UniframeStudioRoleType),
+    AgentDavon(AgentDavonRoleType),
 }
 
 impl AppsSystemRoles {
@@ -17,6 +18,7 @@ impl AppsSystemRoles {
             AppsSystemRoles::Groot(role) => role.as_str(),
             AppsSystemRoles::BlacksmithLab(role) => role.as_str(),
             AppsSystemRoles::UniframeStudio(role) => role.as_str(),
+            AppsSystemRoles::AgentDavon(role) => role.as_str(),
         }
     }
 }
@@ -41,6 +43,25 @@ impl GrootRoleType {
 }
 
 impl AsRef<str> for GrootRoleType {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AgentDavonRoleType {
+    MessageCheck,
+}
+
+impl AgentDavonRoleType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AgentDavonRoleType::MessageCheck => "message_check",
+        }
+    }
+}
+
+impl AsRef<str> for AgentDavonRoleType {
     fn as_ref(&self) -> &str {
         self.as_str()
     }

@@ -5,14 +5,16 @@ use chrono::{DateTime, Utc};
 use core::local_db::tg_bot::groot_bot::subscription_management::check_chat_payment;
 use core::local_db::tg_bot::groot_bot::subscription_management::create_subscription;
 use core::local_db::tg_bot::groot_bot::subscription_management::get_subscription_info;
-use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
+use core::models::common::system_messages::{
+    AgentDavonMessages, AppsSystemMessages, GrootBotMessages,
+};
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState, ShowType};
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
     auto_delete_message, get_chat_title, get_chat_username, get_username,
-    is_message_from_linked_channel, load_super_admins,
+    is_message_from_linked_channel, load_super_admins, read_admins_from_csv,
 };
 use core::utils::tg_bot::groot_bot::subscription_utils::{
     show_plan_selection, PaymentProcess, SubscriptionState,
@@ -24,6 +26,7 @@ use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Request, Requester, Update};
 use teloxide::types::{KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
+use teloxide_core::payloads::SendDocumentSetters;
 use teloxide_core::prelude::ChatId;
 use tracing::{error, info};
 
@@ -45,7 +48,9 @@ pub async fn groot_bot_command_handler(
 
     // Checking subscription
     let is_paid_chat = if let Some(db_pool) = &app_state.db_pool {
-        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+        check_chat_payment(db_pool, msg.chat.id.0)
+            .await
+            .unwrap_or(false)
     } else {
         false
     };
@@ -534,6 +539,150 @@ pub async fn groot_bot_command_handler(
 
             handle_status_command(bot.clone(), msg.clone(), app_state.clone()).await?;
         }
+        GrootBotCommands::DavonReport => {
+            let message_text = msg.text().unwrap_or("");
+            let parts: Vec<&str> = message_text.split_whitespace().collect();
+
+            if parts.len() >= 2 {
+                match parts[1].parse::<i64>() {
+                    Ok(reported_chat_id) => {
+                        info!("Processing new agent report for chat: {}... Reading admin data from CSV", reported_chat_id);
+                        let report_response_prefix =
+                            format!("report_response:{}", reported_chat_id);
+                        let admins_csv_path = format!(
+                            "common_res/agent_davon/reports/{}_admins.csv",
+                            reported_chat_id
+                        );
+
+                        let (chat_title, chat_username, admins) =
+                            match read_admins_from_csv(&admins_csv_path).await {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    error!("Failed to read admin data from CSV: {}", e);
+                                    bot.send_message(
+                                        msg.chat.id,
+                                        format!(
+                                            "{}:Error reading admin data: {}",
+                                            report_response_prefix, e
+                                        ),
+                                    )
+                                    .await?;
+                                    return Ok(());
+                                }
+                            };
+
+                        info!(
+                            "Loaded admin data from CSV: chat '{}' (@{}) [id: {}] contains {} admins",
+                            chat_title,
+                            chat_username,
+                            reported_chat_id,
+                            admins.len()
+                        );
+
+                        let offer_template =
+                            get_message(AppsSystemMessages::AgentDavon(AgentDavonMessages::Offer))
+                                .await?;
+
+                        let offer = offer_template
+                            .replace("{chat_title}", &chat_title)
+                            .replace("{chat_username}", &chat_username)
+                            .replace("{chat_id}", &reported_chat_id.to_string());
+
+                        let mut sent_count = 0;
+
+                        for admin in &admins {
+                            match bot.send_message(ChatId(admin.user_id), &offer).await {
+                                Ok(_) => {
+                                    info!(
+                                        "Offer {} sent to {} [id: {}]",
+                                        sent_count, admin.role, admin.user_id
+                                    );
+                                    sent_count += 1;
+                                }
+                                Err(e) => {
+                                    error!(
+                                        "Failed to send offer {} to {} [id: {}]: {}",
+                                        sent_count, admin.role, admin.user_id, e
+                                    );
+                                }
+                            }
+                        }
+
+                        if sent_count > 0 {
+                            info!("Offer sent to {}/{} admins", sent_count, admins.len());
+
+                            let csv_path = format!(
+                                "common_res/agent_davon/reports/{}_report.csv",
+                                reported_chat_id
+                            );
+
+                            let mut file_sent_count = 0;
+
+                            for admin in admins {
+                                let document = teloxide::types::InputFile::file(&csv_path);
+
+                                match bot
+                                    .send_document(ChatId(admin.user_id), document)
+                                    // .send_document(ChatId(lord_admin_id as i64), document)
+                                    .caption("Отчет о спам-сообщениях ☝️")
+                                    .await
+                                {
+                                    Ok(_) => {
+                                        info!(
+                                            "CSV sent to {} {} [id: {}]",
+                                            admin.role, admin.user_id, admin.user_id
+                                        );
+                                        file_sent_count += 1;
+                                    }
+                                    Err(e) => {
+                                        error!(
+                                            "Failed to send CSV to {} {}: {}",
+                                            admin.role, admin.user_id, e
+                                        );
+                                    }
+                                }
+                            }
+
+                            bot.send_message(
+                                msg.chat.id,
+                                format!(
+                                    "{}:Offer sent: {} participants, {} CSV files for chat: {}",
+                                    report_response_prefix, sent_count, file_sent_count, chat_title
+                                ),
+                            )
+                            .await?;
+                        } else {
+                            error!("Failed to send offer to any admin for chat: {}", chat_title);
+                            bot.send_message(
+                                msg.chat.id,
+                                format!("{}: Failed to send offers to chat admins (possibly due to disabled personal messaging)", report_response_prefix)
+                            ).await?;
+                        }
+                    }
+                    Err(e) => {
+                        error!(
+                            "Invalid chat_id in agent report: {}. Error: {}",
+                            parts[1], e
+                        );
+                        bot.send_message(
+                            msg.chat.id,
+                            format!(
+                                "report_response:{}:Got invalid chat_id: {}",
+                                parts[1], parts[1]
+                            ),
+                        )
+                        .await?;
+                    }
+                }
+            } else {
+                error!("Agent report command missing chat_id argument");
+                bot.send_message(
+                    msg.chat.id,
+                    "report_response:unknown:Got invalid cmd format",
+                )
+                .await?;
+            }
+        }
     }
 
     Ok(())
@@ -558,13 +707,15 @@ pub async fn groot_bot_message_handler(
 
     // Checking subscription
     let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
-        check_chat_payment(db_pool, msg.chat.id.0).await.unwrap_or(false)
+        check_chat_payment(db_pool, msg.chat.id.0)
+            .await
+            .unwrap_or(false)
     } else {
         false
     };
 
     let is_paid_chat = is_paid_chat || msg.chat.id.0 == -1001576410541;
-    
+
     chat_moderation(bot, msg, bot_app_state, is_paid_chat).await?;
 
     Ok(())
@@ -680,6 +831,10 @@ pub async fn handle_subscription_command(
                     payment_id: None,
                     heleket_invoice_uuid: None,
                     heleket_order_id: None,
+                    original_price: None,
+                    discount_percent: None,
+                    final_price: None,
+                    discount_reason: None,
                 },
             );
         }
@@ -700,6 +855,9 @@ pub async fn handle_subscription_command(
             ChatId(owner.id.0 as i64),
             &target_chat_username,
             &target_chat_title,
+            owner.id.0 as i64,
+            target_chat_id,
+            app_state.clone(),
         )
         .await
     } else {
@@ -740,6 +898,10 @@ pub async fn handle_subscription_command(
                     payment_id: None,
                     heleket_invoice_uuid: None,
                     heleket_order_id: None,
+                    original_price: None,
+                    discount_percent: None,
+                    final_price: None,
+                    discount_reason: None,
                 },
             );
         }
@@ -760,6 +922,9 @@ pub async fn handle_subscription_command(
             ChatId(user_id as i64),
             &target_chat_username,
             &target_chat_title,
+            user_id as i64,
+            target_chat_id,
+            app_state.clone(),
         )
         .await
     }

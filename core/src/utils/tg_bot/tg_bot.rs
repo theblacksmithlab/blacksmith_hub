@@ -224,5 +224,5 @@ pub fn create_app_tmp_dir(app_name: &AppName) -> std::io::Result<()> {
 }
 
 pub fn is_localdb_implemented(app_name: &AppName) -> bool {
-    matches!(app_name, AppName::GrootBot | AppName::ProbiotBot)
+    matches!(app_name, AppName::GrootBot)
 }

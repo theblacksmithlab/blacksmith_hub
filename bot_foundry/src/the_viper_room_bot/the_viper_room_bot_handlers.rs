@@ -2,11 +2,11 @@ use crate::the_viper_room_bot::the_viper_room_bot_local_utils::{
     generate_podcast, schedule_podcast, stop_daily_podcasts,
 };
 use anyhow::Result;
-use core::grammers::grammers_functionality::initialize_grammers_client;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::{CommonMessages, TheViperRoomBotMessages};
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
 use core::state::tg_bot::app_state::BotAppState;
+use core::telegram_client::grammers_functionality::initialize_grammers_client;
 use core::utils::common::get_message;
 use std::path::Path;
 use std::sync::Arc;

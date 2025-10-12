@@ -1,5 +1,3 @@
-version: '3.8'
-
 networks:
   uniframe-network:
     driver: bridge
@@ -12,14 +10,21 @@ services:
       context: .
       dockerfile: docker/Dockerfile.bot_foundry_base
     image: bot_foundry_base
-    profiles: ["never-start"]
+    profiles: [ "never-start" ]
+
+  agent_foundry_base:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent_foundry_base
+    image: agent_foundry_base
+    profiles: [ "never-start" ]
 
   the_forge_base:
     build:
       context: .
       dockerfile: docker/Dockerfile.the_forge_base
     image: the_forge_base
-    profiles: ["never-start"]
+    profiles: [ "never-start" ]
 
   probiot_bot:
     build:
@@ -35,6 +40,11 @@ services:
           cpus: '2'
           memory: 4G
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   groot_bot:
     build:
@@ -46,8 +56,33 @@ services:
       - /root/projects/whisper.cpp/models:/app/whisper.cpp/models
       - ./common_res/groot_bot:/app/common_res/groot_bot
       - ./common_res/messages/groot_bot:/app/common_res/messages/groot_bot
+      - ./common_res/messages/agent_davon:/app/common_res/messages/agent_davon
       - ./common_res/messages/common:/app/common_res/messages/common
       - ./common_res/system_roles/groot_bot:/app/common_res/system_roles/groot_bot
+      - ./common_res/local_db:/app/common_res/local_db
+      - ./common_res/agent_davon:/app/common_res/agent_davon
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  agent_davon:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent_davon
+    env_file:
+      - .env
+    volumes:
+      - ./common_res/agent_davon:/app/common_res/agent_davon
+      - ./common_res/messages/common:/app/common_res/messages/common
+      - ./common_res/system_roles/agent_davon:/app/common_res/system_roles/agent_davon
       - ./common_res/local_db:/app/common_res/local_db
     deploy:
       resources:
@@ -55,6 +90,11 @@ services:
           cpus: '2'
           memory: 2G
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   blacksmith_web:
     build:
@@ -72,6 +112,11 @@ services:
           cpus: '4'
           memory: 4G
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   uniframe_studio:
     build:
@@ -89,5 +134,10 @@ services:
           cpus: '4'
           memory: 4G
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - uniframe-network

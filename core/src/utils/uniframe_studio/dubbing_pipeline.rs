@@ -18,7 +18,7 @@ use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 use uuid::Uuid;
 
 pub struct DubbingPipelineService {
@@ -201,27 +201,10 @@ impl DubbingPipelineService {
             Ok(None) => {
                 error!("No GPU instances available for job {}", job_id);
 
-                Self::update_pipeline_status(
-                    &self.db_pool,
-                    &job_id,
-                    "failed",
-                    "Server is currently overloaded. Please try again later.",
-                    Some(0),
-                    None,
-                    Some("All GPU processing instances are currently busy. Please try again in a few minutes."),
-                    None,
-                    None,
-                    None,
-                )
-                    .await;
-
-                return Err(anyhow::anyhow!(
-                    "Server overloaded: All GPU instances are busy"
-                ));
-            }
-            Err(e) => {
-                error!("Failed to acquire GPU instance for job {}: {}", job_id, e);
-
+                let error_msg = "All GPU processing instances are currently busy.\n\
+                Please try again in a few minutes...\n\
+                Need urgent processing? Contact our support team on the main page for priority resource allocation.".to_string(); 
+                
                 Self::update_pipeline_status(
                     &self.db_pool,
                     &job_id,
@@ -229,14 +212,40 @@ impl DubbingPipelineService {
                     "Technical environment initialization failed",
                     Some(0),
                     None,
-                    Some(&format!("Failed to acquire GPU instance: {}", e)),
+                    Some(&error_msg),
+                    None,
+                    None,
+                    None,
+                )
+                    .await;
+
+                return Err(anyhow::anyhow!(
+                    error_msg
+                ));
+            }
+            Err(e) => {
+                error!("Failed to acquire GPU instance for job {}: {}", job_id, e);
+
+                let error_msg = "Failed to acquire GPU instance for the job.\
+                \nPlease try again in a few minutes...".to_string();
+                
+                Self::update_pipeline_status(
+                    &self.db_pool,
+                    &job_id,
+                    "failed",
+                    "Technical environment initialization failed",
+                    Some(0),
+                    None,
+                    Some(&error_msg),
                     None,
                     None,
                     None,
                 )
                 .await;
 
-                return Err(e);
+                return Err(anyhow::anyhow!(
+                    error_msg
+                ));
             }
         };
 
@@ -353,9 +362,9 @@ impl DubbingPipelineService {
                 )
                 .await;
 
-                debug!("Timeout start");
+                info!("Timeout start");
                 tokio::time::sleep(Duration::from_secs(60)).await;
-                debug!("Timeout end");
+                info!("Timeout end");
 
                 let max_attempts = 30;
                 for attempt in 1..=max_attempts {

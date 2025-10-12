@@ -199,3 +199,40 @@ pub async fn get_expiring_subscriptions(
 
     Ok(subscriptions)
 }
+
+pub async fn has_active_subscription_for_other_chats(
+    db_pool: &Pool<Sqlite>,
+    user_id: i64,
+    exclude_chat_id: i64,
+) -> anyhow::Result<bool> {
+    let query = "
+        SELECT COUNT(*) as count
+        FROM subscriptions
+        WHERE paid_by_user_id = ?
+        AND chat_id != ?
+        AND datetime(end_date) > datetime('now')
+    ";
+
+    match sqlx::query_as::<_, (i64,)>(query)
+        .bind(user_id)
+        .bind(exclude_chat_id)
+        .fetch_one(db_pool)
+        .await
+    {
+        Ok((count,)) => {
+            let has_other_subscriptions = count > 0;
+            info!(
+                "User {} has {} active subscriptions for other chats (excluding chat {})",
+                user_id, count, exclude_chat_id
+            );
+            Ok(has_other_subscriptions)
+        }
+        Err(e) => {
+            error!(
+                "Database error checking other subscriptions for user {} (excluding chat {}): {}",
+                user_id, exclude_chat_id, e
+            );
+            Ok(false)
+        }
+    }
+}

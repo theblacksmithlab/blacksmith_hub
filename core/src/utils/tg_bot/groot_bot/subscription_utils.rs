@@ -1,6 +1,9 @@
+use crate::local_db::tg_bot::groot_bot::subscription_management::has_active_subscription_for_other_chats;
+use crate::state::tg_bot::app_state::BotAppState;
 use crate::utils::uniframe_studio::heleket_client::InvoiceResult;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use std::sync::Arc;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::Requester;
 use teloxide::types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup};
@@ -27,6 +30,10 @@ pub struct PaymentProcess {
     pub payment_id: Option<String>,
     pub heleket_invoice_uuid: Option<String>,
     pub heleket_order_id: Option<String>,
+    pub original_price: Option<u32>,
+    pub discount_percent: Option<u32>,
+    pub final_price: Option<u32>,
+    pub discount_reason: Option<String>,
 }
 
 pub struct SubscriptionPlan {
@@ -73,20 +80,52 @@ pub async fn show_plan_selection(
     user_chat_id: ChatId,
     chat_username: &str,
     target_chat_title: &str,
+    user_id: i64,
+    target_chat_id: i64,
+    app_state: Arc<BotAppState>,
 ) -> Result<()> {
+    let has_discount_for_other_chats = if let Some(db_pool) = &app_state.db_pool {
+        has_active_subscription_for_other_chats(db_pool, user_id, target_chat_id)
+            .await
+            .unwrap_or(false)
+    } else {
+        false
+    };
+
+    let discount_info = if has_discount_for_other_chats {
+        "\n🎉 Ваша скидка: 30% (активная подписка на другой чат)\n"
+    } else {
+        "\n💡 Доступные скидки:\n• Годовая подписка: скидка 17%\n• При наличии подписки на другой чат: скидка 30%\n"
+    };
+
     let message_text = format!(
         "Приветствую!\n\
-        Я получил заявку на оплату подписки для чата: {} (@{})\n\n\
+        Я получил заявку на оплату подписки для чата: {} (@{})\n\
+        {}\
         Внимательно проверьте username чата, изменить его после оплаты подписки будет невозможно!\n\n\
         Выберите тарифный план:",
-        target_chat_title,
-        chat_username
+        target_chat_title, chat_username, discount_info
     );
 
     let mut keyboard_rows = vec![];
 
     for plan in &SUBSCRIPTION_PLANS {
-        let button_text = format!("{} - {} $", plan.name, plan.price_usd);
+        let button_text = if has_discount_for_other_chats {
+            let discounted_price = (plan.price_usd as f64 * 0.7).round() as u32;
+            format!(
+                "{} - {}$ → {}$ (-30%)",
+                plan.name, plan.price_usd, discounted_price
+            )
+        } else if plan.id == "yearly" {
+            let discounted_price = (plan.price_usd as f64 * 0.83).round() as u32;
+            format!(
+                "{} - {}$ → {}$ (-17%)",
+                plan.name, plan.price_usd, discounted_price
+            )
+        } else {
+            format!("{} - {}$", plan.name, plan.price_usd)
+        };
+
         keyboard_rows.push(vec![InlineKeyboardButton::callback(
             button_text,
             format!("plan_{}", plan.id),
@@ -113,19 +152,38 @@ pub async fn show_payment_confirmation(
     target_chat_username: &str,
     target_chat_title: &str,
     plan: &SubscriptionPlan,
+    original_price: u32,
+    discount_percent: u32,
+    final_price: u32,
+    discount_reason: &str,
 ) -> Result<()> {
+    let price_text = if discount_percent > 0 {
+        let discount_description = match discount_reason {
+            "existing_subscription" => "скидка за активную подписку",
+            "yearly_plan" => "скидка за годовую подписку",
+            _ => "скидка",
+        };
+
+        format!(
+            "💰 Сумма: ~~{} $~~ → {} $ ({} {}%)",
+            original_price, final_price, discount_description, discount_percent
+        )
+    } else {
+        format!("💰 Сумма: {} $", final_price)
+    };
+
     let message_text = format!(
         "Подтверждение заказа\n\n\
         🎯 Чат: {} (@{})\n\
         📋 Тарифный план: {}\n\
-        💰 Сумма: {} $\n\
+        {}\n\
         ⏱️ Период: {} дней\n\n\
         📝 Описание: {}\n\n\
         ✅ Подтверждаете оплату?",
         target_chat_title,
         target_chat_username,
         plan.name,
-        plan.price_usd,
+        price_text,
         plan.duration_days,
         plan.description
     );

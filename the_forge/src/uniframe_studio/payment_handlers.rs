@@ -8,6 +8,7 @@ use http::StatusCode;
 use md5::{Digest, Md5};
 use serde::Deserialize;
 use std::sync::Arc;
+use tracing::{error, info};
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -54,19 +55,19 @@ pub async fn handle_payment_webhook(
     body: Bytes,
 ) -> Result<StatusCode, StatusCode> {
     let raw_body = String::from_utf8(body.to_vec()).map_err(|_| {
-        eprintln!("Invalid UTF-8 in webhook body");
+        error!("Invalid UTF-8 in webhook body");
         StatusCode::BAD_REQUEST
     })?;
 
-    println!("Received webhook: {}", raw_body);
+    info!("Received webhook: {}", raw_body);
 
     let webhook_data: PaymentWebhook = serde_json::from_str(&raw_body).map_err(|e| {
-        eprintln!("Failed to parse webhook JSON: {}", e);
+        error!("Failed to parse webhook JSON: {}", e);
         StatusCode::BAD_REQUEST
     })?;
 
     if !verify_webhook_signature(&webhook_data, &raw_body) {
-        eprintln!(
+        error!(
             "Invalid webhook signature for order_id: {}",
             webhook_data.order_id
         );
@@ -74,7 +75,7 @@ pub async fn handle_payment_webhook(
     }
 
     if let Err(e) = process_payment_webhook(&app_state, webhook_data).await {
-        eprintln!("Failed to process webhook: {}", e);
+        error!("Failed to process webhook: {}", e);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
@@ -84,17 +85,9 @@ pub async fn handle_payment_webhook(
 fn verify_webhook_signature(webhook_data: &PaymentWebhook, raw_body: &str) -> bool {
     let api_key = std::env::var("HELEKET_API_KEY").unwrap_or_default();
 
-    let mut data: serde_json::Value = match serde_json::from_str(raw_body) {
-        Ok(value) => value,
-        Err(_) => return false,
-    };
+    let json_without_sign = remove_sign_from_raw_json(raw_body);
 
-    if let Some(obj) = data.as_object_mut() {
-        obj.remove("sign");
-    }
-
-    let json_string = serde_json::to_string(&data).unwrap_or_default();
-    let data_base64 = general_purpose::STANDARD.encode(json_string);
+    let data_base64 = general_purpose::STANDARD.encode(&json_without_sign);
     let data_with_key = format!("{}{}", data_base64, api_key);
 
     let mut hasher = Md5::new();
@@ -105,28 +98,47 @@ fn verify_webhook_signature(webhook_data: &PaymentWebhook, raw_body: &str) -> bo
     calculated_signature == webhook_data.sign
 }
 
+fn remove_sign_from_raw_json(raw_body: &str) -> String {
+    if let Some(sign_start) = raw_body.rfind(r#","sign":"#) {
+        let before_sign = &raw_body[..sign_start];
+        let after_sign = &raw_body[sign_start..];
+
+        if let Some(end_pos) = after_sign.find("}") {
+            return format!("{}{}", before_sign, &after_sign[end_pos..]);
+        }
+    }
+
+    raw_body.to_string()
+}
+
 async fn process_payment_webhook(
     app_state: &Arc<UniframeStudioAppState>,
     webhook_data: PaymentWebhook,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let webhook_id = &webhook_data.uuid;
+    let webhook_status = &webhook_data.status;
     let user_id = extract_user_id_from_order(&webhook_data.order_id)?;
     let db_pool = app_state.get_db_pool();
 
-    let already_processed = sqlx::query("SELECT 1 FROM processed_webhooks WHERE webhook_id = ?")
-        .bind(webhook_id)
-        .fetch_optional(db_pool)
-        .await?
-        .is_some();
+    let already_processed =
+        sqlx::query("SELECT 1 FROM processed_webhooks WHERE webhook_id = ? AND status = ?")
+            .bind(webhook_id)
+            .bind(webhook_status)
+            .fetch_optional(db_pool)
+            .await?
+            .is_some();
 
     if already_processed {
-        println!("Webhook {} already processed, skipping", webhook_id);
+        info!(
+            "Webhook {} with status {} already processed, skipping",
+            webhook_id, webhook_status
+        );
         return Ok(());
     }
 
     match webhook_data.status.as_str() {
         "paid" | "paid_over" => {
-            println!(
+            info!(
                 "Processing successful payment for order_id: {}",
                 webhook_data.order_id
             );
@@ -142,25 +154,26 @@ async fn process_payment_webhook(
                 )
                 .await?;
 
-            println!(
+            info!(
                 "Successfully added ${} to user {} balance",
                 amount_usd, user_id
             );
         }
         "fail" | "wrong_amount" | "cancel" | "system_fail" => {
-            println!(
+            error!(
                 "Payment failed for order_id: {}, status: {}",
                 webhook_data.order_id, webhook_data.status
             );
         }
         _ => {
-            println!("Received intermediate status: {}", webhook_data.status);
+            info!("Received intermediate status: {}", webhook_data.status);
         }
     }
 
-    sqlx::query("INSERT INTO processed_webhooks (webhook_id, order_id) VALUES (?, ?)")
+    sqlx::query("INSERT INTO processed_webhooks (webhook_id, order_id, status) VALUES (?, ?, ?)")
         .bind(webhook_id)
         .bind(&webhook_data.order_id)
+        .bind(webhook_status)
         .execute(db_pool)
         .await?;
 

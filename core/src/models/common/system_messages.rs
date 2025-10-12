@@ -7,6 +7,7 @@ pub enum AppsSystemMessages {
     W3ABot(W3ABotMessages),
     W3A(W3AMessages),
     GrootBot(GrootBotMessages),
+    AgentDavon(AgentDavonMessages),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -78,6 +79,19 @@ impl GrootBotMessages {
                 "subscription_cmd_used_in_private_chat"
             }
             GrootBotMessages::ImportantInstructions => "important_instructions",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AgentDavonMessages {
+    Offer,
+}
+
+impl AgentDavonMessages {
+    pub fn as_str(&self) -> &str {
+        match self {
+            AgentDavonMessages::Offer => "offer",
         }
     }
 }

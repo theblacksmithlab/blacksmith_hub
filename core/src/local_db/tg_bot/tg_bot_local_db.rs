@@ -6,9 +6,10 @@ use std::fs;
 use std::path::Path;
 use tracing::{info, warn};
 
-pub async fn setup_bot_localdb_pool(app_name: &AppName) -> anyhow::Result<SqlitePool> {
+pub async fn setup_localdb_pool(app_name: &AppName) -> anyhow::Result<SqlitePool> {
     let db_path = match app_name {
         AppName::GrootBot => "common_res/local_db/groot_bot.db",
+        AppName::AgentDavon => "common_res/local_db/agent_davon.db",
         _ => {
             return Err(anyhow::anyhow!(
                 "Database not supported for app: {}",
@@ -41,7 +42,7 @@ pub async fn setup_bot_localdb_pool(app_name: &AppName) -> anyhow::Result<Sqlite
 
     info!("{} db pool initialized successfully", app_name.as_str());
 
-    create_bot_localdb_tables(&pool, app_name)
+    create_localdb_tables(&pool, app_name)
         .await
         .context("Error creating tables in bot db")?;
 
@@ -50,10 +51,7 @@ pub async fn setup_bot_localdb_pool(app_name: &AppName) -> anyhow::Result<Sqlite
     Ok(pool)
 }
 
-async fn create_bot_localdb_tables(
-    pool: &SqlitePool,
-    app_name: &AppName,
-) -> Result<(), sqlx::Error> {
+async fn create_localdb_tables(pool: &SqlitePool, app_name: &AppName) -> Result<(), sqlx::Error> {
     match app_name {
         AppName::GrootBot => {
             let query = "
@@ -71,6 +69,45 @@ async fn create_bot_localdb_tables(
 
                 CREATE INDEX IF NOT EXISTS idx_chat_id ON subscriptions(chat_id);
                 CREATE INDEX IF NOT EXISTS idx_end_date ON subscriptions(end_date);
+            ";
+            sqlx::query(query).execute(pool).await?;
+        }
+        AppName::AgentDavon => {
+            let query = "
+                CREATE TABLE IF NOT EXISTS chat_monitoring (
+                    chat_id INTEGER PRIMARY KEY,
+                    chat_title TEXT NOT NULL,
+                    chat_username TEXT,
+                    first_message_time TEXT,
+                    last_report_sent TEXT,
+                    spam_count INTEGER DEFAULT 0,
+                    total_messages INTEGER DEFAULT 0,
+                    status TEXT NOT NULL DEFAULT 'collecting',
+                    report_response TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS chat_admins (
+                    chat_id INTEGER,
+                    user_id INTEGER, 
+                    role TEXT, -- 'owner', 'admin', 'linked_channel'
+                    fetched_at TEXT,
+                    PRIMARY KEY (chat_id, user_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS spam_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chat_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    username TEXT,
+                    message_text TEXT NOT NULL,
+                    detected_at TEXT NOT NULL,
+                    FOREIGN KEY (chat_id) REFERENCES chat_monitoring(chat_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_chat_monitoring_status ON chat_monitoring(status);
+                CREATE INDEX IF NOT EXISTS idx_chat_monitoring_first_time ON chat_monitoring(first_message_time);
+                CREATE INDEX IF NOT EXISTS idx_spam_messages_chat_id ON spam_messages(chat_id);
+                CREATE INDEX IF NOT EXISTS idx_spam_messages_detected_at ON spam_messages(detected_at);
             ";
             sqlx::query(query).execute(pool).await?;
         }
