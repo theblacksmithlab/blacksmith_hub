@@ -1012,12 +1012,15 @@ pub async fn quote_entities_check(
 ) -> Result<Option<()>> {
     if let Some(entities) = msg.entities() {
         for entity in entities {
-            if matches!(entity.kind, teloxide::types::MessageEntityKind::Blockquote { .. }) {
+            if matches!(
+                entity.kind,
+                teloxide::types::MessageEntityKind::Blockquote { .. }
+            ) {
                 if is_paid_chat {
                     let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
                         GrootBotMessages::DefaultScamAlert,
                     ))
-                        .await?;
+                    .await?;
                     let formatted_bot_system_message_text =
                         bot_system_message_text.replace("{}", username);
 
@@ -1043,15 +1046,18 @@ pub async fn quote_entities_check(
             }
         }
     }
-    
+
     if let Some(caption_entities) = msg.caption_entities() {
         for entity in caption_entities {
-            if matches!(entity.kind, teloxide::types::MessageEntityKind::Blockquote { .. }) {
+            if matches!(
+                entity.kind,
+                teloxide::types::MessageEntityKind::Blockquote { .. }
+            ) {
                 if is_paid_chat {
                     let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
                         GrootBotMessages::DefaultScamAlert,
                     ))
-                        .await?;
+                    .await?;
                     let formatted_bot_system_message_text =
                         bot_system_message_text.replace("{}", username);
 

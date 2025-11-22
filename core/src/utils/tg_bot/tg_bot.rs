@@ -1,7 +1,7 @@
 use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::models::common::system_messages::{
-    AppsSystemMessages, ProbiotBotMessages, W3ABotMessages,
+    AppsSystemMessages, ProbiotBotMessages,
 };
 use crate::state::tg_bot::app_state::BotAppState;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
@@ -151,9 +151,6 @@ pub async fn append_footer_if_needed<T: TempCacheInit + Send + Sync>(
                     ProbiotBotMessages::ResponseFooter,
                 ))
                 .await?
-            }
-            AppName::W3ABot => {
-                get_message(AppsSystemMessages::W3ABot(W3ABotMessages::ResponseFooter)).await?
             }
             AppName::W3AWeb => {
                 "".to_string()

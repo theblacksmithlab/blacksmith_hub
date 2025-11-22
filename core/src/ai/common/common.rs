@@ -87,20 +87,6 @@ pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
     }
 }
 
-// pub async fn vectorize(data: String, app_state: Arc<RequestAppState>) -> Result<Vec<f32>> {
-//     let llm_client = app_state.llm_client.clone();
-//
-//     let request = CreateEmbeddingRequestArgs::default()
-//         .model(LlmModel::TextEmbedding3Large.as_str())
-//         .input(data)
-//         .build()?;
-//
-//     let response: CreateEmbeddingResponse = llm_client.embeddings().create(request).await?;
-//     let embedding = response.data.into_iter().next().unwrap().embedding;
-//
-//     Ok(embedding)
-// }
-
 pub async fn tokenize_and_truncate(data: &str, max_tokens: usize) -> Result<(String, usize)> {
     let bpe = cl100k_base()?;
     let tokens = bpe.encode_ordinary(&*data);

@@ -1,7 +1,7 @@
 use crate::message_processing_flow::message_processing_flow::process_user_raw_request;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
-use crate::models::common::system_messages::{CommonMessages, ProbiotBotMessages, W3ABotMessages};
+use crate::models::common::system_messages::{CommonMessages, ProbiotBotMessages};
 use crate::state::tg_bot::app_state::BotAppState;
 use crate::utils::common::{convert_markdown_to_telegram, get_message, transcribe_voice_message};
 use crate::utils::tg_bot::tg_bot::{
@@ -241,9 +241,6 @@ pub async fn default_message_handler(
             if let Some(message_enum) = match app_name {
                 AppName::ProbiotBot => Some(AppsSystemMessages::ProbiotBot(
                     ProbiotBotMessages::PrivateChatInvitation,
-                )),
-                AppName::W3ABot => Some(AppsSystemMessages::W3ABot(
-                    W3ABotMessages::PrivateChatInvitation,
                 )),
                 _ => None,
             } {

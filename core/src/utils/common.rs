@@ -24,7 +24,6 @@ pub fn build_resource_file_path(app_name: &AppName, file_name: &str) -> PathBuf 
 pub fn get_mapped_from_app_name_role_directory(app_name: &AppName) -> &str {
     match app_name {
         AppName::ProbiotBot => "probiot",
-        AppName::W3ABot => "w3a",
         AppName::W3AWeb => "w3a",
         AppName::TheViperRoomBot => "the_viper_room",
         AppName::BlacksmithWeb => "blacksmith_lab",
@@ -119,10 +118,6 @@ pub async fn get_message(message_enum: AppsSystemMessages) -> Result<String> {
         ),
         AppsSystemMessages::TheViperRoomBot(msg) => (
             Path::new("common_res/messages/the_viper_room_bot").to_path_buf(),
-            msg.as_str().to_string(),
-        ),
-        AppsSystemMessages::W3ABot(msg) => (
-            Path::new("common_res/messages/w3a_bot").to_path_buf(),
             msg.as_str().to_string(),
         ),
         AppsSystemMessages::GrootBot(msg) => (

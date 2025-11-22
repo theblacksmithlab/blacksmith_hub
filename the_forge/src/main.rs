@@ -42,7 +42,7 @@ async fn main() -> Result<()> {
         "blacksmith_web" => AppName::BlacksmithWeb,
         "the_viper_room" => AppName::TheViperRoom,
         "uniframe_studio" => AppName::UniframeStudio,
-        "probiot_bot" | "the_viper_room_bot" | "tester_bot" | "w3a_bot" | "groot_bot" => {
+        "probiot_bot" | "the_viper_room_bot" | "groot_bot" => {
             info!("No server implementation for {}", app_name_str);
             return Ok(());
         }

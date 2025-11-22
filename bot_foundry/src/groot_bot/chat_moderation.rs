@@ -1,4 +1,9 @@
-use crate::groot_bot::chat_moderation_utils::{ai_check, check_sender, is_user_active, media_restriction_check, message_caption_check, message_entities_check, message_with_web_url_check, quote_entities_check, restricted_words_check, save_message_counts_to_file, scam_emojis_check, scam_stories_check, update_user_message_count, via_bot_message_check};
+use crate::groot_bot::chat_moderation_utils::{
+    ai_check, check_sender, is_user_active, media_restriction_check, message_caption_check,
+    message_entities_check, message_with_web_url_check, quote_entities_check,
+    restricted_words_check, save_message_counts_to_file, scam_emojis_check, scam_stories_check,
+    update_user_message_count, via_bot_message_check,
+};
 use crate::groot_bot::resources_cmd_handler::resources_cmd_handler;
 use anyhow::Result;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
@@ -98,7 +103,7 @@ pub async fn chat_moderation(
         info!("Message from linked channel - skipping moderation");
         return Ok(());
     }
-    
+
     if is_from_chat_itself {
         info!("Message from chat itself - skipping moderation");
     }
@@ -171,8 +176,8 @@ pub async fn chat_moderation(
         &username,
         user_id,
     )
-        .await?
-        .is_some()
+    .await?
+    .is_some()
     {
         return Ok(());
     };

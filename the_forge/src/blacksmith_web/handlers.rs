@@ -207,7 +207,6 @@ async fn prepare_text_for_tts_fn(
     text_to_process: &str,
 ) -> Result<String> {
     let system_role = match app_name {
-        AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::TTSPreProcessing)),
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::TTSPreProcessing)),
         AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
             BlacksmithLabRoleType::TTSPreProcessing,

@@ -4,7 +4,6 @@ pub enum AppsSystemMessages {
     TheViperRoom(TheViperRoomMessages),
     TheViperRoomBot(TheViperRoomBotMessages),
     Common(CommonMessages),
-    W3ABot(W3ABotMessages),
     W3A(W3AMessages),
     GrootBot(GrootBotMessages),
     AgentDavon(AgentDavonMessages),
