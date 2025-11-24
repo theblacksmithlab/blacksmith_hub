@@ -27,7 +27,7 @@ print_help() {
     echo ""
 
     print_message "${YELLOW}" "Available services:"
-    SERVICES=$(docker-compose config --services | grep -v "_base" | grep -v "bot")
+    SERVICES=$(docker-compose config --services | grep -E "^(blacksmith_|uniframe_)")
     for service in $SERVICES; do
         echo "  - $service"
     done
@@ -37,7 +37,7 @@ rebuild_base() {
     print_message "${GREEN}" "Rebuilding the_forge_base image..."
 
     print_message "${YELLOW}" "Stopping and removing dependent containers..."
-    DEPENDENT_SERVICES=$(docker-compose config --services | grep -v "bot" | grep -v "_base")
+    DEPENDENT_SERVICES=$(docker-compose config --services | grep -E "^(blacksmith_|uniframe_)")
     for service in $DEPENDENT_SERVICES; do
         docker-compose stop $service
         docker-compose rm -f $service
@@ -100,7 +100,7 @@ if [ "$1" == "full-redeploy" ]; then
         exit 1
     fi
 
-    SERVICES=$(docker-compose config --services | grep -v "_base" | grep -v "bot")
+    SERVICES=$(docker-compose config --services | grep -E "^(blacksmith_|uniframe_)")
     if ! echo "$SERVICES" | grep -q "$SERVICE_NAME"; then
         print_message "${RED}" "ACHTUNG! Service '$SERVICE_NAME' does not exist."
         print_message "${YELLOW}" "Available services:"
@@ -156,7 +156,7 @@ if [ "$SERVICE_NAME" == "base" ]; then
     exit 0
 fi
 
-SERVICES=$(docker-compose config --services | grep -v "_base" | grep -v "bot")
+SERVICES=$(docker-compose config --services | grep -E "^(blacksmith_|uniframe_)")
 if ! echo "$SERVICES" | grep -q "$SERVICE_NAME"; then
     print_message "${RED}" "ACHTUNG! Service '$SERVICE_NAME' does not exist."
     print_message "${YELLOW}" "Available services:"

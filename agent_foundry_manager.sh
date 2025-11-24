@@ -27,7 +27,7 @@ print_help() {
     echo ""
 
     print_message "${YELLOW}" "Available agents:"
-    AGENTS=$(docker-compose config --services | grep "^agent_")
+    AGENTS=$(docker-compose config --services | grep "^agent_" | grep -v "_base")
     for agent in $AGENTS; do
         echo "  - $agent"
     done
@@ -100,7 +100,7 @@ if [ "$1" == "full-redeploy" ]; then
         exit 1
     fi
 
-    AGENTS=$(docker-compose config --services | grep "^agent_")
+    AGENTS=$(docker-compose config --services | grep "^agent_" | grep -v "_base")
     if ! echo "$AGENTS" | grep -q "$AGENT_NAME"; then
         print_message "${RED}" "ACHTUNG! Agent '$AGENT_NAME' does not exist."
         print_message "${YELLOW}" "Available agents:"
@@ -156,7 +156,7 @@ if [ "$AGENT_NAME" == "base" ]; then
     exit 0
 fi
 
-AGENTS=$(docker-compose config --services | grep "^agent_")
+AGENTS=$(docker-compose config --services | grep "^agent_" | grep -v "_base")
 if ! echo "$AGENTS" | grep -q "$AGENT_NAME"; then
     print_message "${RED}" "ACHTUNG! Agent '$AGENT_NAME' does not exist."
     print_message "${YELLOW}" "Available agents:"

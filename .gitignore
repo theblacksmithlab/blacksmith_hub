@@ -23,6 +23,7 @@ DEV_NOTES.md
 *.log
 tools/tmp
 certs/
+CLAUDE.md
 
 #Groot res
 common_res/groot_bot/black_listed_users.json
