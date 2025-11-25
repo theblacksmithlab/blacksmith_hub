@@ -1,4 +1,4 @@
-use crate::the_viper_room_bot::the_viper_room_bot_local_utils::{
+use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     generate_podcast, schedule_podcast, stop_daily_podcasts,
 };
 use anyhow::Result;
@@ -36,18 +36,18 @@ pub(crate) async fn the_viper_room_command_handler(
         .parse()
         .expect("LORD_ADMIN_ID must be a valid integer");
 
-    let app_tg_account_id = Arc::new(
-        env::var("APP_TG_ACCOUNT_ID").expect("APP_TG_ACCOUNT_ID must be set in environment"),
+    let tg_agent_id = Arc::new(
+        env::var("TG_AGENT_ID").expect("TG_AGENT_ID must be set in environment"),
     );
 
     let session_path = format!(
         "common_res/the_viper_room/grammers_system_session/{}.session",
-        app_tg_account_id
+        tg_agent_id
     );
 
     if !Path::new(&session_path).exists() {
         return Err(anyhow::anyhow!(
-            "System session file not found: {}. Please ensure the session file exists",
+            "Telegram agent session file not found: {}. Please ensure the session file exists",
             session_path
         ));
     }
@@ -75,13 +75,14 @@ pub(crate) async fn the_viper_room_command_handler(
                 bot.clone(),
                 user_id,
                 app_state.clone(),
-                &app_tg_account_id,
+                &tg_agent_id,
                 nickname,
                 "the_viper_room",
             )
             .await?;
         }
 
+        // Testing podcast generation
         TheViperRoomBotCommands::Test if user_id.0 == lord_admin_id => {
             bot.send_message(user_id, "Starting test podcast generation by /test cmd...")
                 .await?;
@@ -90,7 +91,7 @@ pub(crate) async fn the_viper_room_command_handler(
                 bot.clone(),
                 user_id,
                 app_state.clone(),
-                &app_tg_account_id,
+                &tg_agent_id,
                 nickname,
                 "nervosettestchat",
             )
@@ -102,7 +103,7 @@ pub(crate) async fn the_viper_room_command_handler(
                 bot.clone(),
                 user_id,
                 app_state.clone(),
-                app_tg_account_id,
+                tg_agent_id,
                 nickname,
                 session_data,
             )

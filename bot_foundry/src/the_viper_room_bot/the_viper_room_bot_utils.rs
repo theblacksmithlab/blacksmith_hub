@@ -21,7 +21,7 @@ pub(crate) async fn generate_podcast(
     bot: Bot,
     chat_id: ChatId,
     app_state: Arc<BotAppState>,
-    app_tg_account_id: &str,
+    tg_agent_id: &str,
     nickname: String,
     chat_username: &str,
 ) -> anyhow::Result<()> {
@@ -36,7 +36,7 @@ pub(crate) async fn generate_podcast(
     }
 
     let podcast =
-        news_block_creation(&g_client, app_tg_account_id, app_state, nickname, true).await?;
+        news_block_creation(&g_client, tg_agent_id, app_state, nickname, true).await?;
 
     let uploaded_file = g_client.upload_file(&podcast).await?;
 

@@ -17,6 +17,7 @@ use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::sleep;
 use tracing::info;
+use tracing::log::warn;
 
 pub(crate) async fn get_dialogs(client: &g_Client) -> Result<Vec<types::Dialog>, anyhow::Error> {
     info!("Getting list of updates sources...");
@@ -100,7 +101,8 @@ pub(crate) async fn processing_dialogs<T: OpenAIClientInit + Send + Sync>(
                 user_tmp_dir.clone(),
             )
             .await?;
-            sleep(Duration::from_secs(1)).await;
+            // Check for FLOOD_WAIT
+            // sleep(Duration::from_secs(1)).await;
         }
     }
 
@@ -111,7 +113,7 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
 ) -> Result<(), anyhow::Error> {
-    info!("Writing results from information sources in updates.txt...");
+    info!("Writing updates from information sources in updates.txt...");
 
     let updates_file_path = format!("{}/updates.txt", user_tmp_dir);
     let mut updates_file = OpenOptions::new()
@@ -130,12 +132,14 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
         .collect();
 
     let now = Utc::now();
-    let utc_plus_3 = now + ChronoDuration::hours(3);
+    let utc_plus_3_now = now + ChronoDuration::hours(3);
+    let utc_plus_3_start = utc_plus_3_now - ChronoDuration::hours(9);
 
     writeln!(
         updates_file,
-        "\nДата и время формирования обновлений: {}\n",
-        utc_plus_3
+        "Список обновлений за период: с {} по {} (UTC+3)\n",
+        utc_plus_3_start.format("%H:%M %d.%m.%Y"),
+        utc_plus_3_now.format("%H:%M %d.%m.%Y")
     )?;
 
     let system_role = get_system_role_or_fallback(
@@ -146,11 +150,42 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
 
     for file_path in txt_files.clone() {
         let content = read_file_safe(&file_path)?;
-        let response =
-            raw_llm_processing(&system_role, &content, app_state.clone(), LlmModel::Complex)
-                .await?;
-        writeln!(updates_file, "\n{}\n", response)?;
-        info!("{} file processed successfully!", file_path.display());
+        let (source, messages) = parse_channel_file(&content)?;
+
+        if messages.is_empty() {
+            info!("No messages found in {}, skipping", file_path.display());
+            continue;
+        }
+
+        info!("Processing {} messages from source: {}", messages.len(), source);
+
+        for (idx, message_text) in messages.iter().enumerate() {
+            let llm_input = format!(
+                "Источник обновления: {}\nТекст обновления:\n{}",
+                source, message_text
+            );
+
+            let response = raw_llm_processing(
+                &system_role,
+                &llm_input,
+                app_state.clone(),
+                LlmModel::Complex
+            ).await?;
+
+            let trimmed = response.trim();
+            if !trimmed.is_empty() {
+                writeln!(
+                    updates_file,
+                    "Источник обновления: {}\nОбзор обновления:\n{}\n",
+                    source,
+                    trimmed,
+                )?;
+            } else {
+                warn!("Empty response for message {} from {}", idx + 1, source);
+            }
+        }
+
+        info!("{} processed successfully!", file_path.display());
     }
 
     writeln!(updates_file, "\nКонец обновлений")?;
@@ -228,7 +263,10 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
     let mut file = OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(user_tmp_file)?;
+
+    writeln!(file, "ИСТОЧНИК ОБНОВЛЕНИЙ: {}\n", chat_name)?;
 
     let system_role = get_system_role_or_fallback(
         &AppName::TheViperRoom,
@@ -246,14 +284,20 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
             let llm_response =
                 raw_llm_processing(&system_role, text, app_state.clone(), LlmModel::Light).await?;
 
-            if llm_response.trim() == "skip" {
+            let decision = llm_response.trim().to_lowercase();
+
+            if decision != "ok" && decision != "skip" {
+                warn!("Unexpected LLM response: '{}', defaulting to skip", llm_response);
+                continue;
+            }
+
+            if decision == "skip" {
                 continue;
             }
 
             writeln!(
                 file,
-                "***\nИсточник: {}\nНачало обновления:\n{}\nКонец обновления.\n***\n",
-                dialog.chat.name(),
+                "===ТЕКСТ ОБНОВЛЕНИЯ===\n{}\n===КОНЕЦ===\n",
                 text
             )?;
         }
@@ -415,4 +459,35 @@ pub async fn generate_waveform(audio_path: &Path) -> anyhow::Result<Vec<u8>> {
     }
 
     Ok(waveform)
+}
+
+fn parse_channel_file(content: &str) -> Result<(String, Vec<String>), anyhow::Error> {
+    let mut lines = content.lines();
+
+    let source = lines
+        .find(|line| line.starts_with("ИСТОЧНИК:"))
+        .ok_or_else(|| anyhow::anyhow!("Source not found in file"))?
+        .trim_start_matches("ИСТОЧНИК:")
+        .trim()
+        .to_string();
+
+    let remaining_content: String = lines.collect::<Vec<_>>().join("\n");
+
+    let messages: Vec<String> = remaining_content
+        .split("===СООБЩЕНИЕ===")
+        .filter_map(|part| {
+            let text = part
+                .replace("===КОНЕЦ===", "")
+                .trim()
+                .to_string();
+
+            if text.is_empty() {
+                None
+            } else {
+                Some(text)
+            }
+        })
+        .collect();
+
+    Ok((source, messages))
 }

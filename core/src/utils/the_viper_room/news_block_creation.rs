@@ -30,7 +30,6 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
     create_dir_all(&user_tmp_dir)?;
 
     let channels = get_dialogs(&client).await?;
-
     processing_dialogs(&client, channels, app_state.clone(), user_tmp_dir.clone()).await?;
 
     updates_file_creation(user_tmp_dir.clone(), app_state.clone()).await?;
@@ -84,10 +83,10 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
         .map(|entry| entry.path())
         .collect();
 
-    for file_path in &txt_files {
-        remove_file(file_path)?;
-        info!("File {} has been deleted.", file_path.display());
-    }
+    // for file_path in &txt_files {
+    //     remove_file(file_path)?;
+    //     info!("File {} has been deleted.", file_path.display());
+    // }
 
     if need_caption {
         let system_role = get_system_role_or_fallback(

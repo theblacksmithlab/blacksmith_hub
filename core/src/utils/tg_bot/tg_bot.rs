@@ -1,8 +1,6 @@
 use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
-use crate::models::common::system_messages::{
-    AppsSystemMessages, ProbiotBotMessages,
-};
+use crate::models::common::system_messages::{AppsSystemMessages, ProbiotBotMessages};
 use crate::state::tg_bot::app_state::BotAppState;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
 use crate::utils::common::get_message;
