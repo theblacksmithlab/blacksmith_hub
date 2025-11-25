@@ -12,11 +12,11 @@ resolver = "2"
 [workspace.dependencies]
 # Async Runtime & Web Framework
 tokio = { version = "1.38.0", features = ["full"] }
-axum = "0.8.1"
+axum = "0.7.9"
 tower = "0.5.1"
 tower-http = { version = "0.6.1", features = ["trace", "cors"] }
 http = "1.1.0"
-axum-server = { version = "0.7.1", features = ["tls-rustls-no-provider"] }
+axum-server = { version = "0.7.3", features = ["tls-rustls-no-provider"] }
 
 # Telegram Client Libraries
 teloxide = { version = "0.15.0", features = ["macros"] }
