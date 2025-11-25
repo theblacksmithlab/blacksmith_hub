@@ -465,16 +465,21 @@ fn parse_channel_file(content: &str) -> Result<(String, Vec<String>), anyhow::Er
     let mut lines = content.lines();
 
     let source = lines
-        .find(|line| line.starts_with("ИСТОЧНИК:"))
-        .ok_or_else(|| anyhow::anyhow!("Source not found in file"))?
-        .trim_start_matches("ИСТОЧНИК:")
-        .trim()
-        .to_string();
+        .find(|line| line.starts_with("ИСТОЧНИК ОБНОВЛЕНИЙ:"))
+        .map(|line| {
+            line.trim_start_matches("ИСТОЧНИК ОБНОВЛЕНИЙ:")
+                .trim()
+                .to_string()
+        })
+        .unwrap_or_else(|| {
+            warn!("Source not found in file, using default");
+            "Не определено".to_string()
+        });
 
     let remaining_content: String = lines.collect::<Vec<_>>().join("\n");
 
     let messages: Vec<String> = remaining_content
-        .split("===СООБЩЕНИЕ===")
+        .split("===ТЕКСТ ОБНОВЛЕНИЯ===")
         .filter_map(|part| {
             let text = part
                 .replace("===КОНЕЦ===", "")
