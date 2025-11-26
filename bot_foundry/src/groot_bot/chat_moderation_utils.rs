@@ -591,7 +591,7 @@ pub async fn ai_check(
         &system_role,
         message_to_check,
         app_state,
-        LlmModel::Complex2,
+        LlmModel::ComplexPro,
     )
     .await?;
 

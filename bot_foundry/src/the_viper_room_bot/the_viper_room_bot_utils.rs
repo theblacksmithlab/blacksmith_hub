@@ -30,6 +30,8 @@ pub(crate) async fn generate_podcast(
     if !g_client.is_authorized().await? {
         bot.send_message(chat_id, "System g_Client is NOT okay!")
             .await?;
+
+        return Ok(());
     } else {
         bot.send_message(chat_id, "System g_Client is okay!")
             .await?;

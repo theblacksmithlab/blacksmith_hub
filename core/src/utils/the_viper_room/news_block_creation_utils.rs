@@ -137,11 +137,15 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
 
     writeln!(
         updates_file,
-        "Список обновлений за период: с {} по {} (UTC+3)\n",
+        "Список обновлений за период: с {} по {} (UTC+3)\n\
+        Текущее время: {}\n",
         utc_plus_3_start.format("%H:%M %d.%m.%Y"),
+        utc_plus_3_now.format("%H:%M %d.%m.%Y"),
         utc_plus_3_now.format("%H:%M %d.%m.%Y")
     )?;
 
+    writeln!(updates_file, "\n===НАЧАЛО ОБНОВЛЕНИЙ===\n\n")?;
+    
     let system_role = get_system_role_or_fallback(
         &AppName::TheViperRoom,
         TheViperRoomRoleType::ExtractingNews,
@@ -169,7 +173,7 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
                 &system_role,
                 &llm_input,
                 app_state.clone(),
-                LlmModel::Complex
+                LlmModel::ComplexMini
             ).await?;
 
             let trimmed = response.trim();
@@ -188,7 +192,7 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
         info!("{} processed successfully!", file_path.display());
     }
 
-    writeln!(updates_file, "\nКонец обновлений")?;
+    writeln!(updates_file, "\n===КОНЕЦ ОБНОВЛЕНИЙ===")?;
 
     for file_path in &txt_files {
         remove_file(file_path)?;
@@ -218,13 +222,13 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
         .unwrap();
 
     let updates_with_nickname_provided =
-        format!("Адресат: {}\nТекст обновлений: {}", nickname, updates);
+        format!("Адресат: {}\nТекст подготовленный твоим помощником: {}", nickname, updates);
 
     let updates_summarized = raw_llm_processing(
         &system_role,
         &updates_with_nickname_provided,
         app_state.clone(),
-        LlmModel::Complex,
+        LlmModel::ComplexMini,
     )
     .await?;
 

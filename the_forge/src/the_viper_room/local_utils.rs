@@ -27,7 +27,7 @@ pub async fn generate_user_system_nickname(
         &system_role,
         &user_data,
         the_viper_room_app_state,
-        LlmModel::Complex,
+        LlmModel::ComplexMini,
     )
     .await
     .map_err(|e| format!("Failed to generate nickname: {}", e))

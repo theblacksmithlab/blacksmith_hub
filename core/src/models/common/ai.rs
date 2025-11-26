@@ -1,7 +1,7 @@
 pub enum LlmModel {
     Light,               // OpenAI gpt-4o-mini
-    Complex,             // OpenAI gpt-4o
-    Complex2,            // OpenAI gpt-4.1
+    ComplexMini,             // OpenAI gpt-5-mini
+    ComplexPro,            // OpenAI gpt-5.1
     TextEmbedding3Large, // OpenAI embedding generative model
 }
 
@@ -9,8 +9,8 @@ impl LlmModel {
     pub fn as_str(&self) -> &'static str {
         match self {
             LlmModel::Light => "gpt-4o-mini",
-            LlmModel::Complex => "gpt-4o",
-            LlmModel::Complex2 => "gpt-4.1-2025-04-14",
+            LlmModel::ComplexMini => "gpt-5-mini",
+            LlmModel::ComplexPro => "gpt-5.1",
             LlmModel::TextEmbedding3Large => "text-embedding-3-large",
         }
     }
