@@ -19,7 +19,6 @@ pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
     let llm_client = app_state.get_llm_client().clone();
 
     let llm_request = CreateChatCompletionRequestArgs::default()
-        .max_tokens(4095u32)
         .model(model.as_str())
         .temperature(0.2)
         .messages([
@@ -58,7 +57,6 @@ pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
     let llm_client = app_state.get_llm_client().clone();
 
     let llm_request = CreateChatCompletionRequestArgs::default()
-        .max_tokens(4095u32)
         .model(model.as_str())
         .temperature(0.2)
         .messages([
