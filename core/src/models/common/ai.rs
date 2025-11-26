@@ -14,4 +14,11 @@ impl LlmModel {
             LlmModel::TextEmbedding3Large => "text-embedding-3-large",
         }
     }
+
+    pub fn is_gpt5_model(&self) -> bool {
+        matches!(
+            self,
+            LlmModel::ComplexMini | LlmModel::ComplexPro
+        )
+    }
 }

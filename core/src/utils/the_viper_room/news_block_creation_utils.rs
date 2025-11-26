@@ -173,7 +173,7 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
                 &system_role,
                 &llm_input,
                 app_state.clone(),
-                LlmModel::ComplexMini
+                LlmModel::ComplexMini,
             ).await?;
 
             let trimmed = response.trim();
@@ -286,7 +286,12 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
             let text = message.text();
 
             let llm_response =
-                raw_llm_processing(&system_role, text, app_state.clone(), LlmModel::Light).await?;
+                raw_llm_processing(
+                    &system_role,
+                    text,
+                    app_state.clone(),
+                    LlmModel::Light,
+                ).await?;
 
             let decision = llm_response.trim().to_lowercase();
 

@@ -9,6 +9,7 @@ use async_openai::types::{
 use std::sync::Arc;
 use tiktoken_rs::cl100k_base;
 use tracing::info;
+use async_openai::types::ReasoningEffort;
 
 pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
     system_role: &str,
@@ -56,20 +57,25 @@ pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
 ) -> Result<String> {
     let llm_client = app_state.get_llm_client().clone();
 
-    let llm_request = CreateChatCompletionRequestArgs::default()
-        .model(model.as_str())
-        .temperature(0.2)
-        .messages([
-            ChatCompletionRequestSystemMessageArgs::default()
-                .content(system_role)
-                .build()?
-                .into(),
-            ChatCompletionRequestUserMessageArgs::default()
-                .content(request)
-                .build()?
-                .into(),
-        ])
-        .build()?;
+    let mut builder = CreateChatCompletionRequestArgs::default();
+    builder.model(model.as_str());
+
+    if !model.is_gpt5_model() {
+        builder.temperature(0.2);
+    }
+
+    builder.messages([
+        ChatCompletionRequestSystemMessageArgs::default()
+            .content(system_role)
+            .build()?
+            .into(),
+        ChatCompletionRequestUserMessageArgs::default()
+            .content(request)
+            .build()?
+            .into(),
+    ]);
+
+    let llm_request = builder.build()?;
 
     let response = llm_client.chat().create(llm_request).await?;
 
