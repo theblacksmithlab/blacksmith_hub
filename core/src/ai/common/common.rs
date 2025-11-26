@@ -60,7 +60,11 @@ pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
     let mut builder = CreateChatCompletionRequestArgs::default();
     builder.model(model.as_str());
 
-    if !model.is_gpt5_model() {
+    if model.is_gpt5_model() {
+        if let Some(effort) = model.reasoning_effort() {
+            builder.reasoning_effort(effort);
+        }
+    } else {
         builder.temperature(0.2);
     }
 

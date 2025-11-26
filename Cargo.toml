@@ -12,6 +12,7 @@ resolver = "2"
 [workspace.dependencies]
 # Async Runtime & Web Framework
 tokio = { version = "1.38.0", features = ["full"] }
+# DO NOT update until actual axum-server version is below 0.8.*
 axum = "0.7.9"
 tower = "0.5.1"
 tower-http = { version = "0.6.1", features = ["trace", "cors"] }

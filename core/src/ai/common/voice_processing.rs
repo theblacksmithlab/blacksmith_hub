@@ -9,8 +9,10 @@ use std::process::Command;
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::{error, info, warn};
+use reqwest::Client as ReqwestClient;
+use serde_json::json;
 
-pub async fn podcast_tts<T: OpenAIClientInit + Send + Sync>(
+pub async fn podcast_tts_via_openai<T: OpenAIClientInit + Send + Sync>(
     text: String,
     user_tmp_dir: String,
     app_state: Arc<T>,
@@ -165,6 +167,116 @@ pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
             Err(anyhow!("Failed to execute Whisper CLI: {}", err))
         }
     }
+}
+
+pub async fn podcast_tts_via_elevenlabs(
+    text: String,
+    user_tmp_dir: String,
+) -> anyhow::Result<PathBuf> {
+    info!("Starting ElevenLabs podcast recording...");
+
+    let api_key = std::env::var("ELEVEN_LABS_API_KEY")
+        .map_err(|_| anyhow::anyhow!("ELEVEN_LABS_API_KEY not found"))?;
+
+    let now = Utc::now();
+    let utc_plus_3 = now + Duration::hours(3);
+    let date_only = utc_plus_3.date_naive();
+    let file_name = format!("The_Viper_Podcast_({})", date_only);
+    const ELEVEN_LABS_MAX_CHARS: usize = 5000;
+
+    let char_count = text.chars().count();
+
+    if char_count <= ELEVEN_LABS_MAX_CHARS {
+        info!(
+            "Podcast text length: {} chars. Generating single file.",
+            char_count
+        );
+
+        let audio_data = generate_elevenlabs_speech(&text, &api_key).await?;
+        let audio_file_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
+        fs::write(&audio_file_path, audio_data)?;
+
+        info!("Podcast generated as single file");
+        return Ok(PathBuf::from(audio_file_path));
+    }
+
+    let chunks = split_text_into_chunks(&text, ELEVEN_LABS_MAX_CHARS);
+    info!("Text split into {} chunks", chunks.len());
+
+    let mut audio_parts = Vec::new();
+
+    for (i, chunk) in chunks.iter().enumerate() {
+        info!(
+            "Processing chunk {}/{}, length: {} chars",
+            i + 1,
+            chunks.len(),
+            chunk.chars().count()
+        );
+
+        let audio_data = generate_elevenlabs_speech(chunk, &api_key).await?;
+        let part_path = format!("{}/part_{}.mp3", user_tmp_dir, i);
+        fs::write(&part_path, audio_data)?;
+        audio_parts.push(part_path);
+
+        if i < chunks.len() - 1 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        }
+    }
+
+    let final_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
+
+    let mut command = Command::new("ffmpeg");
+    command
+        .arg("-i")
+        .arg(format!("concat:{}", audio_parts.join("|")))
+        .arg("-acodec")
+        .arg("copy")
+        .arg(&final_path);
+
+    let status = command.status()?;
+    if !status.success() {
+        return Err(anyhow::anyhow!("Failed to merge audio files"));
+    }
+
+    for part in audio_parts {
+        if let Err(e) = fs::remove_file(&part) {
+            warn!("Could not delete temporary file {}: {}", part, e);
+        }
+    }
+
+    info!("Complete podcast successfully generated");
+    Ok(PathBuf::from(final_path))
+}
+
+async fn generate_elevenlabs_speech(text: &str, api_key: &str) -> anyhow::Result<Vec<u8>> {
+    let client = ReqwestClient::new();
+
+    let voice_id = "BHMDqCKgYeHHupc0I8VD";
+
+    let response = client
+        .post(format!(
+            "https://api.elevenlabs.io/v1/text-to-speech/{}",
+            voice_id
+        ))
+        .header("xi-api-key", api_key)
+        .header("Content-Type", "application/json")
+        .json(&json!({
+            "text": text,
+            "model_id": "eleven_multilingual_v2",
+            "voice_settings": {
+                "stability": 0.75,        // 0.75 - баланс между стабильностью и выразительностью
+                "similarity_boost": 0.75, // 0.75 - хорошее сходство с голосом
+                "style": 0.0,             // 0.0 - нейтральный стиль (можешь увеличить для драматичности)
+                "use_speaker_boost": true // улучшает качество
+            }
+        }))
+        .send()
+        .await?
+        .bytes()
+        .await?
+        .to_vec();
+
+    Ok(response)
 }
 
 // ElevenLabs TTS functionality

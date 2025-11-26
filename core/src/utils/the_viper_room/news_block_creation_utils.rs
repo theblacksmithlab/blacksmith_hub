@@ -173,7 +173,7 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
                 &system_role,
                 &llm_input,
                 app_state.clone(),
-                LlmModel::ComplexMini,
+                LlmModel::ComplexFast,
             ).await?;
 
             let trimmed = response.trim();
@@ -222,13 +222,13 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
         .unwrap();
 
     let updates_with_nickname_provided =
-        format!("Адресат: {}\nТекст подготовленный твоим помощником: {}", nickname, updates);
+        format!("Адресат: {}\nТекст подкаста подготовленный твоим помощником: {}", nickname, updates);
 
     let updates_summarized = raw_llm_processing(
         &system_role,
         &updates_with_nickname_provided,
         app_state.clone(),
-        LlmModel::ComplexMini,
+        LlmModel::ComplexFast,
     )
     .await?;
 
