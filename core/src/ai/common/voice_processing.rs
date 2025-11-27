@@ -343,7 +343,7 @@ pub async fn podcast_tts_via_elevenlabs(
 async fn generate_elevenlabs_speech(text: &str, api_key: &str) -> anyhow::Result<Vec<u8>> {
     let client = ReqwestClient::new();
 
-    let voice_id = "BHMDqCKgYeHHupc0I8VD";
+    let voice_id = "vpUqfpCIn34tjFW4KHjt";
 
     let response = client
         .post(format!(
@@ -357,9 +357,9 @@ async fn generate_elevenlabs_speech(text: &str, api_key: &str) -> anyhow::Result
             "model_id": "eleven_multilingual_v2",
             "voice_settings": {
                 "stability": 0.5,        // 0.75 - баланс между стабильностью и выразительностью
-                "similarity_boost": 0.75, // 0.75 - хорошее сходство с голосом
-                "style": 0.75,             // 0.0 - нейтральный стиль (можешь увеличить для драматичности)
-                "speed": 1.15,
+                "similarity_boost": 0.5, // 0.75 - хорошее сходство с голосом
+                "style": 0.5,             // 0.0 - нейтральный стиль (можешь увеличить для драматичности)
+                "speed": 1.05,
                 "use_speaker_boost": true // улучшает качество
             }
         }))
