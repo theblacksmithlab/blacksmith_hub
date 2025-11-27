@@ -33,11 +33,10 @@ server {
         proxy_read_timeout 30s;
     }
 
-    # The Viper Room API
+    # The Viper Room API (HTTP - TLS terminated at nginx)
     location ~ ^/(the_viper_room_user_request|the_viper_room_avatar_request) {
-        proxy_pass https://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
-        proxy_ssl_verify off;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

@@ -2,9 +2,8 @@ server:
   host: "0.0.0.0"
   port: 3001
 
-tls:
-  cert_path: "/etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem"
-  key_path: "/etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem"
+# TLS section removed - nginx handles TLS termination
+# This service runs as HTTP only, nginx proxies HTTPS → HTTP
 
 cors:
   allowed_origins:

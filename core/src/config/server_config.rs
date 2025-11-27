@@ -4,7 +4,9 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 pub struct AppConfig {
     pub server: ServerConfig,
-    pub tls: TlsConfig,
+    // DEBUG: Temporary - TLS is optional during migration to nginx-only TLS termination
+    // After migration: remove TlsConfig completely
+    pub tls: Option<TlsConfig>,
     pub cors: CorsConfig,
 }
 
