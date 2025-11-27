@@ -358,8 +358,8 @@ async fn generate_elevenlabs_speech(text: &str, api_key: &str) -> anyhow::Result
             "voice_settings": {
                 "stability": 0.5,        // 0.75 - баланс между стабильностью и выразительностью
                 "similarity_boost": 0.75, // 0.75 - хорошее сходство с голосом
-                "style": 0.0,             // 0.0 - нейтральный стиль (можешь увеличить для драматичности)
-                "speed": 1.1,
+                "style": 0.75,             // 0.0 - нейтральный стиль (можешь увеличить для драматичности)
+                "speed": 1.15,
                 "use_speaker_boost": true // улучшает качество
             }
         }))
