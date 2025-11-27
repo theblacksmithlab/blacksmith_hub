@@ -9,7 +9,6 @@ use async_openai::types::{
 use std::sync::Arc;
 use tiktoken_rs::cl100k_base;
 use tracing::info;
-use async_openai::types::ReasoningEffort;
 
 pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
     system_role: &str,

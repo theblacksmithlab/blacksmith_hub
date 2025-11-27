@@ -397,7 +397,7 @@ pub(crate) async fn mix_podcast_with_music(
     let fade_start = duration - 4.0;
 
     let filter_complex = format!(
-        "[1:a]volume=0.18,afade=t=out:st={}:d=4[music];[0:a][music]amix=inputs=2:duration=first",
+        "[1:a]volume=0.36,afade=t=out:st={}:d=4[music];[0:a][music]amix=inputs=2:duration=first",
         fade_start
     );
 
