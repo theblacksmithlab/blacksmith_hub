@@ -295,12 +295,20 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
 
             let decision = llm_response.trim().to_lowercase();
 
-            if decision != "ok" && decision != "skip" {
-                warn!("Unexpected LLM response: '{}', defaulting to skip", llm_response);
+            info!("LLM usefulness decision: {}", decision);
+
+            let contains_ok = decision.contains("ok");
+            let contains_skip = decision.contains("skip");
+
+            if !contains_ok && !contains_skip {
+                warn!(
+                    "Unexpected LLM response: '{}', defaulting to skip",
+                    llm_response
+                );
                 continue;
             }
 
-            if decision == "skip" {
+            if contains_skip {
                 continue;
             }
 

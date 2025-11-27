@@ -36,10 +36,9 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
 
     let podcast_text = summarize_updates(user_tmp_dir.clone(), app_state.clone(), nickname).await?;
 
-    let audio_path = podcast_tts_via_openai_new(
+    let audio_path = podcast_tts_via_elevenlabs(
         podcast_text.clone(),
         user_tmp_dir.clone(),
-        app_state.clone(),
     )
     .await?;
 

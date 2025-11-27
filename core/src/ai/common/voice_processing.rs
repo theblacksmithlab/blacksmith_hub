@@ -118,7 +118,7 @@ pub async fn podcast_tts_via_openai_new<T: OpenAIClientInit + Send + Sync>(
 
     let llm_client = app_state.get_llm_client().clone();
 
-    const MAX_TTS_CHARS: usize = 2048;
+    const MAX_TTS_CHARS: usize = 4095;
 
     let char_count = text.chars().count();
 
@@ -274,7 +274,7 @@ pub async fn podcast_tts_via_elevenlabs(
     let utc_plus_3 = now + Duration::hours(3);
     let date_only = utc_plus_3.date_naive();
     let file_name = format!("The_Viper_Podcast_({})", date_only);
-    const ELEVEN_LABS_MAX_CHARS: usize = 5000;
+    const ELEVEN_LABS_MAX_CHARS: usize = 9900;
 
     let char_count = text.chars().count();
 
@@ -358,7 +358,7 @@ async fn generate_elevenlabs_speech(text: &str, api_key: &str) -> anyhow::Result
             "voice_settings": {
                 "stability": 0.5,        // 0.75 - баланс между стабильностью и выразительностью
                 "similarity_boost": 0.75, // 0.75 - хорошее сходство с голосом
-                "style": 0.5,             // 0.0 - нейтральный стиль (можешь увеличить для драматичности)
+                "style": 0.0,             // 0.0 - нейтральный стиль (можешь увеличить для драматичности)
                 "speed": 1.1,
                 "use_speaker_boost": true // улучшает качество
             }
