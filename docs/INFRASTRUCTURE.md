@@ -18,7 +18,8 @@ Nginx выступает как reverse proxy для всех сервисов, 
 | Path Pattern | Destination | Port | SSL Internal |
 |-------------|-------------|------|--------------|
 | `/api/uniframe/*` | uniframe_studio | 8080 | HTTPS |
-| `/user_action`, `/get_user_avatar`, etc. | blacksmith_web | 3000 | HTTPS |
+| `/the_viper_room_user_request`, `/the_viper_room_avatar_request` | the_viper_room | 3001 | HTTPS |
+| `/user_action`, `/get_user_avatar`, `/blacksmith_web_*` | blacksmith_web | 3000 | HTTPS |
 | `/` (default) | Static files | - | - |
 
 ### Домены
@@ -39,6 +40,12 @@ Nginx выступает как reverse proxy для всех сервисов, 
 - Connect: 30s
 - Send: 30s
 - Read: 30s
+
+**The Viper Room:**
+- Connect: 600s (10 минут)
+- Send: 600s
+- Read: 600s
+- Причина: длительная генерация подкастов через LLM и Telegram API
 
 **Blacksmith Web:**
 - Connect: 600s (10 минут)
@@ -92,8 +99,24 @@ server {
         proxy_read_timeout 30s;
     }
 
+    # The Viper Room API
+    location ~ ^/(the_viper_room_user_request|the_viper_room_avatar_request) {
+        proxy_pass https://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_ssl_verify off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass_request_headers on;
+        proxy_connect_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
+        send_timeout 600s;
+    }
+
     # API endpoints (Blacksmith Web)
-    location ~ ^/(user_action|get_user_avatar|the_viper_room_user_request|the_viper_room_avatar_request|blacksmith_web_user_request|blacksmith_web_chat_fetch|blacksmith_web_tts_request) {
+    location ~ ^/(user_action|get_user_avatar|blacksmith_web_user_request|blacksmith_web_chat_fetch|blacksmith_web_tts_request) {
         proxy_pass https://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_ssl_verify off;
@@ -122,6 +145,7 @@ server {
 
 Все сервисы работают в Docker и слушают localhost:
 - **uniframe_studio:** `127.0.0.1:8080`
+- **the_viper_room:** `127.0.0.1:3001`
 - **blacksmith_web:** `127.0.0.1:3000`
 - **Боты:** не имеют HTTP интерфейса, работают через Telegram API
 - **Агенты:** не имеют HTTP интерфейса, работают через Telegram User API
@@ -211,6 +235,7 @@ sudo ufw status
 
 ---
 
-**Версия документа:** 1.0  
-**Дата создания:** 2025-11-23  
-**Последнее обновление:** 2025-11-23
+**Версия документа:** 1.1
+**Дата создания:** 2025-11-23
+**Последнее обновление:** 2025-11-27
+**Изменения в 1.1:** Добавлен The Viper Room сервер (порт 3001), исправлена маршрутизация эндпоинтов

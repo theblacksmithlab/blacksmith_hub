@@ -17,7 +17,7 @@ pub async fn podcast_tts_via_openai<T: OpenAIClientInit + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
 ) -> anyhow::Result<PathBuf> {
-    info!("Starting recording podcast...");
+    info!("Starting recording podcast via OpenAI TTS model...");
 
     let now = Utc::now();
     let utc_plus_3 = now + Duration::hours(3);
@@ -99,7 +99,7 @@ pub async fn podcast_tts_via_openai<T: OpenAIClientInit + Send + Sync>(
         }
     }
 
-    info!("Complete podcast successfully generated");
+    info!("Complete podcast successfully generated via OpenAI API");
 
     Ok(PathBuf::from(final_path))
 }
@@ -109,7 +109,7 @@ pub async fn podcast_tts_via_openai_new<T: OpenAIClientInit + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
 ) -> anyhow::Result<PathBuf> {
-    info!("Starting recording podcast...");
+    info!("tarting recording podcast via OpenAI TTS model...");
 
     let now = Utc::now();
     let utc_plus_3 = now + Duration::hours(3);
@@ -191,7 +191,7 @@ pub async fn podcast_tts_via_openai_new<T: OpenAIClientInit + Send + Sync>(
         }
     }
 
-    info!("Complete podcast successfully generated");
+    info!("Complete podcast successfully generated via OpenAI API");
 
     Ok(PathBuf::from(final_path))
 }
@@ -265,7 +265,7 @@ pub async fn podcast_tts_via_elevenlabs(
     text: String,
     user_tmp_dir: String,
 ) -> anyhow::Result<PathBuf> {
-    info!("Starting ElevenLabs podcast recording...");
+    info!("Starting ElevenLabs podcast recording via ElevenLabs TTS model...");
 
     let api_key = std::env::var("ELEVEN_LABS_API_KEY")
         .map_err(|_| anyhow::anyhow!("ELEVEN_LABS_API_KEY not found"))?;
@@ -336,7 +336,7 @@ pub async fn podcast_tts_via_elevenlabs(
         }
     }
 
-    info!("Complete podcast successfully generated");
+    info!("Complete podcast successfully generated via ElevenLabs API");
     Ok(PathBuf::from(final_path))
 }
 
@@ -356,11 +356,11 @@ async fn generate_elevenlabs_speech(text: &str, api_key: &str) -> anyhow::Result
             "text": text,
             "model_id": "eleven_multilingual_v2",
             "voice_settings": {
-                "stability": 0.5,        // 0.75 - баланс между стабильностью и выразительностью
-                "similarity_boost": 0.5, // 0.75 - хорошее сходство с голосом
-                "style": 0.5,             // 0.0 - нейтральный стиль (можешь увеличить для драматичности)
+                "stability": 0.5,
+                "similarity_boost": 0.5,
+                "style": 0.5,
                 "speed": 1.05,
-                "use_speaker_boost": true // улучшает качество
+                "use_speaker_boost": true
             }
         }))
         .send()
@@ -371,64 +371,3 @@ async fn generate_elevenlabs_speech(text: &str, api_key: &str) -> anyhow::Result
 
     Ok(response)
 }
-
-// ElevenLabs TTS functionality
-// async fn generate_speech(text: &str, api_key: &str) -> Result<Vec<u8>> {
-//     let client = ReqwestClient::new();
-//     let voice_id = "nPczCjzI2devNBz1zQrb";
-//
-//     let response = client
-//         .post(format!(
-//             "https://api.elevenlabs.io/v1/text-to-speech/{}/stream",
-//             voice_id
-//         ))
-//         .header("xi-api-key", api_key)
-//         .header("Content-Type", "application/json")
-//         .json(&json!({
-//             "text": text,
-//             "model_id": "eleven_multilingual_v2",
-//             "voice_settings": {
-//                 "stability": 0.9,
-//                 "similarity_boost": 0.65,
-//                 "speed": 1.3
-//             }
-//         }))
-//         .send()
-//         .await?
-//         .bytes()
-//         .await?
-//         .to_vec();
-//
-//     Ok(response)
-// }
-//
-// pub(crate) async fn text_to_speech_11_labs<T: LlmProcessing + Send + Sync>(
-//     text: String,
-//     user_tmp_dir: String,
-//     app_state: Arc<T>
-// ) -> Result<PathBuf> {
-//     info!("Starting recording podcast...");
-//
-//     let api_key = env::var("ELEVEN_LABS_API_KEY")
-//         .map_err(|_| anyhow::anyhow!("ELEVEN_LABS_API_KEY not found in environment"))?;
-//
-//     let now = Utc::now();
-//     let utc_plus_3 = now + Duration::hours(3);
-//     let date_only = utc_plus_3.date_naive();
-//
-//     let podcast_number = get_podcast_counter().await?;
-//     let file_name = format!("The_Viper_podcast_#{}_{}",
-//                             podcast_number,
-//                             date_only
-//     );
-//
-//     let audio_file_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
-//
-//     let audio_data = generate_speech(&text, &api_key).await?;
-//
-//     fs::write(&audio_file_path, audio_data)?;
-//
-//     info!("fn: text_to_speech | Podcast is ready");
-//
-//     Ok(PathBuf::from(audio_file_path))
-// }

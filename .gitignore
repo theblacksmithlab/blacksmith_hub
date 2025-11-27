@@ -21,7 +21,6 @@ common_res/the_viper_room/background_music.mp3
 common_res/w3a/w3a_qdrant_index.json
 DEV_NOTES.md
 *.log
-tools/tmp
 certs/
 CLAUDE.md
 

@@ -164,3 +164,25 @@ services:
         max-file: "3"
     networks:
       - uniframe-network
+
+  the_viper_room:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.the_viper_room
+    volumes:
+      - ./common_res:/app/common_res
+    env_file:
+      - .env
+    ports:
+      - "3001:3001"
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
