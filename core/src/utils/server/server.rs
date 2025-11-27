@@ -2,7 +2,6 @@ use crate::state::server_common::app_state::ServerAppState;
 use anyhow::{Context, Result};
 use axum::http::{HeaderValue, Method, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::options;
 use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
 use std::net::SocketAddr;
@@ -26,7 +25,6 @@ pub async fn start_server(server_app_state: Arc<ServerAppState>, app: Router) ->
         .allow_credentials(false);
 
     let app = app
-        .route("/{*path}", options(|| async { StatusCode::OK }))
         .fallback(handler_404)
         .layer(cors);
 
