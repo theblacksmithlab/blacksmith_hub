@@ -1,5 +1,7 @@
 use async_openai::types::ReasoningEffort;
+use strum_macros::Display;
 
+#[derive(Debug, Display)]
 pub enum LlmModel {
     Tiny,
     Light,
@@ -7,6 +9,7 @@ pub enum LlmModel {
     Complex,
     TextEmbedding3Large, // OpenAI embedding generative model
     ComplexFast,      // gpt-5.1 (low reasoning)
+    TTS,
 }
 
 impl LlmModel {
@@ -17,6 +20,7 @@ impl LlmModel {
             LlmModel::ComplexMini => "gpt-5-mini",
             LlmModel::Complex | LlmModel::ComplexFast => "gpt-5.1",
             LlmModel::TextEmbedding3Large => "text-embedding-3-large",
+            LlmModel::TTS => "gpt-4o-mini-tts",
         }
     }
 

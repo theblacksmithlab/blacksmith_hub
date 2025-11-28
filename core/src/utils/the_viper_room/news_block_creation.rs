@@ -1,5 +1,5 @@
 use crate::ai::common::common::raw_llm_processing;
-use crate::ai::common::voice_processing::{podcast_tts_via_elevenlabs, podcast_tts_via_openai, podcast_tts_via_openai_new};
+use crate::ai::common::voice_processing::{podcast_tts_via_elevenlabs, podcast_tts_via_openai};
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
@@ -18,6 +18,7 @@ use std::fs::{create_dir_all, read_dir, remove_file, rename};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, info};
+use crate::models::the_viper_room::common::TTSProvider;
 
 pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
     client: &g_Client,
@@ -36,11 +37,33 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
 
     let podcast_text = summarize_updates(user_tmp_dir.clone(), app_state.clone(), nickname).await?;
 
-    let audio_path = podcast_tts_via_elevenlabs(
-        podcast_text.clone(),
-        user_tmp_dir.clone(),
-    )
-    .await?;
+    let tts_provider = TTSProvider::OpenAI;
+
+    let audio_path = match tts_provider {
+        TTSProvider::OpenAI => {
+             let audio_path = podcast_tts_via_openai(
+                podcast_text.clone(),
+                user_tmp_dir.clone(),
+                app_state.clone(),
+            )
+                .await?;
+            audio_path
+        }
+        TTSProvider::ElevenLabs => {
+            let audio_path = podcast_tts_via_elevenlabs(
+                podcast_text.clone(),
+                user_tmp_dir.clone(),
+            )
+                .await?;
+            audio_path
+        }
+    };
+    
+    // let audio_path = podcast_tts_via_elevenlabs(
+    //     podcast_text.clone(),
+    //     user_tmp_dir.clone(),
+    // )
+    // .await?;
 
     info!("Starting to add background music to the podcast...");
     let background_music_path = "common_res/the_viper_room/background_music.mp3";

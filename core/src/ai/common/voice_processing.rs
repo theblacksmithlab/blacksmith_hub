@@ -11,6 +11,7 @@ use std::time::Instant;
 use tracing::{error, info, warn};
 use reqwest::Client as ReqwestClient;
 use serde_json::json;
+use crate::models::common::ai::LlmModel;
 
 pub async fn podcast_tts_via_openai<T: OpenAIClientInit + Send + Sync>(
     text: String,
@@ -40,6 +41,7 @@ pub async fn podcast_tts_via_openai<T: OpenAIClientInit + Send + Sync>(
             .input(&text)
             .voice(Voice::Onyx)
             .model(SpeechModel::Tts1Hd)
+            // .model(SpeechModel::Other(LlmModel::TTS.to_string()))
             .speed(1.3)
             .build()?;
 
@@ -69,6 +71,7 @@ pub async fn podcast_tts_via_openai<T: OpenAIClientInit + Send + Sync>(
             .input(chunk)
             .voice(Voice::Onyx)
             .model(SpeechModel::Tts1Hd)
+            // .model(SpeechModel::Other(LlmModel::TTS.to_string()))
             .speed(1.3)
             .build()?;
 
@@ -104,97 +107,97 @@ pub async fn podcast_tts_via_openai<T: OpenAIClientInit + Send + Sync>(
     Ok(PathBuf::from(final_path))
 }
 
-pub async fn podcast_tts_via_openai_new<T: OpenAIClientInit + Send + Sync>(
-    text: String,
-    user_tmp_dir: String,
-    app_state: Arc<T>,
-) -> anyhow::Result<PathBuf> {
-    info!("tarting recording podcast via OpenAI TTS model...");
-
-    let now = Utc::now();
-    let utc_plus_3 = now + Duration::hours(3);
-    let date_only = utc_plus_3.date_naive();
-    let file_name = format!("The_Viper_Podcast_({})", date_only);
-
-    let llm_client = app_state.get_llm_client().clone();
-
-    const MAX_TTS_CHARS: usize = 4095;
-
-    let char_count = text.chars().count();
-
-    if char_count <= MAX_TTS_CHARS {
-        let char_count = text.chars().count();
-        info!(
-            "Podcast text length is: {} characters. There is not need to split text into chunks.",
-            char_count
-        );
-        let request = CreateSpeechRequestArgs::default()
-            .input(&text)
-            .voice(Voice::Onyx)
-            .model(SpeechModel::Other("gpt-4o-mini-tts".to_string()))
-            .speed(1.3)
-            .build()?;
-
-        info!("Starting OpenAI voice generation...");
-        let response = llm_client.audio().speech(request).await?;
-        let audio_file_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
-        response.save(&audio_file_path).await?;
-
-        info!("Podcast generated as single file");
-        return Ok(PathBuf::from(audio_file_path));
-    }
-
-    let chunks = split_text_into_chunks(&text, MAX_TTS_CHARS);
-    info!("Text split into {} chunks", chunks.len());
-
-    let mut audio_parts = Vec::new();
-
-    for (i, chunk) in chunks.iter().enumerate() {
-        info!(
-            "Processing podcast chunk: {}/{}, podcast length: {} chars",
-            i + 1,
-            chunks.len(),
-            chunk.chars().count()
-        );
-
-        let request = CreateSpeechRequestArgs::default()
-            .input(chunk)
-            .voice(Voice::Onyx)
-            .model(SpeechModel::Other("gpt-4o-mini-tts".to_string()))
-            .speed(1.3)
-            .build()?;
-
-        let response = llm_client.audio().speech(request).await?;
-        let part_path = format!("{}/part_{}.mp3", user_tmp_dir, i);
-        response.save(&part_path).await?;
-        audio_parts.push(part_path);
-    }
-
-    let final_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
-
-    let mut command = Command::new("ffmpeg");
-    command
-        .arg("-i")
-        .arg(format!("concat:{}", audio_parts.join("|")))
-        .arg("-acodec")
-        .arg("copy")
-        .arg(&final_path);
-
-    let status = command.status()?;
-    if !status.success() {
-        return Err(anyhow::anyhow!("Failed to merge audio files"));
-    }
-
-    for part in audio_parts {
-        if let Err(e) = fs::remove_file(&part) {
-            warn!("Could not delete temporary file {}: {}", part, e);
-        }
-    }
-
-    info!("Complete podcast successfully generated via OpenAI API");
-
-    Ok(PathBuf::from(final_path))
-}
+// pub async fn podcast_tts_via_openai_new<T: OpenAIClientInit + Send + Sync>(
+//     text: String,
+//     user_tmp_dir: String,
+//     app_state: Arc<T>,
+// ) -> anyhow::Result<PathBuf> {
+//     info!("Starting recording podcast via OpenAI TTS model...");
+// 
+//     let now = Utc::now();
+//     let utc_plus_3 = now + Duration::hours(3);
+//     let date_only = utc_plus_3.date_naive();
+//     let file_name = format!("The_Viper_Podcast_({})", date_only);
+// 
+//     let llm_client = app_state.get_llm_client().clone();
+// 
+//     const MAX_TTS_CHARS: usize = 4095;
+// 
+//     let char_count = text.chars().count();
+// 
+//     if char_count <= MAX_TTS_CHARS {
+//         let char_count = text.chars().count();
+//         info!(
+//             "Podcast text length is: {} characters. There is not need to split text into chunks.",
+//             char_count
+//         );
+//         let request = CreateSpeechRequestArgs::default()
+//             .input(&text)
+//             .voice(Voice::Onyx)
+//             .model(SpeechModel::Other(LlmModel::TTS.to_string()))
+//             .speed(1.3)
+//             .build()?;
+// 
+//         info!("Starting OpenAI voice generation...");
+//         let response = llm_client.audio().speech(request).await?;
+//         let audio_file_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
+//         response.save(&audio_file_path).await?;
+// 
+//         info!("Podcast generated as single file");
+//         return Ok(PathBuf::from(audio_file_path));
+//     }
+// 
+//     let chunks = split_text_into_chunks(&text, MAX_TTS_CHARS);
+//     info!("Text split into {} chunks", chunks.len());
+// 
+//     let mut audio_parts = Vec::new();
+// 
+//     for (i, chunk) in chunks.iter().enumerate() {
+//         info!(
+//             "Processing podcast chunk: {}/{}, podcast length: {} chars",
+//             i + 1,
+//             chunks.len(),
+//             chunk.chars().count()
+//         );
+// 
+//         let request = CreateSpeechRequestArgs::default()
+//             .input(chunk)
+//             .voice(Voice::Onyx)
+//             .model(SpeechModel::Other(LlmModel::TTS.to_string()))
+//             .speed(1.3)
+//             .build()?;
+// 
+//         let response = llm_client.audio().speech(request).await?;
+//         let part_path = format!("{}/part_{}.mp3", user_tmp_dir, i);
+//         response.save(&part_path).await?;
+//         audio_parts.push(part_path);
+//     }
+// 
+//     let final_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
+// 
+//     let mut command = Command::new("ffmpeg");
+//     command
+//         .arg("-i")
+//         .arg(format!("concat:{}", audio_parts.join("|")))
+//         .arg("-acodec")
+//         .arg("copy")
+//         .arg(&final_path);
+// 
+//     let status = command.status()?;
+//     if !status.success() {
+//         return Err(anyhow::anyhow!("Failed to merge audio files"));
+//     }
+// 
+//     for part in audio_parts {
+//         if let Err(e) = fs::remove_file(&part) {
+//             warn!("Could not delete temporary file {}: {}", part, e);
+//         }
+//     }
+// 
+//     info!("Complete podcast successfully generated via OpenAI API");
+// 
+//     Ok(PathBuf::from(final_path))
+// }
 
 pub async fn simple_tts<T: OpenAIClientInit + Send + Sync>(
     text: &str,
