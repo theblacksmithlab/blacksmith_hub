@@ -192,10 +192,11 @@ impl TheViperRoomMessages {
 pub enum TheViperRoomBotMessages {
     DonationFooter,
     WrongCmdOrNoRightsMessage,
-    PublicChatMesageCommunication,
+    PublicChatMessageCommunication,
     StartMessage,
     FAQ,
     MainMenu,
+    UnexpectedMessage,
 }
 
 impl TheViperRoomBotMessages {
@@ -203,12 +204,13 @@ impl TheViperRoomBotMessages {
         match self {
             TheViperRoomBotMessages::DonationFooter => "donation_footer",
             TheViperRoomBotMessages::WrongCmdOrNoRightsMessage => "wrong_cmd_or_no_rights_message",
-            TheViperRoomBotMessages::PublicChatMesageCommunication => {
+            TheViperRoomBotMessages::PublicChatMessageCommunication => {
                 "public_chat_message_communication"
             }
             TheViperRoomBotMessages::StartMessage => "start_message",
             TheViperRoomBotMessages::FAQ => "faq",
             TheViperRoomBotMessages::MainMenu => "main_menu_text",
+            TheViperRoomBotMessages::UnexpectedMessage => "unexpected_message",
         }
     }
 }

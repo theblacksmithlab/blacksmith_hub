@@ -1,5 +1,6 @@
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
-    generate_podcast, schedule_podcast, send_main_menu, stop_daily_podcasts,
+    generate_podcast, schedule_podcast, send_actual_daily_public_podcast, send_main_menu,
+    stop_daily_podcasts,
 };
 use anyhow::Result;
 use core::models::common::system_messages::AppsSystemMessages;
@@ -54,7 +55,7 @@ pub(crate) async fn the_viper_room_message_handler(bot: Bot, msg: Message) -> Re
             );
 
             let bot_msg = get_message(AppsSystemMessages::TheViperRoomBot(
-                TheViperRoomBotMessages::PublicChatMesageCommunication,
+                TheViperRoomBotMessages::PublicChatMessageCommunication,
             ))
             .await?;
 
@@ -95,9 +96,7 @@ pub(crate) async fn the_viper_room_message_handler(bot: Bot, msg: Message) -> Re
             Ok(())
         }
         "🎙 Сегодняшний подкаст" => {
-            let temp_message = "Сейчас скину тебе сегодняшний подкаст".to_string();
-            bot.send_message(chat_id, temp_message).await?;
-
+            send_actual_daily_public_podcast(bot, chat_id).await?;
             Ok(())
         }
         "🎧 Персональный подкаст" => {
@@ -113,11 +112,13 @@ pub(crate) async fn the_viper_room_message_handler(bot: Bot, msg: Message) -> Re
             Ok(())
         }
         _ => {
-            let bot_msg = get_message(AppsSystemMessages::Common(
-                CommonMessages::PrivateCmdUsedInPublicChat,
+            let bot_msg = get_message(AppsSystemMessages::TheViperRoomBot(
+                TheViperRoomBotMessages::UnexpectedMessage,
             ))
             .await?;
-            bot.send_message(chat_id, bot_msg).await?;
+            bot.send_message(chat_id, bot_msg)
+                .reply_to(msg.id)
+                .await?;
             Ok(())
         }
     }
@@ -206,10 +207,13 @@ pub(crate) async fn the_viper_room_command_handler(
             .await?;
             let welcome_text = welcome_text_template.replace("{}", &username.to_string());
 
-            let keyboard = KeyboardMarkup::new(vec![vec![
-                KeyboardButton::new("🏠 Главное меню"),
-                KeyboardButton::new("❓ Задать вопрос"),
-            ]])
+            let keyboard = KeyboardMarkup::new(vec![
+                vec![
+                KeyboardButton::new("🏠 Главное меню")
+                ],
+                vec![KeyboardButton::new("❓ Задать вопрос")
+                ]
+            ])
             .resize_keyboard()
             .persistent();
 
@@ -317,7 +321,7 @@ pub(crate) async fn the_viper_room_bor_callback_query_handler(
     }
 
     match q.data.as_deref() {
-        Some("back_to_menu") => {
+        Some("back_to_main_menu") => {
             send_main_menu(&bot, user_id, chat_id).await?;
 
             if let Err(e) = bot.delete_message(chat_id, callback_query_message).await {

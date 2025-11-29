@@ -8,16 +8,19 @@ use core::state::tg_bot::app_state::BotAppState;
 use core::telegram_client::grammers_functionality::initialize_grammers_client;
 use core::utils::common::get_message;
 use core::utils::the_viper_room::news_block_creation::news_block_creation;
-use core::utils::the_viper_room::news_block_creation_utils::generate_waveform;
+use core::utils::the_viper_room::news_block_creation_utils::{
+    generate_waveform, save_daily_public_podcast,
+};
 use grammers_client::types::{attributes::Attribute, InputMessage};
 use grammers_client::Client as g_Client;
-use std::fs::{read_to_string, remove_file};
+use std::fs::{read_dir, read_to_string, remove_file};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use teloxide::prelude::{ChatId, Requester};
 use teloxide::Bot;
-use teloxide_core::payloads::SendMessageSetters;
-use teloxide_core::types::{KeyboardButton, KeyboardMarkup, UserId};
+use teloxide_core::payloads::{SendMessageSetters, SendVoiceSetters};
+use teloxide_core::types::{InputFile, KeyboardButton, KeyboardMarkup, UserId};
 use tokio::time;
 use tokio::time::Instant;
 use tracing::error;
@@ -71,6 +74,11 @@ pub(crate) async fn generate_podcast(
 
     g_client.send_message(&chat, input_message).await?;
     g_client.send_message(&chat, podcast_caption).await?;
+
+    // Save daily podcast before deleting temporary files
+    if let Err(e) = save_daily_public_podcast(&podcast, &podcast_caption_file).await {
+        error!("Failed to save daily public podcast: {}", e);
+    }
 
     for file in [&podcast, &podcast_caption_file] {
         match remove_file(file) {
@@ -220,6 +228,65 @@ pub async fn send_main_menu(bot: &Bot, _user_id: UserId, chat_id: ChatId) -> Res
     bot.send_message(chat_id, main_menu_text)
         .reply_markup(keyboard)
         .await?;
+
+    Ok(())
+}
+
+pub(crate) async fn send_actual_daily_public_podcast(bot: Bot, chat_id: ChatId) -> Result<()> {
+    let daily_podcast_dir = "common_res/the_viper_room/daily_public_podcast";
+
+    info!("Looking for daily public podcast in: {}", daily_podcast_dir);
+
+    // Find podcast and caption files
+    let mut podcast_file: Option<PathBuf> = None;
+    let mut caption_file: Option<PathBuf> = None;
+
+    if let Ok(entries) = read_dir(daily_podcast_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(extension) = path.extension() {
+                    match extension.to_str() {
+                        Some("mp3") => podcast_file = Some(path),
+                        Some("txt") => caption_file = Some(path),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    // Check if podcast exists
+    let podcast_path = match podcast_file {
+        Some(path) => path,
+        None => {
+            let no_podcast_msg = "К сожалению, сегодняшний подкаст ещё не готов. Попробуйте позже!";
+            bot.send_message(chat_id, no_podcast_msg).await?;
+            return Ok(());
+        }
+    };
+
+    info!("Found daily podcast: {:?}", podcast_path);
+
+    // Read caption if exists
+    let caption = if let Some(caption_path) = caption_file {
+        info!("Found caption: {:?}", caption_path);
+        read_to_string(&caption_path).unwrap_or_else(|e| {
+            error!("Failed to read caption file: {}", e);
+            "Сегодняшний подкаст".to_string()
+        })
+    } else {
+        "Сегодняшний подкаст".to_string()
+    };
+
+    info!("Sending daily podcast to user...");
+
+    // Send voice message with caption
+    bot.send_voice(chat_id, InputFile::file(&podcast_path))
+        .caption(&caption)
+        .await?;
+
+    info!("Daily podcast sent successfully!");
 
     Ok(())
 }

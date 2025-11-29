@@ -9,9 +9,9 @@ use chrono::Utc;
 use grammers_client::types::Chat::{Channel, Group, User};
 use grammers_client::{types, Client as g_Client};
 use std::fs;
-use std::fs::{read_dir, remove_file, OpenOptions};
+use std::fs::{copy, read_dir, remove_file, OpenOptions};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::Command;
@@ -388,13 +388,17 @@ pub(crate) async fn mix_podcast_with_music(
     }
 
     info!("Getting podcast duration...");
-    let duration = get_duration(podcast_path).await?;
-    info!("Podcast duration: {} seconds", duration);
+    let podcast_duration = get_duration(podcast_path).await?;
+    info!("Podcast duration: {} seconds", podcast_duration);
 
-    let fade_start = duration - 4.0;
+    let fade_start = podcast_duration - 4.0;
 
+    // Loop music indefinitely, then apply volume and fade-out
+    // amix with duration=first will cut music to match podcast length
     let filter_complex = format!(
-        "[1:a]volume=0.05,afade=t=out:st={}:d=4[music];[0:a][music]amix=inputs=2:duration=first",
+        "[1:a]aloop=loop=-1:size=2e+09[music_looped];\
+         [music_looped]volume=0.05,afade=t=out:st={}:d=4[music];\
+         [0:a][music]amix=inputs=2:duration=first",
         fade_start
     );
 
@@ -473,6 +477,48 @@ pub async fn generate_waveform(audio_path: &Path) -> anyhow::Result<Vec<u8>> {
     }
 
     Ok(waveform)
+}
+
+pub async fn save_daily_public_podcast(
+    podcast_path: &PathBuf,
+    caption_path: &PathBuf,
+) -> anyhow::Result<()> {
+    let daily_podcast_dir = "common_res/the_viper_room/daily_public_podcast";
+
+    // Ensure directory exists
+    fs::create_dir_all(daily_podcast_dir)?;
+
+    info!("Cleaning old daily podcast files...");
+    // Remove all old files from daily_public_podcast directory
+    for entry in read_dir(daily_podcast_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            remove_file(&path)?;
+            info!("Removed old file: {:?}", path);
+        }
+    }
+
+    info!("Saving new daily podcast...");
+
+    // Copy new podcast and caption
+    let podcast_filename = podcast_path
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("Invalid podcast path"))?;
+    let caption_filename = caption_path
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("Invalid caption path"))?;
+
+    let dest_podcast = PathBuf::from(daily_podcast_dir).join(podcast_filename);
+    let dest_caption = PathBuf::from(daily_podcast_dir).join(caption_filename);
+
+    copy(podcast_path, &dest_podcast)?;
+    copy(caption_path, &dest_caption)?;
+
+    info!("Daily podcast saved to: {:?}", dest_podcast);
+    info!("Daily caption saved to: {:?}", dest_caption);
+
+    Ok(())
 }
 
 fn parse_channel_file(content: &str) -> Result<(String, Vec<String>), anyhow::Error> {
