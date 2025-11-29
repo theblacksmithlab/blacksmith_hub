@@ -56,12 +56,6 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
         }
     };
 
-    // let audio_path = podcast_tts_via_elevenlabs(
-    //     podcast_text.clone(),
-    //     user_tmp_dir.clone(),
-    // )
-    // .await?;
-
     info!("Starting to add background music to the podcast...");
     let background_music_path = "common_res/the_viper_room/background_music.mp3";
     let mixed_audio_path = audio_path.with_file_name(format!(
@@ -102,10 +96,10 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
         .map(|entry| entry.path())
         .collect();
 
-    // for file_path in &txt_files {
-    //     remove_file(file_path)?;
-    //     info!("File {} has been deleted.", file_path.display());
-    // }
+    for file_path in &txt_files {
+        remove_file(file_path)?;
+        info!("File {} has been deleted.", file_path.display());
+    }
 
     if need_caption {
         let system_role = get_system_role_or_fallback(

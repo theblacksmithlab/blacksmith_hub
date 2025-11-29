@@ -2,7 +2,6 @@ use anyhow::anyhow;
 use anyhow::Result;
 use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
 use core::models::common::system_messages::AppsSystemMessages;
-use core::models::common::system_messages::CommonMessages;
 use core::models::common::system_messages::TheViperRoomBotMessages;
 use core::state::tg_bot::app_state::BotAppState;
 use core::telegram_client::grammers_functionality::initialize_grammers_client;
@@ -19,14 +18,14 @@ use std::sync::Arc;
 use std::time::Duration;
 use teloxide::prelude::{ChatId, Requester};
 use teloxide::Bot;
-use teloxide_core::payloads::{SendMessageSetters, SendVoiceSetters};
+use teloxide_core::payloads::{SendAudioSetters, SendMessageSetters};
 use teloxide_core::types::{InputFile, KeyboardButton, KeyboardMarkup, UserId};
 use tokio::time;
 use tokio::time::Instant;
 use tracing::error;
 use tracing::log::info;
 
-pub(crate) async fn generate_podcast(
+pub async fn generate_podcast(
     g_client: g_Client,
     bot: Bot,
     chat_id: ChatId,
@@ -74,8 +73,7 @@ pub(crate) async fn generate_podcast(
 
     g_client.send_message(&chat, input_message).await?;
     g_client.send_message(&chat, podcast_caption).await?;
-
-    // Save daily podcast before deleting temporary files
+    
     if let Err(e) = save_daily_public_podcast(&podcast, &podcast_caption_file).await {
         error!("Failed to save daily public podcast: {}", e);
     }
@@ -90,7 +88,7 @@ pub(crate) async fn generate_podcast(
     Ok(())
 }
 
-pub(crate) async fn schedule_podcast(
+pub async fn schedule_podcast(
     bot: Bot,
     user_id: ChatId,
     app_state: Arc<BotAppState>,
@@ -188,7 +186,7 @@ pub(crate) async fn schedule_podcast(
     Ok(())
 }
 
-pub(crate) async fn stop_daily_podcasts(app_state: Arc<BotAppState>) -> anyhow::Result<()> {
+pub async fn stop_daily_podcasts(app_state: Arc<BotAppState>) -> Result<()> {
     info!("Stopping podcast scheduling task by /stop cmd...");
     let is_running = {
         let running = app_state.podcast_manager.state.is_running.lock().await;
@@ -237,7 +235,6 @@ pub(crate) async fn send_actual_daily_public_podcast(bot: Bot, chat_id: ChatId) 
 
     info!("Looking for daily public podcast in: {}", daily_podcast_dir);
 
-    // Find podcast and caption files
     let mut podcast_file: Option<PathBuf> = None;
     let mut caption_file: Option<PathBuf> = None;
 
@@ -256,7 +253,6 @@ pub(crate) async fn send_actual_daily_public_podcast(bot: Bot, chat_id: ChatId) 
         }
     }
 
-    // Check if podcast exists
     let podcast_path = match podcast_file {
         Some(path) => path,
         None => {
@@ -268,7 +264,8 @@ pub(crate) async fn send_actual_daily_public_podcast(bot: Bot, chat_id: ChatId) 
 
     info!("Found daily podcast: {:?}", podcast_path);
 
-    // Read caption if exists
+    let title = extract_podcast_title(&podcast_path);
+
     let caption = if let Some(caption_path) = caption_file {
         info!("Found caption: {:?}", caption_path);
         read_to_string(&caption_path).unwrap_or_else(|e| {
@@ -281,12 +278,31 @@ pub(crate) async fn send_actual_daily_public_podcast(bot: Bot, chat_id: ChatId) 
 
     info!("Sending daily podcast to user...");
 
-    // Send voice message with caption
-    bot.send_voice(chat_id, InputFile::file(&podcast_path))
+    let thumbnail_path = "common_res/the_viper_room/podcast_cover.jpg";
+
+    bot.send_audio(chat_id, InputFile::file(&podcast_path))
+        .title(title)
+        .performer("The Viper Room")
+        .thumbnail(InputFile::file(thumbnail_path))
         .caption(&caption)
         .await?;
 
     info!("Daily podcast sent successfully!");
 
     Ok(())
+}
+
+fn extract_podcast_title(path: &PathBuf) -> String {
+    if let Some(file_name) = path.file_stem() {
+        if let Some(name_str) = file_name.to_str() {
+            if let Some(date_start) = name_str.rfind('(') {
+                if let Some(date_end) = name_str.rfind(')') {
+                    let date = &name_str[date_start + 1..date_end];
+                    return format!("Daily Podcast [{}]", date);
+                }
+            }
+        }
+    }
+
+    "Daily Podcast".to_string()
 }

@@ -13,9 +13,7 @@ use std::fs::{copy, read_dir, remove_file, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::process::Command;
-use tokio::time::sleep;
 use tracing::info;
 use tracing::log::warn;
 
@@ -101,7 +99,7 @@ pub(crate) async fn processing_dialogs<T: OpenAIClientInit + Send + Sync>(
                 user_tmp_dir.clone(),
             )
             .await?;
-            // Check for FLOOD_WAIT
+            // Check for FLOOD_WAIT (unnecessary for now)
             // sleep(Duration::from_secs(1)).await;
         }
     }
@@ -262,7 +260,7 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
 ) -> anyhow::Result<()> {
     let mut messages = client.iter_messages(dialog.chat());
     let now = Utc::now();
-    let period = now - chrono::Duration::hours(9); // TODO: Implement news parsing period setting from UI
+    let period = now - chrono::Duration::hours(12);
 
     let user_tmp_file = format!(
         "{}/{}.txt",
@@ -485,11 +483,9 @@ pub async fn save_daily_public_podcast(
 ) -> anyhow::Result<()> {
     let daily_podcast_dir = "common_res/the_viper_room/daily_public_podcast";
 
-    // Ensure directory exists
     fs::create_dir_all(daily_podcast_dir)?;
 
     info!("Cleaning old daily podcast files...");
-    // Remove all old files from daily_public_podcast directory
     for entry in read_dir(daily_podcast_dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -501,7 +497,6 @@ pub async fn save_daily_public_podcast(
 
     info!("Saving new daily podcast...");
 
-    // Copy new podcast and caption
     let podcast_filename = podcast_path
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("Invalid podcast path"))?;
