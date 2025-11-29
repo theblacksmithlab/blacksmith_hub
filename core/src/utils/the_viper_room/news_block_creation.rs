@@ -5,6 +5,7 @@ use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::TheViperRoomBotMessages;
 use crate::models::common::system_roles::TheViperRoomRoleType;
+use crate::models::the_viper_room::common::TTSProvider;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::get_message;
 use crate::utils::common::get_system_role_or_fallback;
@@ -18,7 +19,6 @@ use std::fs::{create_dir_all, read_dir, remove_file, rename};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, info};
-use crate::models::the_viper_room::common::TTSProvider;
 
 pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
     client: &g_Client,
@@ -41,24 +41,21 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
 
     let audio_path = match tts_provider {
         TTSProvider::OpenAI => {
-             let audio_path = podcast_tts_via_openai(
+            let audio_path = podcast_tts_via_openai(
                 podcast_text.clone(),
                 user_tmp_dir.clone(),
                 app_state.clone(),
             )
-                .await?;
+            .await?;
             audio_path
         }
         TTSProvider::ElevenLabs => {
-            let audio_path = podcast_tts_via_elevenlabs(
-                podcast_text.clone(),
-                user_tmp_dir.clone(),
-            )
-                .await?;
+            let audio_path =
+                podcast_tts_via_elevenlabs(podcast_text.clone(), user_tmp_dir.clone()).await?;
             audio_path
         }
     };
-    
+
     // let audio_path = podcast_tts_via_elevenlabs(
     //     podcast_text.clone(),
     //     user_tmp_dir.clone(),

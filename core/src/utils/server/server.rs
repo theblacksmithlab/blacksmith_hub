@@ -24,9 +24,7 @@ pub async fn start_server(server_app_state: Arc<ServerAppState>, app: Router) ->
         .allow_headers(AllowHeaders::any())
         .allow_credentials(false);
 
-    let app = app
-        .fallback(handler_404)
-        .layer(cors);
+    let app = app.fallback(handler_404).layer(cors);
 
     let addr: SocketAddr = format!(
         "{}:{}",
@@ -40,11 +38,9 @@ pub async fn start_server(server_app_state: Arc<ServerAppState>, app: Router) ->
     // After migration: remove this conditional and use only HTTP (see commented code below)
     if let Some(tls_config_data) = &server_app_state.config.tls {
         info!("Starting server with TLS on {}...", addr);
-        let tls_config = RustlsConfig::from_pem_file(
-            &tls_config_data.cert_path,
-            &tls_config_data.key_path,
-        )
-        .await?;
+        let tls_config =
+            RustlsConfig::from_pem_file(&tls_config_data.cert_path, &tls_config_data.key_path)
+                .await?;
 
         axum_server::bind_rustls(addr, tls_config)
             .serve(app.into_make_service())

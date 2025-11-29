@@ -4,7 +4,8 @@ use crate::probiot_bot::probiot_bot_handlers::{
     probiot_callback_query_handler, probiot_command_handler,
 };
 use crate::the_viper_room_bot::the_viper_room_bot_handlers::{
-    the_viper_room_command_handler, the_viper_room_message_handler,
+    the_viper_room_bor_callback_query_handler, the_viper_room_command_handler,
+    the_viper_room_message_handler,
 };
 use anyhow::{anyhow, Result};
 use async_openai::Client as LLM_Client;
@@ -159,7 +160,9 @@ fn get_handlers(
                 .filter_command::<TheViperRoomBotCommands>()
                 .endpoint(the_viper_room_command_handler),
             Update::filter_message().endpoint(the_viper_room_message_handler),
-            None,
+            Some(
+                Update::filter_callback_query().endpoint(the_viper_room_bor_callback_query_handler),
+            ),
             None,
         )),
         AppName::GrootBot => Ok((

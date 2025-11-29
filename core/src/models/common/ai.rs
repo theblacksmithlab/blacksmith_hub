@@ -8,7 +8,7 @@ pub enum LlmModel {
     ComplexMini,
     Complex,
     TextEmbedding3Large, // OpenAI embedding generative model
-    ComplexFast,      // gpt-5.1 (low reasoning)
+    ComplexFast,         // gpt-5.1 (low reasoning)
     TTS,
 }
 
@@ -34,7 +34,7 @@ impl LlmModel {
     pub fn reasoning_effort(&self) -> Option<ReasoningEffort> {
         match self {
             LlmModel::ComplexFast => Some(ReasoningEffort::Low),
-            _ => None
+            _ => None,
         }
     }
 }

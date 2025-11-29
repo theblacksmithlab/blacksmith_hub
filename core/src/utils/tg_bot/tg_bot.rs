@@ -13,21 +13,138 @@ use teloxide::dispatching::{Dispatcher, UpdateHandler};
 use teloxide::error_handlers::LoggingErrorHandler;
 use teloxide::net::Download;
 use teloxide::prelude::{ChatId, Message, Requester};
-use teloxide::types::{ChatAction, InlineKeyboardButton, InlineKeyboardMarkup};
+use teloxide::sugar::request::RequestReplyExt;
+use teloxide::types::{
+    ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntityKind, User,
+};
 use teloxide::{dptree, Bot};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
-pub async fn check_username(bot: Bot, msg: Message) -> bool {
-    if let Some(_username) = msg.chat.username() {
+pub async fn check_username_from_message(bot: &Bot, msg: &Message) -> bool {
+    if msg.chat.username().is_some() {
         true
     } else {
-        let error_message = "Извините, но для использования приложения необходимо установить username в Telegram.\nПожалуйста, установите username в настройках что бы получить доступ к приложению";
-        let _ = bot.send_message(msg.chat.id, error_message).await;
+        let error_message = "Извините, но для использования приложения необходимо установить username в Telegram.\n\
+                            Пожалуйста, установите username в настройках что бы получить доступ к приложению";
+        let _ = bot
+            .send_message(msg.chat.id, error_message)
+            .reply_to(msg.id)
+            .await;
         false
     }
+}
+
+pub async fn check_username_from_user(bot: &Bot, user: &User, chat_id: ChatId) -> bool {
+    if user.username.is_some() {
+        true
+    } else {
+        let error_message = "Извините, но для использования приложения необходимо установить username в Telegram.\n\
+                            Пожалуйста, установите username в настройках что бы получить доступ к приложению";
+        let _ = bot.send_message(chat_id, error_message).await;
+        false
+    }
+}
+
+// pub fn get_username_from_message(msg: &Message) -> String {
+//     msg.from
+//         .as_ref()
+//         .map(|user| {
+//             if let Some(username) = &user.username {
+//                 return username.to_string();
+//             }
+//
+//             let first_name = user.first_name.trim();
+//             let last_name = user.last_name.as_deref().unwrap_or("").trim();
+//
+//             match (first_name.is_empty(), last_name.is_empty()) {
+//                 (false, false) => format!("{} {}", first_name, last_name),
+//                 (false, true) => first_name.to_string(),
+//                 (true, false) => last_name.to_string(),
+//                 (true, true) => "mommy's_anon".to_string(),
+//             }
+//         })
+//         .unwrap_or_else(|| "mommy's_anon".to_string())
+// }
+
+pub fn get_username_from_message(msg: &Message) -> String {
+    msg.from
+        .as_ref()
+        .map(|user| get_username_from_user(user))
+        .unwrap_or_else(|| "mommy's_anon".to_string())
+}
+
+pub fn get_username_from_user(user: &User) -> String {
+    if let Some(username) = &user.username {
+        return username.to_string();
+    }
+
+    let first_name = user.first_name.trim();
+    let last_name = user.last_name.as_deref().unwrap_or("").trim();
+
+    match (first_name.is_empty(), last_name.is_empty()) {
+        (false, false) => format!("{} {}", first_name, last_name),
+        (false, true) => first_name.to_string(),
+        (true, false) => last_name.to_string(),
+        (true, true) => "mommy's_anon".to_string(),
+    }
+}
+
+pub fn get_chat_title(msg: &Message) -> String {
+    msg.chat
+        .title()
+        .map(|title| title.to_string())
+        .unwrap_or_else(|| "No Title Chat".to_string())
+}
+
+pub async fn is_bot_addressed(bot: &Bot, msg: &Message) -> Result<bool> {
+    let bot_user = bot.get_me().await?;
+    let bot_username = bot_user
+        .username
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("Bot has no username"))?;
+
+    if let Some(reply_to) = &msg.reply_to_message() {
+        if let Some(from) = &reply_to.from {
+            if from.is_bot && from.id == bot_user.id {
+                return Ok(true);
+            }
+        }
+    }
+
+    if let Some(text) = msg.text() {
+        let mention = format!("@{}", bot_username);
+        if text.contains(&mention) {
+            return Ok(true);
+        }
+    }
+
+    if let Some(entities) = msg.entities() {
+        for entity in entities {
+            match &entity.kind {
+                MessageEntityKind::Mention => {
+                    if let Some(text) = msg.text() {
+                        let start = entity.offset;
+                        let end = start + entity.length;
+                        let mentioned = &text[start..end];
+                        if mentioned == format!("@{}", bot_username) {
+                            return Ok(true);
+                        }
+                    }
+                }
+                MessageEntityKind::TextMention { user } => {
+                    if user.id == bot_user.id {
+                        return Ok(true);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    Ok(false)
 }
 
 pub async fn run_bot_dispatcher(

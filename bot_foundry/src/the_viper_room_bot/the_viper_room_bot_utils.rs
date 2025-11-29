@@ -1,7 +1,12 @@
 use anyhow::anyhow;
+use anyhow::Result;
 use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
+use core::models::common::system_messages::AppsSystemMessages;
+use core::models::common::system_messages::CommonMessages;
+use core::models::common::system_messages::TheViperRoomBotMessages;
 use core::state::tg_bot::app_state::BotAppState;
 use core::telegram_client::grammers_functionality::initialize_grammers_client;
+use core::utils::common::get_message;
 use core::utils::the_viper_room::news_block_creation::news_block_creation;
 use core::utils::the_viper_room::news_block_creation_utils::generate_waveform;
 use grammers_client::types::{attributes::Attribute, InputMessage};
@@ -11,6 +16,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use teloxide::prelude::{ChatId, Requester};
 use teloxide::Bot;
+use teloxide_core::payloads::SendMessageSetters;
+use teloxide_core::types::{KeyboardButton, KeyboardMarkup, UserId};
 use tokio::time;
 use tokio::time::Instant;
 use tracing::error;
@@ -24,7 +31,7 @@ pub(crate) async fn generate_podcast(
     tg_agent_id: &str,
     nickname: String,
     chat_username: &str,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     info!("Starting podcast generation by /podcast cmd...");
 
     if !g_client.is_authorized().await? {
@@ -37,8 +44,7 @@ pub(crate) async fn generate_podcast(
             .await?;
     }
 
-    let podcast =
-        news_block_creation(&g_client, tg_agent_id, app_state, nickname, true).await?;
+    let podcast = news_block_creation(&g_client, tg_agent_id, app_state, nickname, true).await?;
 
     let uploaded_file = g_client.upload_file(&podcast).await?;
 
@@ -83,7 +89,7 @@ pub(crate) async fn schedule_podcast(
     app_tg_account_id: Arc<String>,
     nickname: String,
     session_data: Vec<u8>,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     info!("Starting podcast scheduling task by /schedule cmd...");
     {
         let mut is_running = app_state.podcast_manager.state.is_running.lock().await;
@@ -189,5 +195,31 @@ pub(crate) async fn stop_daily_podcasts(app_state: Arc<BotAppState>) -> anyhow::
 
     app_state.podcast_manager.state.stop_sender.send(true)?;
     info!("Stop signal sent to daily podcast generation task");
+    Ok(())
+}
+
+pub async fn send_main_menu(bot: &Bot, _user_id: UserId, chat_id: ChatId) -> Result<()> {
+    let main_menu_text = get_message(AppsSystemMessages::TheViperRoomBot(
+        TheViperRoomBotMessages::MainMenu,
+    ))
+    .await?;
+
+    let keyboard = KeyboardMarkup::new(vec![
+        vec![
+            KeyboardButton::new("🎧 Персональный подкаст"),
+            KeyboardButton::new("🎙 Сегодняшний подкаст"),
+        ],
+        vec![
+            KeyboardButton::new("❓ Задать вопрос"),
+            KeyboardButton::new("⚙️ Настройки"),
+        ],
+    ])
+    .resize_keyboard()
+    .persistent();
+
+    bot.send_message(chat_id, main_menu_text)
+        .reply_markup(keyboard)
+        .await?;
+
     Ok(())
 }

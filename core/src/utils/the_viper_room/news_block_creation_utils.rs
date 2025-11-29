@@ -145,7 +145,7 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
     )?;
 
     writeln!(updates_file, "\n===НАЧАЛО ОБНОВЛЕНИЙ===\n\n")?;
-    
+
     let system_role = get_system_role_or_fallback(
         &AppName::TheViperRoom,
         TheViperRoomRoleType::ExtractingNews,
@@ -161,7 +161,11 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
             continue;
         }
 
-        info!("Processing {} messages from source: {}", messages.len(), source);
+        info!(
+            "Processing {} messages from source: {}",
+            messages.len(),
+            source
+        );
 
         for (idx, message_text) in messages.iter().enumerate() {
             let llm_input = format!(
@@ -174,15 +178,15 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
                 &llm_input,
                 app_state.clone(),
                 LlmModel::ComplexFast,
-            ).await?;
+            )
+            .await?;
 
             let trimmed = response.trim();
             if !trimmed.is_empty() {
                 writeln!(
                     updates_file,
                     "Источник обновления: {}\nОбзор обновления:\n{}\n",
-                    source,
-                    trimmed,
+                    source, trimmed,
                 )?;
             } else {
                 warn!("Empty response for message {} from {}", idx + 1, source);
@@ -221,8 +225,10 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
         .map_err(|e| format!("Failed to read 'updates': {}", e))
         .unwrap();
 
-    let updates_with_nickname_provided =
-        format!("Адресат: {}\nТекст подкаста подготовленный твоим помощником: {}", nickname, updates);
+    let updates_with_nickname_provided = format!(
+        "Адресат: {}\nТекст подкаста подготовленный твоим помощником: {}",
+        nickname, updates
+    );
 
     let updates_summarized = raw_llm_processing(
         &system_role,
@@ -286,12 +292,7 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
             let text = message.text();
 
             let llm_response =
-                raw_llm_processing(
-                    &system_role,
-                    text,
-                    app_state.clone(),
-                    LlmModel::Light,
-                ).await?;
+                raw_llm_processing(&system_role, text, app_state.clone(), LlmModel::Light).await?;
 
             let decision = llm_response.trim().to_lowercase();
 
@@ -312,11 +313,7 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
                 continue;
             }
 
-            writeln!(
-                file,
-                "===ТЕКСТ ОБНОВЛЕНИЯ===\n{}\n===КОНЕЦ===\n",
-                text
-            )?;
+            writeln!(file, "===ТЕКСТ ОБНОВЛЕНИЯ===\n{}\n===КОНЕЦ===\n", text)?;
         }
     }
 
@@ -498,10 +495,7 @@ fn parse_channel_file(content: &str) -> Result<(String, Vec<String>), anyhow::Er
     let messages: Vec<String> = remaining_content
         .split("===ТЕКСТ ОБНОВЛЕНИЯ===")
         .filter_map(|part| {
-            let text = part
-                .replace("===КОНЕЦ===", "")
-                .trim()
-                .to_string();
+            let text = part.replace("===КОНЕЦ===", "").trim().to_string();
 
             if text.is_empty() {
                 None
