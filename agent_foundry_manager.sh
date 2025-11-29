@@ -27,7 +27,7 @@ print_help() {
     echo ""
 
     print_message "${YELLOW}" "Available agents:"
-    AGENTS=$(docker-compose config --services | grep "^agent_" | grep -v "_base")
+    AGENTS=$(docker compose config --services | grep "^agent_" | grep -v "_base")
     for agent in $AGENTS; do
         echo "  - $agent"
     done
@@ -37,10 +37,10 @@ rebuild_base() {
     print_message "${GREEN}" "Rebuilding agent_foundry_base image..."
 
     print_message "${YELLOW}" "Stopping and removing dependent agent containers..."
-    DEPENDENT_AGENTS=$(docker-compose config --services | grep "^agent_")
+    DEPENDENT_AGENTS=$(docker compose config --services | grep "^agent_")
     for agent in $DEPENDENT_AGENTS; do
-        docker-compose stop $agent
-        docker-compose rm -f $agent
+        docker compose stop $agent
+        docker compose rm -f $agent
     done
 
     BASE_IMAGE_ID=$(docker images -q agent_foundry_base)
@@ -50,29 +50,29 @@ rebuild_base() {
     fi
 
     print_message "${GREEN}" "Building agent_foundry_base image..."
-    docker-compose build agent_foundry_base
+    docker compose build agent_foundry_base
 
     print_message "${GREEN}" "Rebuilding dependent agents..."
     for agent in $DEPENDENT_AGENTS; do
-        docker-compose build $agent
+        docker compose build $agent
     done
 
     print_message "${GREEN}" "Base image and dependent agents rebuilt successfully!"
-    print_message "${YELLOW}" "To start agents, use: docker-compose up -d <agent_name>"
+    print_message "${YELLOW}" "To start agents, use: docker compose up -d <agent_name>"
 }
 
 restart_agent() {
     local agent=$1
     print_message "${GREEN}" "Simple restart for agent: $agent..."
-    docker-compose restart $agent
+    docker compose restart $agent
     print_message "${GREEN}" "Agent restarted successfully!"
 }
 
 redeploy_agent() {
     local agent=$1
     print_message "${GREEN}" "Full redeployment for agent: $agent..."
-    docker-compose stop $agent
-    docker-compose rm -f $agent
+    docker compose stop $agent
+    docker compose rm -f $agent
 
     IMAGE_ID=$(docker images -q blacksmith_lab_${agent})
     if [[ -n "$IMAGE_ID" ]]; then
@@ -80,8 +80,8 @@ redeploy_agent() {
         docker rmi -f "$IMAGE_ID"
     fi
 
-    docker-compose build $agent
-    docker-compose up -d $agent
+    docker compose build $agent
+    docker compose up -d $agent
     print_message "${GREEN}" "Agent redeployed successfully!"
 }
 
@@ -100,7 +100,7 @@ if [ "$1" == "full-redeploy" ]; then
         exit 1
     fi
 
-    AGENTS=$(docker-compose config --services | grep "^agent_" | grep -v "_base")
+    AGENTS=$(docker compose config --services | grep "^agent_" | grep -v "_base")
     if ! echo "$AGENTS" | grep -q "$AGENT_NAME"; then
         print_message "${RED}" "ACHTUNG! Agent '$AGENT_NAME' does not exist."
         print_message "${YELLOW}" "Available agents:"
@@ -111,8 +111,8 @@ if [ "$1" == "full-redeploy" ]; then
     print_message "${BLUE}" "=== Full redeployment process for $AGENT_NAME ==="
 
     print_message "${YELLOW}" "1. Stopping and removing $AGENT_NAME..."
-    docker-compose stop $AGENT_NAME
-    docker-compose rm -f $AGENT_NAME
+    docker compose stop $AGENT_NAME
+    docker compose rm -f $AGENT_NAME
 
     IMAGE_ID=$(docker images -q blacksmith_lab_${AGENT_NAME})
     if [[ -n "$IMAGE_ID" ]]; then
@@ -127,11 +127,11 @@ if [ "$1" == "full-redeploy" ]; then
         docker rmi -f "$BASE_IMAGE_ID"
     fi
 
-    docker-compose build agent_foundry_base
+    docker compose build agent_foundry_base
 
     print_message "${YELLOW}" "3. Rebuilding and starting $AGENT_NAME..."
-    docker-compose build $AGENT_NAME
-    docker-compose up -d $AGENT_NAME
+    docker compose build $AGENT_NAME
+    docker compose up -d $AGENT_NAME
 
     print_message "${GREEN}" "Full redeployment of $AGENT_NAME completed successfully!"
     exit 0
@@ -156,7 +156,7 @@ if [ "$AGENT_NAME" == "base" ]; then
     exit 0
 fi
 
-AGENTS=$(docker-compose config --services | grep "^agent_" | grep -v "_base")
+AGENTS=$(docker compose config --services | grep "^agent_" | grep -v "_base")
 if ! echo "$AGENTS" | grep -q "$AGENT_NAME"; then
     print_message "${RED}" "ACHTUNG! Agent '$AGENT_NAME' does not exist."
     print_message "${YELLOW}" "Available agents:"

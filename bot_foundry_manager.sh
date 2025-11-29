@@ -27,7 +27,7 @@ print_help() {
     echo ""
 
     print_message "${YELLOW}" "Available bots:"
-    BOTS=$(docker-compose config --services | grep "_bot$")
+    BOTS=$(docker compose config --services | grep "_bot$")
     for bot in $BOTS; do
         echo "  - $bot"
     done
@@ -37,10 +37,10 @@ rebuild_base() {
     print_message "${GREEN}" "Rebuilding bot_foundry_base image..."
 
     print_message "${YELLOW}" "Stopping and removing dependent bot containers..."
-    DEPENDENT_BOTS=$(docker-compose config --services | grep "_bot$")
+    DEPENDENT_BOTS=$(docker compose config --services | grep "_bot$")
     for bot in $DEPENDENT_BOTS; do
-        docker-compose stop $bot
-        docker-compose rm -f $bot
+        docker compose stop $bot
+        docker compose rm -f $bot
     done
 
     BASE_IMAGE_ID=$(docker images -q bot_foundry_base)
@@ -50,29 +50,29 @@ rebuild_base() {
     fi
 
     print_message "${GREEN}" "Building bot_foundry_base image..."
-    docker-compose build bot_foundry_base
+    docker compose build bot_foundry_base
 
     print_message "${GREEN}" "Rebuilding dependent bots..."
     for bot in $DEPENDENT_BOTS; do
-        docker-compose build $bot
+        docker compose build $bot
     done
 
     print_message "${GREEN}" "Base image and dependent bots rebuilt successfully!"
-    print_message "${YELLOW}" "To start bots, use: docker-compose up -d <bot_name>"
+    print_message "${YELLOW}" "To start bots, use: docker compose up -d <bot_name>"
 }
 
 restart_bot() {
     local bot=$1
     print_message "${GREEN}" "Simple restart for bot: $bot..."
-    docker-compose restart $bot
+    docker compose restart $bot
     print_message "${GREEN}" "Bot restarted successfully!"
 }
 
 redeploy_bot() {
     local bot=$1
     print_message "${GREEN}" "Full redeployment for bot: $bot..."
-    docker-compose stop $bot
-    docker-compose rm -f $bot
+    docker compose stop $bot
+    docker compose rm -f $bot
 
     IMAGE_ID=$(docker images -q blacksmith_lab_${bot})
     if [[ -n "$IMAGE_ID" ]]; then
@@ -80,8 +80,8 @@ redeploy_bot() {
         docker rmi -f "$IMAGE_ID"
     fi
 
-    docker-compose build $bot
-    docker-compose up -d $bot
+    docker compose build $bot
+    docker compose up -d $bot
     print_message "${GREEN}" "Bot redeployed successfully!"
 }
 
@@ -100,7 +100,7 @@ if [ "$1" == "full-redeploy" ]; then
         exit 1
     fi
 
-    BOTS=$(docker-compose config --services | grep "_bot$")
+    BOTS=$(docker compose config --services | grep "_bot$")
     if ! echo "$BOTS" | grep -q "$BOT_NAME"; then
         print_message "${RED}" "ACHTUNG! Bot '$BOT_NAME' does not exist."
         print_message "${YELLOW}" "Available bots:"
@@ -111,8 +111,8 @@ if [ "$1" == "full-redeploy" ]; then
     print_message "${BLUE}" "=== Full redeployment process for $BOT_NAME ==="
 
     print_message "${YELLOW}" "1. Stopping and removing $BOT_NAME..."
-    docker-compose stop $BOT_NAME
-    docker-compose rm -f $BOT_NAME
+    docker compose stop $BOT_NAME
+    docker compose rm -f $BOT_NAME
 
     IMAGE_ID=$(docker images -q blacksmith_lab_${BOT_NAME})
     if [[ -n "$IMAGE_ID" ]]; then
@@ -127,11 +127,11 @@ if [ "$1" == "full-redeploy" ]; then
         docker rmi -f "$BASE_IMAGE_ID"
     fi
 
-    docker-compose build bot_foundry_base
+    docker compose build bot_foundry_base
 
     print_message "${YELLOW}" "3. Rebuilding and starting $BOT_NAME..."
-    docker-compose build $BOT_NAME
-    docker-compose up -d $BOT_NAME
+    docker compose build $BOT_NAME
+    docker compose up -d $BOT_NAME
 
     print_message "${GREEN}" "Full redeployment of $BOT_NAME completed successfully!"
     exit 0
@@ -156,7 +156,7 @@ if [ "$BOT_NAME" == "base" ]; then
     exit 0
 fi
 
-BOTS=$(docker-compose config --services | grep "_bot$")
+BOTS=$(docker compose config --services | grep "_bot$")
 if ! echo "$BOTS" | grep -q "$BOT_NAME"; then
     print_message "${RED}" "ACHTUNG! Bot '$BOT_NAME' does not exist."
     print_message "${YELLOW}" "Available bots:"
