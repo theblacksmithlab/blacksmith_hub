@@ -46,7 +46,14 @@ pub async fn generate_podcast(
             .await?;
     }
 
-    let podcast = news_block_creation(&g_client, tg_agent_id, app_state, nickname, true).await?;
+    let podcast = news_block_creation(
+        &g_client,
+        tg_agent_id,
+        app_state,
+        nickname,
+        true
+    )
+        .await?;
 
     let uploaded_file = g_client.upload_file(&podcast).await?;
 

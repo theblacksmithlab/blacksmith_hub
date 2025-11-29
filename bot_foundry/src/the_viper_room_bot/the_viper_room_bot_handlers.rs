@@ -20,10 +20,7 @@ use teloxide::prelude::{Message, Requester};
 use teloxide::sugar::request::RequestReplyExt;
 use teloxide::Bot;
 use teloxide_core::payloads::{SendMessageSetters, SendPhotoSetters};
-use teloxide_core::types::{
-    CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, KeyboardButton,
-    KeyboardMarkup, UserId,
-};
+use teloxide_core::types::{CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, KeyboardButton, KeyboardMarkup, ParseMode, UserId};
 use tracing::info;
 use tracing::log::warn;
 
@@ -219,6 +216,7 @@ pub(crate) async fn the_viper_room_command_handler(
 
             bot.send_photo(chat_id, InputFile::file(photo_path))
                 .caption(welcome_text)
+                .parse_mode(ParseMode::Html)
                 .reply_markup(keyboard)
                 .await?;
         }

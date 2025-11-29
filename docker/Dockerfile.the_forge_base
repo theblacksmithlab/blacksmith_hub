@@ -31,17 +31,8 @@ WORKDIR /app
 
 COPY --from=builder /usr/src/app/target/release/the_forge .
 
-RUN mkdir -p /etc/letsencrypt/live/api.blacksmith-lab.com/
-
-COPY ./certs/fullchain.pem /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
-COPY ./certs/privkey.pem /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem
-
 RUN chown 1001:1000 /app/the_forge && \
     chmod +x /app/the_forge
-
-RUN chown -R 1001:1000 /etc/letsencrypt/live && \
-    chmod 600 /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem && \
-    chmod 644 /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
 
 RUN mkdir -p tmp && \
     chown 1001:1000 tmp && \

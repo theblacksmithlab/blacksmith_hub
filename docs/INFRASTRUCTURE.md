@@ -88,7 +88,7 @@ server {
     
     # Uniframe Studio API
     location /api/uniframe/ {
-        proxy_pass https://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -116,9 +116,8 @@ server {
 
     # API endpoints (Blacksmith Web)
     location ~ ^/(user_action|get_user_avatar|blacksmith_web_user_request|blacksmith_web_chat_fetch|blacksmith_web_tts_request) {
-        proxy_pass https://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
-        proxy_ssl_verify off;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
