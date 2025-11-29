@@ -100,10 +100,11 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
         None => return Json(vec![]),
     };
 
-    info!(
-        "App-Source: {} | Fetching chat history for user: {}",
-        app_name, user_id
-    );
+    // info!(
+    //     "App-Source: {} | Fetching chat history for user: {}",
+    //     app_name, user_id
+    // );
+
     match fetch_chat_history_from_db(
         &blacksmith_web_app_state.local_db_pool,
         &user_id,
