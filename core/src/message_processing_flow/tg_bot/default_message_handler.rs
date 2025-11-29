@@ -179,8 +179,7 @@ pub async fn default_message_handler(
                     .await
                     .unwrap_or_else(|_| llm_response.clone());
 
-                    // Temporary turned-off fot debug
-                    let _converted_to_markdown_v2_full_response =
+                    let converted_to_markdown_v2_full_response =
                         convert_markdown_to_telegram(&full_response);
 
                     let message_id = Uuid::new_v4().to_string();
@@ -189,7 +188,7 @@ pub async fn default_message_handler(
 
                     stop_bots_chat_action(typing_flag).await;
 
-                    bot.send_message(chat_id, &full_response)
+                    bot.send_message(chat_id, converted_to_markdown_v2_full_response)
                         .reply_markup(create_tts_button(chat_id, &message_id))
                         .parse_mode(ParseMode::MarkdownV2)
                         .await?;
