@@ -73,6 +73,29 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  the_viper_room_bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.the_viper_room_bot
+    env_file:
+      - .env
+    volumes:
+      - ./common_res/the_viper_room:/app/common_res/the_viper_room
+      - ./common_res/messages/the_viper_room_bot:/app/common_res/messages/the_viper_room_bot
+      - ./common_res/messages/common:/app/common_res/messages/common
+      - ./common_res/system_roles/the_viper_room:/app/common_res/system_roles/the_viper_room
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   agent_davon:
     build:
       context: .
@@ -105,7 +128,7 @@ services:
     env_file:
       - .env
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     deploy:
       resources:
         limits:
@@ -141,3 +164,25 @@ services:
         max-file: "3"
     networks:
       - uniframe-network
+
+  the_viper_room:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.the_viper_room
+    volumes:
+      - ./common_res:/app/common_res
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:3001:3001"  # Bind to localhost only - nginx handles external access
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -28,6 +28,15 @@ impl ContextBuilder for DefaultContextBuilder {
             .map(|doc| match doc {
                 DocumentType::Default(d) => d.text.clone(),
                 DocumentType::W3A(d) => d.text.clone(),
+                DocumentType::HybridSearch(d) => {
+                    let mut header = format!("=== {} ===", d.metadata.title);
+
+                    if let Some(extra) = &d.metadata.extra {
+                        header.push_str(&format!("\n{}", extra));
+                    }
+
+                    format!("{}\n\n{}", header, d.text)
+                }
             })
             .collect::<Vec<String>>()
             .join("\n\n");

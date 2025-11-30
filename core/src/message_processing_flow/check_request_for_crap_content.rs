@@ -19,7 +19,6 @@ pub async fn check_request_for_common_case<T: OpenAIClientInit + Send + Sync>(
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(
             ProbiotRoleType::CommonCaseDetection,
         )),
-        AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::CommonCaseDetection)),
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::CommonCaseDetection)),
         AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
             BlacksmithLabRoleType::CommonCaseDetection,

@@ -23,11 +23,12 @@ print_help() {
     echo "  ./the_forge_manager.sh base rebuild               - Rebuild the_forge_base image"
     echo "  ./the_forge_manager.sh blacksmith_web restart     - Restart the blacksmith_web service"
     echo "  ./the_forge_manager.sh uniframe_studio redeploy   - Full redeploy of the uniframe_studio service"
+    echo "  ./the_forge_manager.sh the_viper_room redeploy    - Full redeploy of the the_viper_room service"
     echo "  ./the_forge_manager.sh full-redeploy blacksmith_web - Rebuild base and redeploy blacksmith_web only"
     echo ""
 
     print_message "${YELLOW}" "Available services:"
-    SERVICES=$(docker-compose config --services | grep -v "_base" | grep -v "bot")
+    SERVICES=$(docker compose config --services | grep -E "^(blacksmith_web|uniframe_studio|the_viper_room)$")
     for service in $SERVICES; do
         echo "  - $service"
     done
@@ -37,10 +38,10 @@ rebuild_base() {
     print_message "${GREEN}" "Rebuilding the_forge_base image..."
 
     print_message "${YELLOW}" "Stopping and removing dependent containers..."
-    DEPENDENT_SERVICES=$(docker-compose config --services | grep -v "bot" | grep -v "_base")
+    DEPENDENT_SERVICES=$(docker compose config --services | grep -E "^(blacksmith_web|uniframe_studio|the_viper_room)$")
     for service in $DEPENDENT_SERVICES; do
-        docker-compose stop $service
-        docker-compose rm -f $service
+        docker compose stop $service
+        docker compose rm -f $service
     done
 
     BASE_IMAGE_ID=$(docker images -q the_forge_base)
@@ -50,29 +51,29 @@ rebuild_base() {
     fi
 
     print_message "${GREEN}" "Building the_forge_base image..."
-    docker-compose build the_forge_base
+    docker compose build the_forge_base
 
     print_message "${GREEN}" "Rebuilding dependent services..."
     for service in $DEPENDENT_SERVICES; do
-        docker-compose build $service
+        docker compose build $service
     done
 
     print_message "${GREEN}" "Base image and dependent services rebuilt successfully!"
-    print_message "${YELLOW}" "To start services, use: docker-compose up -d <service_name>"
+    print_message "${YELLOW}" "To start services, use: docker compose up -d <service_name>"
 }
 
 restart_service() {
     local service=$1
     print_message "${GREEN}" "Simple restart for service: $service..."
-    docker-compose restart $service
+    docker compose restart $service
     print_message "${GREEN}" "Service restarted successfully!"
 }
 
 redeploy_service() {
     local service=$1
     print_message "${GREEN}" "Full redeployment for service: $service..."
-    docker-compose stop $service
-    docker-compose rm -f $service
+    docker compose stop $service
+    docker compose rm -f $service
 
     IMAGE_ID=$(docker images -q blacksmith_lab_${service})
     if [[ -n "$IMAGE_ID" ]]; then
@@ -80,8 +81,8 @@ redeploy_service() {
         docker rmi -f "$IMAGE_ID"
     fi
 
-    docker-compose build $service
-    docker-compose up -d $service
+    docker compose build $service
+    docker compose up -d $service
     print_message "${GREEN}" "Service redeployed successfully!"
 }
 
@@ -100,7 +101,7 @@ if [ "$1" == "full-redeploy" ]; then
         exit 1
     fi
 
-    SERVICES=$(docker-compose config --services | grep -v "_base" | grep -v "bot")
+    SERVICES=$(docker compose config --services | grep -E "^(blacksmith_web|uniframe_studio|the_viper_room)$")
     if ! echo "$SERVICES" | grep -q "$SERVICE_NAME"; then
         print_message "${RED}" "ACHTUNG! Service '$SERVICE_NAME' does not exist."
         print_message "${YELLOW}" "Available services:"
@@ -111,8 +112,8 @@ if [ "$1" == "full-redeploy" ]; then
     print_message "${BLUE}" "=== Full redeployment process for $SERVICE_NAME ==="
 
     print_message "${YELLOW}" "1. Stopping and removing $SERVICE_NAME..."
-    docker-compose stop $SERVICE_NAME
-    docker-compose rm -f $SERVICE_NAME
+    docker compose stop $SERVICE_NAME
+    docker compose rm -f $SERVICE_NAME
 
     IMAGE_ID=$(docker images -q blacksmith_lab_${SERVICE_NAME})
     if [[ -n "$IMAGE_ID" ]]; then
@@ -127,11 +128,11 @@ if [ "$1" == "full-redeploy" ]; then
         docker rmi -f "$BASE_IMAGE_ID"
     fi
 
-    docker-compose build the_forge_base
+    docker compose build the_forge_base
 
     print_message "${YELLOW}" "3. Rebuilding and starting $SERVICE_NAME..."
-    docker-compose build $SERVICE_NAME
-    docker-compose up -d $SERVICE_NAME
+    docker compose build $SERVICE_NAME
+    docker compose up -d $SERVICE_NAME
 
     print_message "${GREEN}" "Full redeployment of $SERVICE_NAME completed successfully!"
     exit 0
@@ -156,7 +157,7 @@ if [ "$SERVICE_NAME" == "base" ]; then
     exit 0
 fi
 
-SERVICES=$(docker-compose config --services | grep -v "_base" | grep -v "bot")
+SERVICES=$(docker compose config --services | grep -E "^(blacksmith_web|uniframe_studio|the_viper_room)$")
 if ! echo "$SERVICES" | grep -q "$SERVICE_NAME"; then
     print_message "${RED}" "ACHTUNG! Service '$SERVICE_NAME' does not exist."
     print_message "${YELLOW}" "Available services:"

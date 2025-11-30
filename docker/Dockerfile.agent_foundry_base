@@ -14,7 +14,6 @@ COPY core core/
 COPY the_forge the_forge/
 COPY bot_foundry bot_foundry/
 COPY agent_foundry agent_foundry/
-COPY tools tools/
 
 RUN cargo build -p agent_foundry --release -j 4
 

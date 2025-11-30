@@ -587,13 +587,8 @@ pub async fn ai_check(
     let system_role =
         get_system_role_or_fallback(&AppName::GrootBot, GrootRoleType::MessageCheck, None);
 
-    let scam_detection_result = raw_llm_processing_json(
-        &system_role,
-        message_to_check,
-        app_state,
-        LlmModel::Complex2,
-    )
-    .await?;
+    let scam_detection_result =
+        raw_llm_processing_json(&system_role, message_to_check, app_state, LlmModel::Light).await?;
 
     let is_scam: bool = match serde_json::from_str::<serde_json::Value>(&scam_detection_result) {
         Ok(json) => match json.get("is_scam") {
@@ -999,4 +994,90 @@ pub async fn handle_groot_report(
     }
 
     Ok(())
+}
+
+pub async fn quote_entities_check(
+    bot: Bot,
+    msg: Message,
+    is_paid_chat: bool,
+    app_name: &AppName,
+    chat_title: &str,
+    username: &str,
+    user_id: u64,
+) -> Result<Option<()>> {
+    if let Some(entities) = msg.entities() {
+        for entity in entities {
+            if matches!(
+                entity.kind,
+                teloxide::types::MessageEntityKind::Blockquote { .. }
+            ) {
+                if is_paid_chat {
+                    let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
+                        GrootBotMessages::DefaultScamAlert,
+                    ))
+                    .await?;
+                    let formatted_bot_system_message_text =
+                        bot_system_message_text.replace("{}", username);
+
+                    paid_chat_spam_warning(
+                        bot.clone(),
+                        &msg,
+                        msg.thread_id,
+                        formatted_bot_system_message_text,
+                        format!(
+                            "Quote detected in message entities... message DELETED. | Violator id: {}",
+                            user_id
+                        ),
+                        app_name,
+                        chat_title,
+                        username
+                    )
+                        .await?;
+                    return Ok(Some(()));
+                } else {
+                    unpaid_chat_spam_warning(bot, &msg, msg.thread_id, chat_title).await?;
+                    return Ok(Some(()));
+                }
+            }
+        }
+    }
+
+    if let Some(caption_entities) = msg.caption_entities() {
+        for entity in caption_entities {
+            if matches!(
+                entity.kind,
+                teloxide::types::MessageEntityKind::Blockquote { .. }
+            ) {
+                if is_paid_chat {
+                    let bot_system_message_text = get_message(AppsSystemMessages::GrootBot(
+                        GrootBotMessages::DefaultScamAlert,
+                    ))
+                    .await?;
+                    let formatted_bot_system_message_text =
+                        bot_system_message_text.replace("{}", username);
+
+                    paid_chat_spam_warning(
+                        bot.clone(),
+                        &msg,
+                        msg.thread_id,
+                        formatted_bot_system_message_text,
+                        format!(
+                            "Quote detected in caption entities... message DELETED. | Violator id: {}",
+                            user_id
+                        ),
+                        app_name,
+                        chat_title,
+                        username
+                    )
+                        .await?;
+                    return Ok(Some(()));
+                } else {
+                    unpaid_chat_spam_warning(bot, &msg, msg.thread_id, chat_title).await?;
+                    return Ok(Some(()));
+                }
+            }
+        }
+    }
+
+    Ok(None)
 }

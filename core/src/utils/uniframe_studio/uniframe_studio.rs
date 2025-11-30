@@ -32,8 +32,7 @@ pub async fn validate_transcription_keywords(
     let llm_message = format!("Raw transcription keywords: {}", raw_transcription_keywords);
 
     let validated_keywords =
-        match raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Complex)
-            .await
+        match raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light).await
         {
             Ok(response) => response,
             Err(e) => {

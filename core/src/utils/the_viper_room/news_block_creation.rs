@@ -1,10 +1,11 @@
 use crate::ai::common::common::raw_llm_processing;
-use crate::ai::common::voice_processing::podcast_tts;
+use crate::ai::common::voice_processing::{podcast_tts_via_elevenlabs, podcast_tts_via_openai};
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::TheViperRoomBotMessages;
 use crate::models::common::system_roles::TheViperRoomRoleType;
+use crate::models::the_viper_room::common::TTSProvider;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::get_message;
 use crate::utils::common::get_system_role_or_fallback;
@@ -30,19 +31,30 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
     create_dir_all(&user_tmp_dir)?;
 
     let channels = get_dialogs(&client).await?;
-
     processing_dialogs(&client, channels, app_state.clone(), user_tmp_dir.clone()).await?;
 
     updates_file_creation(user_tmp_dir.clone(), app_state.clone()).await?;
 
     let podcast_text = summarize_updates(user_tmp_dir.clone(), app_state.clone(), nickname).await?;
 
-    let audio_path = podcast_tts(
-        podcast_text.clone(),
-        user_tmp_dir.clone(),
-        app_state.clone(),
-    )
-    .await?;
+    let tts_provider = TTSProvider::OpenAI;
+
+    let audio_path = match tts_provider {
+        TTSProvider::OpenAI => {
+            let audio_path = podcast_tts_via_openai(
+                podcast_text.clone(),
+                user_tmp_dir.clone(),
+                app_state.clone(),
+            )
+            .await?;
+            audio_path
+        }
+        TTSProvider::ElevenLabs => {
+            let audio_path =
+                podcast_tts_via_elevenlabs(podcast_text.clone(), user_tmp_dir.clone()).await?;
+            audio_path
+        }
+    };
 
     info!("Starting to add background music to the podcast...");
     let background_music_path = "common_res/the_viper_room/background_music.mp3";

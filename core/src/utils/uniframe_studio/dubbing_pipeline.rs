@@ -203,32 +203,8 @@ impl DubbingPipelineService {
 
                 let error_msg = "All GPU processing instances are currently busy.\n\
                 Please try again in a few minutes...\n\
-                Need urgent processing? Contact our support team on the main page for priority resource allocation.".to_string(); 
-                
-                Self::update_pipeline_status(
-                    &self.db_pool,
-                    &job_id,
-                    "failed",
-                    "Technical environment initialization failed",
-                    Some(0),
-                    None,
-                    Some(&error_msg),
-                    None,
-                    None,
-                    None,
-                )
-                    .await;
+                Need urgent processing? Contact our support team on the main page for priority resource allocation.".to_string();
 
-                return Err(anyhow::anyhow!(
-                    error_msg
-                ));
-            }
-            Err(e) => {
-                error!("Failed to acquire GPU instance for job {}: {}", job_id, e);
-
-                let error_msg = "Failed to acquire GPU instance for the job.\
-                \nPlease try again in a few minutes...".to_string();
-                
                 Self::update_pipeline_status(
                     &self.db_pool,
                     &job_id,
@@ -243,9 +219,30 @@ impl DubbingPipelineService {
                 )
                 .await;
 
-                return Err(anyhow::anyhow!(
-                    error_msg
-                ));
+                return Err(anyhow::anyhow!(error_msg));
+            }
+            Err(e) => {
+                error!("Failed to acquire GPU instance for job {}: {}", job_id, e);
+
+                let error_msg = "Failed to acquire GPU instance for the job.\
+                \nPlease try again in a few minutes..."
+                    .to_string();
+
+                Self::update_pipeline_status(
+                    &self.db_pool,
+                    &job_id,
+                    "failed",
+                    "Technical environment initialization failed",
+                    Some(0),
+                    None,
+                    Some(&error_msg),
+                    None,
+                    None,
+                    None,
+                )
+                .await;
+
+                return Err(anyhow::anyhow!(error_msg));
             }
         };
 

@@ -1,4 +1,5 @@
 use crate::rag_system::context_builder::DefaultContextBuilder;
+use crate::rag_system::retriever::qdrant::QdrantHybridSearchRetriever;
 use crate::rag_system::retriever::QdrantRetriever;
 use crate::rag_system::types::{RAGConfig, RetrievedContext};
 use crate::rag_system::vectorizer::OpenAIVectorizer;
@@ -15,28 +16,25 @@ pub async fn get_results_via_rag_system<T: OpenAIClientInit + QdrantClientInit +
     app_state: Arc<T>,
 ) -> anyhow::Result<RetrievedContext> {
     let vectorizer = OpenAIVectorizer::new(app_state.clone());
-
     let retriever = QdrantRetriever::new(app_state.clone(), collection_names.clone());
-
-    let payload_key_based_retriever =
-        QdrantRetriever::new(app_state.clone(), collection_names.clone());
-
     let context_builder = DefaultContextBuilder::new().with_separator("\n-\n".to_string());
+    let hybrid_search_retriever =
+        QdrantHybridSearchRetriever::new(app_state.clone(), collection_names.clone());
 
     let rag_system = RAGSystem::new(
         vectorizer,
+        retriever.clone(),
         retriever,
-        payload_key_based_retriever,
+        hybrid_search_retriever,
         context_builder,
         config,
     );
 
     let result = rag_system.process(input_data).await?;
 
-    let total_resulting_docs_quantity = result.documents.len();
     info!(
         "Docs' total amount retrieved by the RAG system in the main search: {}",
-        total_resulting_docs_quantity
+        result.documents.len()
     );
 
     Ok(result)

@@ -11,7 +11,7 @@ use crate::models::common::system_roles::{BlacksmithLabRoleType, ProbiotRoleType
 use crate::rag_system::context_builder::DefaultContextBuilder;
 use crate::rag_system::get_results_via_rag_system::get_results_via_rag_system::get_results_via_rag_system;
 use crate::rag_system::retriever::QdrantRetriever;
-use crate::rag_system::types::DocumentType;
+use crate::rag_system::types::{DocumentType, RAGConfig};
 use crate::rag_system::{
     get_advanced_rag_config, get_payload_key_based_rag_config, ContextBuilder,
     PayloadKeyBasedRetriever,
@@ -92,17 +92,20 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
         .collect();
 
     let rag_config = match app_name {
-        AppName::W3AWeb | AppName::W3ABot => get_payload_key_based_rag_config(),
+        AppName::W3AWeb => get_payload_key_based_rag_config(),
         AppName::BlacksmithWeb => get_advanced_rag_config(),
         _ => get_advanced_rag_config(),
     };
 
-    info!("Collections names for RAG system: {:?}", collection_names);
+    info!(
+        "Collections names to use for RAG system determined: {:?}",
+        collection_names
+    );
 
     let rag_system_search_result = get_results_via_rag_system(
         clarified_request,
         &collection_names,
-        rag_config,
+        rag_config.clone(),
         app_state.clone(),
     )
     .await?;
@@ -117,17 +120,14 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
             .await
             .unwrap_or_else(|_| (search_result_content.clone(), max_tokens));
 
-    let (additional_context, extra_data) = if matches!(app_name, AppName::W3AWeb | AppName::W3ABot)
+    let (extended_context, extra_data) = if matches!(rag_config, RAGConfig::PayloadKeyBased { .. })
     {
         let initial_search_result_lesson_learned = rag_system_search_result
             .documents
             .first()
-            .and_then(|doc| {
-                if let DocumentType::W3A(d) = doc {
-                    Some(d.lesson_title.clone())
-                } else {
-                    None
-                }
+            .and_then(|doc| match doc {
+                DocumentType::W3A(d) => Some(d.lesson_title.clone()),
+                _ => None,
             })
             .unwrap_or_default();
 
@@ -141,24 +141,44 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
             initial_search_result_lesson_learned
         );
 
-        fetch_additional_context(
-            user_raw_request,
-            clarified_request,
-            app_state.clone(),
-            current_cache,
-            &app_name,
-            &collection_names,
-            &initial_search_result_titled_content,
-            token_count,
-            max_tokens,
-            min_tokens,
-            vec![initial_search_result_lesson_learned],
-            5,
-            0,
-        )
-        .await?
+        if token_count >= min_tokens {
+            info!(
+                "Token count {} >= min_tokens {}, no extension needed.",
+                token_count, min_tokens
+            );
+            (
+                initial_search_result_titled_content,
+                vec![initial_search_result_lesson_learned],
+            )
+        } else {
+            info!(
+                "Token count {} < min_tokens {}, extending context...",
+                token_count, min_tokens
+            );
+
+            fetch_additional_context(
+                user_raw_request,
+                clarified_request,
+                app_state.clone(),
+                current_cache,
+                &app_name,
+                &collection_names,
+                &initial_search_result_titled_content,
+                token_count,
+                max_tokens,
+                min_tokens,
+                vec![initial_search_result_lesson_learned],
+                5,
+                0,
+            )
+            .await?
+        }
     } else {
-        (String::new(), Vec::new())
+        info!("No context extension needed for this RAGConfig type.");
+        (
+            post_processed_initial_search_result_content.clone(),
+            Vec::new(),
+        )
     };
 
     let llm_message = format!(
@@ -166,11 +186,7 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
         user_raw_request,
         clarified_request,
         current_cache,
-        if matches!(app_name, AppName::W3AWeb | AppName::W3ABot) {
-            additional_context
-        } else {
-            post_processed_initial_search_result_content
-        }
+        extended_context,
     );
 
     info!(
@@ -180,7 +196,6 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
 
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::MainProcessing)),
-        AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::MainProcessing)),
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::MainProcessing)),
         AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
             BlacksmithLabRoleType::MainProcessing,
@@ -200,7 +215,7 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
     };
 
     let llm_response =
-        raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Complex).await?;
+        raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::ComplexMini).await?;
 
     Ok((llm_response, extra_data))
 }
@@ -219,9 +234,6 @@ pub async fn handle_common_case_request<T: OpenAIClientInit + Send + Sync>(
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(
             ProbiotRoleType::CommonCaseRequestProcessing,
-        )),
-        AppName::W3ABot => Some(AppsSystemRoles::W3A(
-            W3ARoleType::CommonCaseRequestProcessing,
         )),
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(
             W3ARoleType::CommonCaseRequestProcessing,
@@ -248,75 +260,6 @@ pub async fn handle_common_case_request<T: OpenAIClientInit + Send + Sync>(
 
     Ok(llm_response)
 }
-
-// pub async fn get_llm_recommendation<T: OpenAIClientInit + QdrantClientInit + Send + Sync>(
-//     user_raw_request: &str,
-//     clarified_request: &str,
-//     app_state: Arc<T>,
-//     current_cache: &str,
-//     app_name: &AppName,
-//     lesson_learned: &Vec<String>,
-// ) -> Result<String> {
-//     let w3a_academy_learning_structure =
-//         get_message(AppsSystemMessages::W3A(W3AMessages::W3AStudyStructure)).await?;
-//
-//     let system_role = get_system_role_or_fallback(&app_name, W3ARoleType::Recommendation, None);
-//
-//     let llm_message = format!("User's current query: {}\nUser's refined query: {}\nChat history: {}\nWeb3 Academy learning structure:{}\nCompleted lessons:{:?}\n", user_raw_request, clarified_request, current_cache, w3a_academy_learning_structure, lesson_learned);
-//
-//     let result =
-//         raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Complex).await?;
-//
-//     info!("LLM lesson recommendation: {}", result);
-//
-//     let parsed_json: Value = serde_json::from_str(&result).map_err(|err| {
-//         error!("Failed to parse LLM response as JSON: {}", err);
-//         err
-//     })?;
-//
-//     let llm_lesson_recommendation = parsed_json
-//         .get("Recommended lesson")
-//         .and_then(|v| v.as_str())
-//         .unwrap_or("")
-//         .to_lowercase();
-//
-//     info!("Extracted recommendation: {}", llm_lesson_recommendation);
-//
-//     if !llm_lesson_recommendation.is_empty()
-//         && !lesson_exists_in_structure(&llm_lesson_recommendation, &w3a_academy_learning_structure)
-//     {
-//         warn!(
-//             "Recommended lesson '{}' not found in W3A structure, returning empty string",
-//             llm_lesson_recommendation
-//         );
-//         return Ok(String::new());
-//     }
-//
-//     Ok(llm_lesson_recommendation)
-// }
-
-// fn lesson_exists_in_structure(lesson: &str, structure_json: &str) -> bool {
-//     if let Ok(structure) = serde_json::from_str::<Value>(structure_json) {
-//         if let Some(obj) = structure.as_object() {
-//             for (_, module_value) in obj {
-//                 if let Some(module_obj) = module_value.as_object() {
-//                     for (_, block_value) in module_obj {
-//                         if let Some(lessons) = block_value.as_array() {
-//                             for lesson_value in lessons {
-//                                 if let Some(lesson_str) = lesson_value.as_str() {
-//                                     if lesson_str.to_lowercase() == lesson {
-//                                         return true;
-//                                     }
-//                                 }
-//                             }
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//     }
-//     false
-// }
 
 pub async fn get_additional_context_by_llm_recommendation<
     T: OpenAIClientInit + QdrantClientInit + Send + Sync,

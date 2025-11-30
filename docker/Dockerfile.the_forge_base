@@ -1,4 +1,4 @@
-FROM rust:latest AS builder
+FROM rust:bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config \
@@ -15,7 +15,6 @@ COPY core core/
 COPY the_forge the_forge/
 COPY bot_foundry bot_foundry/
 COPY agent_foundry agent_foundry/
-COPY tools tools/
 
 RUN cargo build -p the_forge --release -j 4
 
@@ -32,17 +31,8 @@ WORKDIR /app
 
 COPY --from=builder /usr/src/app/target/release/the_forge .
 
-RUN mkdir -p /etc/letsencrypt/live/api.blacksmith-lab.com/
-
-COPY ./certs/fullchain.pem /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
-COPY ./certs/privkey.pem /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem
-
 RUN chown 1001:1000 /app/the_forge && \
     chmod +x /app/the_forge
-
-RUN chown -R 1001:1000 /etc/letsencrypt/live && \
-    chmod 600 /etc/letsencrypt/live/api.blacksmith-lab.com/privkey.pem && \
-    chmod 644 /etc/letsencrypt/live/api.blacksmith-lab.com/fullchain.pem
 
 RUN mkdir -p tmp && \
     chown 1001:1000 tmp && \

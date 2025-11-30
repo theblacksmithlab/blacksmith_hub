@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
     let app_name = match app_name_str.as_str() {
         "agent_davon" => AppName::AgentDavon,
         "the_viper_room" | "w3a_web" | "blacksmith_web" | "probiot_bot" | "the_viper_room_bot"
-        | "tester_bot" | "w3a_bot" | "groot_bot" => {
+        | "groot_bot" => {
             info!(
                 "No Telegram agent system implementation for {}",
                 app_name_str

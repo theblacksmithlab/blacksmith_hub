@@ -1,0 +1,9 @@
+FROM the_forge_base
+
+USER root
+
+COPY the_forge/src/the_viper_room/config.yaml /app/config.yaml
+
+USER 1001:1000
+
+ENV APP_NAME="the_viper_room"

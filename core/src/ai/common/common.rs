@@ -18,22 +18,30 @@ pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
 ) -> Result<String> {
     let llm_client = app_state.get_llm_client().clone();
 
-    let llm_request = CreateChatCompletionRequestArgs::default()
-        .max_tokens(4095u32)
-        .model(model.as_str())
-        .temperature(0.2)
-        .messages([
-            ChatCompletionRequestSystemMessageArgs::default()
-                .content(system_role)
-                .build()?
-                .into(),
-            ChatCompletionRequestUserMessageArgs::default()
-                .content(request)
-                .build()?
-                .into(),
-        ])
-        .response_format(JsonObject)
-        .build()?;
+    let mut builder = CreateChatCompletionRequestArgs::default();
+    builder.model(model.as_str());
+
+    if model.is_gpt5_model() {
+        if let Some(effort) = model.reasoning_effort() {
+            builder.reasoning_effort(effort);
+        }
+    } else {
+        builder.temperature(0.2);
+    }
+
+    builder.messages([
+        ChatCompletionRequestSystemMessageArgs::default()
+            .content(system_role)
+            .build()?
+            .into(),
+        ChatCompletionRequestUserMessageArgs::default()
+            .content(request)
+            .build()?
+            .into()
+    ])
+        .response_format(JsonObject);
+
+    let llm_request = builder.build()?;
 
     let response = llm_client.chat().create(llm_request).await?;
 
@@ -57,21 +65,29 @@ pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
 ) -> Result<String> {
     let llm_client = app_state.get_llm_client().clone();
 
-    let llm_request = CreateChatCompletionRequestArgs::default()
-        .max_tokens(4095u32)
-        .model(model.as_str())
-        .temperature(0.2)
-        .messages([
-            ChatCompletionRequestSystemMessageArgs::default()
-                .content(system_role)
-                .build()?
-                .into(),
-            ChatCompletionRequestUserMessageArgs::default()
-                .content(request)
-                .build()?
-                .into(),
-        ])
-        .build()?;
+    let mut builder = CreateChatCompletionRequestArgs::default();
+    builder.model(model.as_str());
+
+    if model.is_gpt5_model() {
+        if let Some(effort) = model.reasoning_effort() {
+            builder.reasoning_effort(effort);
+        }
+    } else {
+        builder.temperature(0.2);
+    }
+
+    builder.messages([
+        ChatCompletionRequestSystemMessageArgs::default()
+            .content(system_role)
+            .build()?
+            .into(),
+        ChatCompletionRequestUserMessageArgs::default()
+            .content(request)
+            .build()?
+            .into(),
+    ]);
+
+    let llm_request = builder.build()?;
 
     let response = llm_client.chat().create(llm_request).await?;
 
@@ -86,20 +102,6 @@ pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
         Ok("Error generating response... Please try again".to_string())
     }
 }
-
-// pub async fn vectorize(data: String, app_state: Arc<RequestAppState>) -> Result<Vec<f32>> {
-//     let llm_client = app_state.llm_client.clone();
-//
-//     let request = CreateEmbeddingRequestArgs::default()
-//         .model(LlmModel::TextEmbedding3Large.as_str())
-//         .input(data)
-//         .build()?;
-//
-//     let response: CreateEmbeddingResponse = llm_client.embeddings().create(request).await?;
-//     let embedding = response.data.into_iter().next().unwrap().embedding;
-//
-//     Ok(embedding)
-// }
 
 pub async fn tokenize_and_truncate(data: &str, max_tokens: usize) -> Result<(String, usize)> {
     let bpe = cl100k_base()?;

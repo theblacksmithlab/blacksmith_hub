@@ -9,14 +9,13 @@ use chrono::Utc;
 use grammers_client::types::Chat::{Channel, Group, User};
 use grammers_client::{types, Client as g_Client};
 use std::fs;
-use std::fs::{read_dir, remove_file, OpenOptions};
+use std::fs::{copy, read_dir, remove_file, OpenOptions};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::process::Command;
-use tokio::time::sleep;
 use tracing::info;
+use tracing::log::warn;
 
 pub(crate) async fn get_dialogs(client: &g_Client) -> Result<Vec<types::Dialog>, anyhow::Error> {
     info!("Getting list of updates sources...");
@@ -100,7 +99,8 @@ pub(crate) async fn processing_dialogs<T: OpenAIClientInit + Send + Sync>(
                 user_tmp_dir.clone(),
             )
             .await?;
-            sleep(Duration::from_secs(1)).await;
+            // Check for FLOOD_WAIT (unnecessary for now)
+            // sleep(Duration::from_secs(1)).await;
         }
     }
 
@@ -111,7 +111,7 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
 ) -> Result<(), anyhow::Error> {
-    info!("Writing results from information sources in updates.txt...");
+    info!("Writing updates from information sources in updates.txt...");
 
     let updates_file_path = format!("{}/updates.txt", user_tmp_dir);
     let mut updates_file = OpenOptions::new()
@@ -130,13 +130,19 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
         .collect();
 
     let now = Utc::now();
-    let utc_plus_3 = now + ChronoDuration::hours(3);
+    let utc_plus_3_now = now + ChronoDuration::hours(3);
+    let utc_plus_3_start = utc_plus_3_now - ChronoDuration::hours(9);
 
     writeln!(
         updates_file,
-        "\nДата и время формирования обновлений: {}\n",
-        utc_plus_3
+        "Список обновлений за период: с {} по {} (UTC+3)\n\
+        Текущее время: {}\n",
+        utc_plus_3_start.format("%H:%M %d.%m.%Y"),
+        utc_plus_3_now.format("%H:%M %d.%m.%Y"),
+        utc_plus_3_now.format("%H:%M %d.%m.%Y")
     )?;
+
+    writeln!(updates_file, "\n===НАЧАЛО ОБНОВЛЕНИЙ===\n\n")?;
 
     let system_role = get_system_role_or_fallback(
         &AppName::TheViperRoom,
@@ -146,14 +152,49 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
 
     for file_path in txt_files.clone() {
         let content = read_file_safe(&file_path)?;
-        let response =
-            raw_llm_processing(&system_role, &content, app_state.clone(), LlmModel::Complex)
-                .await?;
-        writeln!(updates_file, "\n{}\n", response)?;
-        info!("{} file processed successfully!", file_path.display());
+        let (source, messages) = parse_channel_file(&content)?;
+
+        if messages.is_empty() {
+            info!("No messages found in {}, skipping", file_path.display());
+            continue;
+        }
+
+        info!(
+            "Processing {} messages from source: {}",
+            messages.len(),
+            source
+        );
+
+        for (idx, message_text) in messages.iter().enumerate() {
+            let llm_input = format!(
+                "Источник обновления: {}\nТекст обновления:\n{}",
+                source, message_text
+            );
+
+            let response = raw_llm_processing(
+                &system_role,
+                &llm_input,
+                app_state.clone(),
+                LlmModel::ComplexFast,
+            )
+            .await?;
+
+            let trimmed = response.trim();
+            if !trimmed.is_empty() {
+                writeln!(
+                    updates_file,
+                    "Источник обновления: {}\nОбзор обновления:\n{}\n",
+                    source, trimmed,
+                )?;
+            } else {
+                warn!("Empty response for message {} from {}", idx + 1, source);
+            }
+        }
+
+        info!("{} processed successfully!", file_path.display());
     }
 
-    writeln!(updates_file, "\nКонец обновлений")?;
+    writeln!(updates_file, "\n===КОНЕЦ ОБНОВЛЕНИЙ===")?;
 
     for file_path in &txt_files {
         remove_file(file_path)?;
@@ -182,14 +223,16 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
         .map_err(|e| format!("Failed to read 'updates': {}", e))
         .unwrap();
 
-    let updates_with_nickname_provided =
-        format!("Адресат: {}\nТекст обновлений: {}", nickname, updates);
+    let updates_with_nickname_provided = format!(
+        "Адресат: {}\nТекст подкаста подготовленный твоим помощником: {}",
+        nickname, updates
+    );
 
     let updates_summarized = raw_llm_processing(
         &system_role,
         &updates_with_nickname_provided,
         app_state.clone(),
-        LlmModel::Complex,
+        LlmModel::ComplexFast,
     )
     .await?;
 
@@ -217,7 +260,7 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
 ) -> anyhow::Result<()> {
     let mut messages = client.iter_messages(dialog.chat());
     let now = Utc::now();
-    let period = now - chrono::Duration::hours(9); // TODO: Implement news parsing period setting from UI
+    let period = now - chrono::Duration::hours(12);
 
     let user_tmp_file = format!(
         "{}/{}.txt",
@@ -228,7 +271,10 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
     let mut file = OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(user_tmp_file)?;
+
+    writeln!(file, "ИСТОЧНИК ОБНОВЛЕНИЙ: {}\n", chat_name)?;
 
     let system_role = get_system_role_or_fallback(
         &AppName::TheViperRoom,
@@ -246,16 +292,26 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
             let llm_response =
                 raw_llm_processing(&system_role, text, app_state.clone(), LlmModel::Light).await?;
 
-            if llm_response.trim() == "skip" {
+            let decision = llm_response.trim().to_lowercase();
+
+            info!("LLM usefulness decision: {}", decision);
+
+            let contains_ok = decision.contains("ok");
+            let contains_skip = decision.contains("skip");
+
+            if !contains_ok && !contains_skip {
+                warn!(
+                    "Unexpected LLM response: '{}', defaulting to skip",
+                    llm_response
+                );
                 continue;
             }
 
-            writeln!(
-                file,
-                "***\nИсточник: {}\nНачало обновления:\n{}\nКонец обновления.\n***\n",
-                dialog.chat.name(),
-                text
-            )?;
+            if contains_skip {
+                continue;
+            }
+
+            writeln!(file, "===ТЕКСТ ОБНОВЛЕНИЯ===\n{}\n===КОНЕЦ===\n", text)?;
         }
     }
 
@@ -330,13 +386,17 @@ pub(crate) async fn mix_podcast_with_music(
     }
 
     info!("Getting podcast duration...");
-    let duration = get_duration(podcast_path).await?;
-    info!("Podcast duration: {} seconds", duration);
+    let podcast_duration = get_duration(podcast_path).await?;
+    info!("Podcast duration: {} seconds", podcast_duration);
 
-    let fade_start = duration - 4.0;
+    let fade_start = podcast_duration - 4.0;
 
+    // Loop music indefinitely, then apply volume and fade-out
+    // amix with duration=first will cut music to match podcast length
     let filter_complex = format!(
-        "[1:a]volume=0.045,afade=t=out:st={}:d=4[music];[0:a][music]amix=inputs=2:duration=first",
+        "[1:a]aloop=loop=-1:size=2e+09[music_looped];\
+         [music_looped]volume=0.05,afade=t=out:st={}:d=4[music];\
+         [0:a][music]amix=inputs=2:duration=first",
         fade_start
     );
 
@@ -415,4 +475,76 @@ pub async fn generate_waveform(audio_path: &Path) -> anyhow::Result<Vec<u8>> {
     }
 
     Ok(waveform)
+}
+
+pub async fn save_daily_public_podcast(
+    podcast_path: &PathBuf,
+    caption_path: &PathBuf,
+) -> anyhow::Result<()> {
+    let daily_podcast_dir = "common_res/the_viper_room/daily_public_podcast";
+
+    fs::create_dir_all(daily_podcast_dir)?;
+
+    info!("Cleaning old daily podcast files...");
+    for entry in read_dir(daily_podcast_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            remove_file(&path)?;
+            info!("Removed old file: {:?}", path);
+        }
+    }
+
+    info!("Saving new daily podcast...");
+
+    let podcast_filename = podcast_path
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("Invalid podcast path"))?;
+    let caption_filename = caption_path
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("Invalid caption path"))?;
+
+    let dest_podcast = PathBuf::from(daily_podcast_dir).join(podcast_filename);
+    let dest_caption = PathBuf::from(daily_podcast_dir).join(caption_filename);
+
+    copy(podcast_path, &dest_podcast)?;
+    copy(caption_path, &dest_caption)?;
+
+    info!("Daily podcast saved to: {:?}", dest_podcast);
+    info!("Daily caption saved to: {:?}", dest_caption);
+
+    Ok(())
+}
+
+fn parse_channel_file(content: &str) -> Result<(String, Vec<String>), anyhow::Error> {
+    let mut lines = content.lines();
+
+    let source = lines
+        .find(|line| line.starts_with("ИСТОЧНИК ОБНОВЛЕНИЙ:"))
+        .map(|line| {
+            line.trim_start_matches("ИСТОЧНИК ОБНОВЛЕНИЙ:")
+                .trim()
+                .to_string()
+        })
+        .unwrap_or_else(|| {
+            warn!("Source not found in file, using default");
+            "Не определено".to_string()
+        });
+
+    let remaining_content: String = lines.collect::<Vec<_>>().join("\n");
+
+    let messages: Vec<String> = remaining_content
+        .split("===ТЕКСТ ОБНОВЛЕНИЯ===")
+        .filter_map(|part| {
+            let text = part.replace("===КОНЕЦ===", "").trim().to_string();
+
+            if text.is_empty() {
+                None
+            } else {
+                Some(text)
+            }
+        })
+        .collect();
+
+    Ok((source, messages))
 }

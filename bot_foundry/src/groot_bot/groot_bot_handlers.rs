@@ -13,12 +13,13 @@ use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState,
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
-    auto_delete_message, get_chat_title, get_chat_username, get_username,
-    is_message_from_linked_channel, load_super_admins, read_admins_from_csv,
+    auto_delete_message, get_chat_username, is_message_from_linked_channel, load_super_admins,
+    read_admins_from_csv,
 };
 use core::utils::tg_bot::groot_bot::subscription_utils::{
     show_plan_selection, PaymentProcess, SubscriptionState,
 };
+use core::utils::tg_bot::tg_bot::{get_chat_title, get_username_from_message};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -42,7 +43,7 @@ pub async fn groot_bot_command_handler(
     let chat_title = get_chat_title(&msg);
     let chat_id = msg.chat.id;
     let chat_username = get_chat_username(&msg);
-    let username = get_username(&msg);
+    let username = get_username_from_message(&msg);
     let mut is_admin = false;
     let mut is_from_linked_channel = false;
 

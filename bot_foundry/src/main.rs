@@ -3,22 +3,17 @@ use crate::groot_bot::groot_bot_handlers::{groot_bot_command_handler, groot_bot_
 use crate::probiot_bot::probiot_bot_handlers::{
     probiot_callback_query_handler, probiot_command_handler,
 };
-use crate::tester_bot::tester_bot_handlers::{
-    tester_bot_command_handler, tester_bot_message_handler,
-};
 use crate::the_viper_room_bot::the_viper_room_bot_handlers::{
-    the_viper_room_command_handler, the_viper_room_message_handler,
+    the_viper_room_bor_callback_query_handler, the_viper_room_command_handler,
+    the_viper_room_message_handler,
 };
-use crate::w3a_bot::w3a_bot_handlers::w3a_bot_command_handler;
 use anyhow::{anyhow, Result};
 use async_openai::Client as LLM_Client;
 use core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;
 use core::models::common::app_name::AppName;
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
-use core::models::tg_bot::tester_bot::tester_bot_commands::TesterBotCommands;
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
-use core::models::tg_bot::w3a_bot::w3a_bot_commands::W3ABotCommands;
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
 use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
@@ -35,9 +30,7 @@ use tracing_subscriber::EnvFilter;
 
 pub mod groot_bot;
 pub mod probiot_bot;
-pub mod tester_bot;
 pub mod the_viper_room_bot;
-pub mod w3a_bot;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -57,8 +50,6 @@ async fn main() -> Result<()> {
     let app_name = match app_name_str.as_str() {
         "probiot_bot" => AppName::ProbiotBot,
         "the_viper_room_bot" => AppName::TheViperRoomBot,
-        "tester_bot" => AppName::TesterBot,
-        "w3a_bot" => AppName::W3ABot,
         "groot_bot" => AppName::GrootBot,
         "the_viper_room" | "w3a_web" | "blacksmith_web" => {
             info!("No Telegram bot system implementation for {}", app_name_str);
@@ -120,8 +111,6 @@ async fn start_bot_with_handlers(
     let bot = match app_state.app_name {
         AppName::ProbiotBot => Bot::new(env::var("TELOXIDE_TOKEN_PROBIOT")?),
         AppName::TheViperRoomBot => Bot::new(env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM")?),
-        AppName::TesterBot => Bot::new(env::var("TELOXIDE_TOKEN_TESTER")?),
-        AppName::W3ABot => Bot::new(env::var("TELOXIDE_TOKEN_W3A")?),
         AppName::GrootBot => Bot::new(env::var("TELOXIDE_TOKEN_GROOT")?),
         _ => {
             return Err(anyhow::anyhow!(
@@ -171,23 +160,9 @@ fn get_handlers(
                 .filter_command::<TheViperRoomBotCommands>()
                 .endpoint(the_viper_room_command_handler),
             Update::filter_message().endpoint(the_viper_room_message_handler),
-            None,
-            None,
-        )),
-        AppName::TesterBot => Ok((
-            Update::filter_message()
-                .filter_command::<TesterBotCommands>()
-                .endpoint(tester_bot_command_handler),
-            Update::filter_message().endpoint(tester_bot_message_handler),
-            None,
-            None,
-        )),
-        AppName::W3ABot => Ok((
-            Update::filter_message()
-                .filter_command::<W3ABotCommands>()
-                .endpoint(w3a_bot_command_handler),
-            Update::filter_message().endpoint(default_message_handler),
-            None,
+            Some(
+                Update::filter_callback_query().endpoint(the_viper_room_bor_callback_query_handler),
+            ),
             None,
         )),
         AppName::GrootBot => Ok((

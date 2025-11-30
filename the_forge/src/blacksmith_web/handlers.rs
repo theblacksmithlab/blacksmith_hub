@@ -100,10 +100,11 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
         None => return Json(vec![]),
     };
 
-    info!(
-        "App-Source: {} | Fetching chat history for user: {}",
-        app_name, user_id
-    );
+    // info!(
+    //     "App-Source: {} | Fetching chat history for user: {}",
+    //     app_name, user_id
+    // );
+
     match fetch_chat_history_from_db(
         &blacksmith_web_app_state.local_db_pool,
         &user_id,
@@ -207,7 +208,6 @@ async fn prepare_text_for_tts_fn(
     text_to_process: &str,
 ) -> Result<String> {
     let system_role = match app_name {
-        AppName::W3ABot => Some(AppsSystemRoles::W3A(W3ARoleType::TTSPreProcessing)),
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::TTSPreProcessing)),
         AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
             BlacksmithLabRoleType::TTSPreProcessing,
@@ -232,7 +232,7 @@ async fn prepare_text_for_tts_fn(
         &system_role,
         &llm_message,
         blacksmith_web_app_state,
-        LlmModel::Complex,
+        LlmModel::Light,
     )
     .await?;
 

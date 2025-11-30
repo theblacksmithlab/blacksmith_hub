@@ -4,7 +4,6 @@ pub enum AppsSystemMessages {
     TheViperRoom(TheViperRoomMessages),
     TheViperRoomBot(TheViperRoomBotMessages),
     Common(CommonMessages),
-    W3ABot(W3ABotMessages),
     W3A(W3AMessages),
     GrootBot(GrootBotMessages),
     AgentDavon(AgentDavonMessages),
@@ -106,6 +105,7 @@ pub enum CommonMessages {
     ErrorProcessingVoiceMessage,
     GlobalErrorProcessingVoiceMessage,
     InvalidRequestContent,
+    PrivateCmdUsedInPublicChat,
 }
 
 impl CommonMessages {
@@ -123,6 +123,7 @@ impl CommonMessages {
                 "global_error_processing_voice_message"
             }
             CommonMessages::InvalidRequestContent => "invalid_request_content",
+            CommonMessages::PrivateCmdUsedInPublicChat => "private_cmd_used_in_public_chat",
         }
     }
 }
@@ -191,6 +192,11 @@ impl TheViperRoomMessages {
 pub enum TheViperRoomBotMessages {
     DonationFooter,
     WrongCmdOrNoRightsMessage,
+    PublicChatMessageCommunication,
+    StartMessage,
+    FAQ,
+    MainMenu,
+    UnexpectedMessage,
 }
 
 impl TheViperRoomBotMessages {
@@ -198,6 +204,13 @@ impl TheViperRoomBotMessages {
         match self {
             TheViperRoomBotMessages::DonationFooter => "donation_footer",
             TheViperRoomBotMessages::WrongCmdOrNoRightsMessage => "wrong_cmd_or_no_rights_message",
+            TheViperRoomBotMessages::PublicChatMessageCommunication => {
+                "public_chat_message_communication"
+            }
+            TheViperRoomBotMessages::StartMessage => "start_message",
+            TheViperRoomBotMessages::FAQ => "faq",
+            TheViperRoomBotMessages::MainMenu => "main_menu_text",
+            TheViperRoomBotMessages::UnexpectedMessage => "unexpected_message",
         }
     }
 }
