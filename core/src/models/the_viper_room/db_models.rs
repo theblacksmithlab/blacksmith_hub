@@ -13,3 +13,11 @@ pub struct UserChannel {
     pub channel_id: i64,
     pub channel_title: String,
 }
+
+/// Temporary channel data for adding channels workflow
+/// Used to store channels before saving to database
+#[derive(Debug, Clone)]
+pub struct PendingChannel {
+    pub channel_id: i64,
+    pub channel_title: String,
+}

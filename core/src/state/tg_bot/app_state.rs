@@ -4,6 +4,7 @@ use crate::models::tg_bot::groot_bot::groot_bot::{ChatMessageStats, ResourcesDia
 use crate::models::tg_bot::groot_bot::groot_bot::{MessageCounts, MessageReports};
 use crate::models::tg_bot::the_viper_room_bot::podcast_manager::PodcastManager;
 use crate::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
+use crate::models::the_viper_room::db_models::PendingChannel;
 use crate::utils::tg_bot::groot_bot::subscription_utils::PaymentProcess;
 use crate::utils::tg_bot::tg_bot::is_localdb_implemented;
 use crate::utils::uniframe_studio::heleket_client::{HeleketClient, HeleketConfig};
@@ -31,6 +32,7 @@ pub struct BotAppState {
     pub db_pool: Option<Arc<SqlitePool>>,
     pub heleket_client: Option<HeleketClient>,
     pub the_viper_room_bot_user_states: Option<Mutex<HashMap<u64, TheViperRoomBotUserState>>>,
+    pub the_viper_room_bot_pending_channels: Option<Mutex<HashMap<u64, Vec<PendingChannel>>>>,
 }
 
 impl BotAppState {
@@ -54,6 +56,13 @@ impl BotAppState {
             None
         };
 
+        // Initialize The Viper Room Bot pending channels storage if this is The Viper Room Bot
+        let the_viper_room_bot_pending_channels = if matches!(app_name, AppName::TheViperRoomBot) {
+            Some(Mutex::new(HashMap::new()))
+        } else {
+            None
+        };
+
         Ok(Self {
             llm_client,
             podcast_manager,
@@ -68,6 +77,7 @@ impl BotAppState {
             db_pool,
             heleket_client: None,
             the_viper_room_bot_user_states,
+            the_viper_room_bot_pending_channels,
         })
     }
 
@@ -123,6 +133,7 @@ impl BotAppState {
             db_pool,
             heleket_client,
             the_viper_room_bot_user_states: None,
+            the_viper_room_bot_pending_channels: None,
         })
     }
 }

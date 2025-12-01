@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use anyhow::Result;
 use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
+use core::local_db::the_viper_room::channel_management;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::TheViperRoomBotMessages;
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
@@ -13,6 +14,7 @@ use core::utils::the_viper_room::news_block_creation_utils::{
 };
 use grammers_client::types::{attributes::Attribute, InputMessage};
 use grammers_client::Client as g_Client;
+use teloxide::types::{ChatKind, PublicChatKind};
 use std::fs::{read_dir, read_to_string, remove_file};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -297,6 +299,213 @@ pub async fn send_settings_menu(
         .await?;
 
     Ok(())
+}
+
+/// Sends the channels management menu with inline keyboard buttons
+/// Sets user state to ChannelsMenuView
+pub async fn send_channels_menu(
+    bot: &Bot,
+    user_id: UserId,
+    chat_id: ChatId,
+    app_state: &Arc<BotAppState>,
+) -> Result<()> {
+    // Set user state to ChannelsMenuView
+    if let Some(states) = &app_state.the_viper_room_bot_user_states {
+        let mut states_lock = states.lock().await;
+        states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsMenuView);
+    }
+
+    let channels_text = "📋 Управление каналами\n\nВыберите действие:";
+
+    let inline_keyboard = InlineKeyboardMarkup::new(vec![
+        vec![InlineKeyboardButton::callback(
+            "📋 Показать мои каналы",
+            "channels_show_list",
+        )],
+        vec![InlineKeyboardButton::callback(
+            "➕ Добавить канал",
+            "channels_add",
+        )],
+        vec![InlineKeyboardButton::callback(
+            "➖ Удалить канал",
+            "channels_delete",
+        )],
+        vec![InlineKeyboardButton::callback(
+            "« Назад в настройки",
+            "back_to_settings",
+        )],
+        vec![InlineKeyboardButton::callback(
+            "« Выйти в главное меню",
+            "back_to_main_menu",
+        )],
+    ]);
+
+    bot.send_message(chat_id, channels_text)
+        .reply_markup(inline_keyboard)
+        .await?;
+
+    Ok(())
+}
+
+/// Shows the list of user's channels from database
+pub async fn show_user_channels(
+    bot: &Bot,
+    user_id: UserId,
+    chat_id: ChatId,
+    app_state: &Arc<BotAppState>,
+) -> Result<()> {
+    // Get database pool
+    let db_pool = match &app_state.db_pool {
+        Some(pool) => pool,
+        None => {
+            bot.send_message(chat_id, "Ошибка: база данных недоступна")
+                .await?;
+            return Ok(());
+        }
+    };
+
+    // Fetch user channels from database
+    let user_id_i64 = user_id.0 as i64;
+    let channels = channel_management::get_user_channels(db_pool.as_ref(), user_id_i64).await?;
+
+    // Format message
+    let message = if channels.is_empty() {
+        "📋 Ваш список каналов пуст\n\nДобавьте каналы для персонального подкаста."
+    } else {
+        // Build channels list
+        let channels_list = channels
+            .iter()
+            .enumerate()
+            .map(|(i, ch)| format!("{}. {} (ID: {})", i + 1, ch.channel_title, ch.channel_id))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        &format!("📋 Ваши каналы:\n\n{}", channels_list)
+    };
+
+    // Send back to channels menu after showing the list
+    let inline_keyboard = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
+        "« Назад в управление каналами",
+        "back_to_channels_menu",
+    )]]);
+
+    bot.send_message(chat_id, message)
+        .reply_markup(inline_keyboard)
+        .await?;
+
+    Ok(())
+}
+
+/// Prompts user to add channels by sending instruction and reply keyboard
+/// Sets user state to ChannelsAdding and clears pending channels list
+pub async fn send_add_channel_prompt(
+    bot: &Bot,
+    user_id: UserId,
+    chat_id: ChatId,
+    app_state: &Arc<BotAppState>,
+) -> Result<()> {
+    // Set user state to ChannelsAdding
+    if let Some(states) = &app_state.the_viper_room_bot_user_states {
+        let mut states_lock = states.lock().await;
+        states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsAdding);
+    }
+
+    // Clear pending channels for this user (start fresh)
+    if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
+        let mut pending_lock = pending.lock().await;
+        pending_lock.insert(user_id.0, Vec::new());
+    }
+
+    // TODO: Replace with get_message() when message is added to system messages
+    let instruction_text = "➕ Добавление каналов\n\nИнструкция по добавлению канала";
+
+    // Send reply keyboard with save/exit buttons
+    let keyboard = KeyboardMarkup::new(vec![
+        vec![KeyboardButton::new("💾 Сохранить")],
+        vec![KeyboardButton::new("🏠 Выйти в главное меню")],
+    ])
+    .resize_keyboard()
+    .one_time_keyboard();
+
+    bot.send_message(chat_id, instruction_text)
+        .reply_markup(keyboard)
+        .await?;
+
+    Ok(())
+}
+
+/// Represents parsed channel input from user
+pub enum ChannelInput {
+    /// Channel forwarded from a post - contains (channel_id, channel_title)
+    Forwarded(i64, String),
+    /// Text input with channel usernames (without @)
+    Usernames(Vec<String>),
+}
+
+/// Parses user input to extract channel information
+/// Supports: forwarded posts from channels, @username, username, comma-separated usernames
+pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInput> {
+    // Check if message is forwarded from a channel
+    if let Some(forward) = &msg.forward_from_chat() {
+        // Check that it's a channel (not group or private chat)
+        match &forward.kind {
+            ChatKind::Public(public_chat) => {
+                // Check if it's a channel (not a group/supergroup)
+                match &public_chat.kind {
+                    PublicChatKind::Channel(_) => {
+                        let channel_id = forward.id.0;
+                        let channel_title = forward.title().unwrap_or("Unknown Channel").to_string();
+                        return Ok(ChannelInput::Forwarded(channel_id, channel_title));
+                    }
+                    _ => {
+                        return Err(anyhow!(
+                            "Источник сообщения не подходит для обработки. Пожалуйста, перешлите сообщение из канала, а не из группы."
+                        ));
+                    }
+                }
+            }
+            ChatKind::Private(_) => {
+                return Err(anyhow!(
+                    "Источник сообщения не подходит для обработки. Пожалуйста, перешлите сообщение из канала."
+                ));
+            }
+        }
+    }
+
+    // Check if message contains text input with channel username(s)
+    if let Some(text) = msg.text() {
+        let text = text.trim();
+        if text.is_empty() {
+            return Err(anyhow!("Пустое сообщение. Отправьте username канала."));
+        }
+
+        // Parse comma-separated usernames
+        let usernames: Vec<String> = text
+            .split(',')
+            .map(|s| {
+                let trimmed = s.trim();
+                // Remove @ if present
+                if trimmed.starts_with('@') {
+                    trimmed[1..].to_string()
+                } else {
+                    trimmed.to_string()
+                }
+            })
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        if usernames.is_empty() {
+            return Err(anyhow!(
+                "Не удалось извлечь username каналов. Пример: @channelname или channelname1, channelname2"
+            ));
+        }
+
+        return Ok(ChannelInput::Usernames(usernames));
+    }
+
+    Err(anyhow!(
+        "Неподдерживаемый тип сообщения. Отправьте username канала или перешлите пост из канала."
+    ))
 }
 
 pub(crate) async fn send_actual_daily_public_podcast(bot: Bot, chat_id: ChatId) -> Result<()> {
