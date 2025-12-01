@@ -275,7 +275,7 @@ pub async fn send_settings_menu(
         states_lock.insert(user_id.0, TheViperRoomBotUserState::InSettingsMenu);
     }
 
-    let settings_text = "⚙️ Настройки";
+    let settings_text = "⚙️ Настройки:";
 
     let inline_keyboard = InlineKeyboardMarkup::new(vec![
         vec![InlineKeyboardButton::callback(
@@ -315,11 +315,11 @@ pub async fn send_channels_menu(
         states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsMenuView);
     }
 
-    let channels_text = "📋 Управление каналами\n\nВыберите действие:";
+    let channels_text = "📋 Управление каналами:";
 
     let inline_keyboard = InlineKeyboardMarkup::new(vec![
         vec![InlineKeyboardButton::callback(
-            "📋 Показать мои каналы",
+            "👁 Показать мои каналы",
             "channels_show_list",
         )],
         vec![InlineKeyboardButton::callback(

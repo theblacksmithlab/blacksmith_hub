@@ -82,7 +82,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
     // Check if user is in settings menu and sent text instead of using buttons
     if current_state.is_in_settings() && !current_state.expects_text_input() {
-        let warning_msg = "Вы находитесь в меню настроек. Пожалуйста, выберите действие с помощью кнопок или вернитесь в главное меню.";
+        let warning_msg = "Вы находитесь в меню настроек. Пожалуйста, выберите действие с помощью кнопок или вернитесь в главное меню, вызвав команду /menu.";
         bot.send_message(chat_id, warning_msg).await?;
         return Ok(());
     }
@@ -455,6 +455,15 @@ pub(crate) async fn the_viper_room_command_handler(
                 .parse_mode(ParseMode::Html)
                 .reply_markup(keyboard)
                 .await?;
+        }
+
+        TheViperRoomBotCommands::Menu => {
+            info!(
+                "User: {} [{}] executed {:?} cmd in private chat",
+                username, user_id, cmd
+            );
+
+            send_main_menu(&bot, user_id, chat_id, &app_state).await?;
         }
 
         TheViperRoomBotCommands::Podcast if user_id.0 == lord_admin_id => {
