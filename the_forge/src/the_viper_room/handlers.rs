@@ -1,8 +1,8 @@
 use crate::the_viper_room::local_utils::{generate_user_system_nickname, get_user_system_nickname};
 use axum::extract::State;
 use axum::Json;
-use core::models::the_viper_room::the_viper_room::AuthStage::MiniAppInitConfirmed;
-use core::models::the_viper_room::the_viper_room::{
+use core::models::the_viper_room::the_viper_room_web_ui::AuthStage::MiniAppInitConfirmed;
+use core::models::the_viper_room::the_viper_room_web_ui::{
     ActionStep, AuthStage, TheViperRoomServerResponse, TheViperRoomUserAction,
 };
 use core::state::the_viper_room::app_state::TheViperRoomAppState;

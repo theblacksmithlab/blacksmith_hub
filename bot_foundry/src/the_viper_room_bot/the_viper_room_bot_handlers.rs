@@ -1,11 +1,13 @@
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     generate_podcast, schedule_podcast, send_actual_daily_public_podcast, send_main_menu,
-    stop_daily_podcasts,
+    send_settings_menu, stop_daily_podcasts,
 };
 use anyhow::Result;
+use core::local_db::the_viper_room::user_management;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::{CommonMessages, TheViperRoomBotMessages};
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
+use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
 use core::state::tg_bot::app_state::BotAppState;
 use core::telegram_client::grammers_functionality::initialize_grammers_client;
 use core::utils::common::get_message;
@@ -24,7 +26,11 @@ use teloxide_core::types::{CallbackQuery, InlineKeyboardButton, InlineKeyboardMa
 use tracing::info;
 use tracing::log::warn;
 
-pub(crate) async fn the_viper_room_message_handler(bot: Bot, msg: Message) -> Result<()> {
+pub(crate) async fn the_viper_room_message_handler(
+    bot: Bot,
+    msg: Message,
+    app_state: Arc<BotAppState>,
+) -> Result<()> {
     if check_username_from_message(&bot, &msg).await == false {
         return Ok(());
     }
@@ -62,9 +68,26 @@ pub(crate) async fn the_viper_room_message_handler(bot: Bot, msg: Message) -> Re
         return Ok(());
     }
 
+    let current_state = if let Some(states) = &app_state.the_viper_room_bot_user_states {
+        let states_lock = states.lock().await;
+        states_lock
+            .get(&user_id.0)
+            .cloned()
+            .unwrap_or(TheViperRoomBotUserState::Idle)
+    } else {
+        TheViperRoomBotUserState::Idle
+    };
+
+    // Check if user is in settings menu and sent text instead of using buttons
+    if current_state.is_in_settings() && !current_state.expects_text_input() {
+        let warning_msg = "Вы находитесь в меню настроек. Пожалуйста, выберите действие с помощью кнопок или вернитесь в главное меню.";
+        bot.send_message(chat_id, warning_msg).await?;
+        return Ok(());
+    }
+
     match msg_text {
         "🏠 Главное меню" => {
-            send_main_menu(&bot, user_id, chat_id).await?;
+            send_main_menu(&bot, user_id, chat_id, &app_state).await?;
             Ok(())
         }
         "❓ Задать вопрос" => {
@@ -104,9 +127,7 @@ pub(crate) async fn the_viper_room_message_handler(bot: Bot, msg: Message) -> Re
             Ok(())
         }
         "⚙️ Настройки" => {
-            let temp_message = "Пока нечего настраивать)".to_string();
-            bot.send_message(chat_id, temp_message).await?;
-
+            send_settings_menu(&bot, user_id, chat_id, &app_state).await?;
             Ok(())
         }
         _ => {
@@ -199,6 +220,19 @@ pub(crate) async fn the_viper_room_command_handler(
                 "User: {} [{}] executed {:?} cmd in private chat",
                 username, user_id, cmd
             );
+
+            // Register or update user in database
+            if let Some(db_pool) = &app_state.db_pool {
+                let user_id_i64 = user_id.0 as i64;
+                user_management::create_or_update_user(
+                    db_pool.as_ref(),
+                    user_id_i64,
+                    Some(&username),
+                )
+                .await?;
+                info!("User {} [{}] registered/updated in database", username, user_id);
+            }
+
             let welcome_text_template = get_message(AppsSystemMessages::TheViperRoomBot(
                 TheViperRoomBotMessages::StartMessage,
             ))
@@ -291,6 +325,7 @@ pub(crate) async fn the_viper_room_command_handler(
 pub(crate) async fn the_viper_room_bor_callback_query_handler(
     bot: Bot,
     q: CallbackQuery,
+    app_state: Arc<BotAppState>,
 ) -> Result<()> {
     let user = &q.from;
     let chat_id = match &q.message {
@@ -321,7 +356,41 @@ pub(crate) async fn the_viper_room_bor_callback_query_handler(
 
     match q.data.as_deref() {
         Some("back_to_main_menu") => {
-            send_main_menu(&bot, user_id, chat_id).await?;
+            send_main_menu(&bot, user_id, chat_id, &app_state).await?;
+
+            if let Err(e) = bot.delete_message(chat_id, callback_query_message).await {
+                warn!("Failed to delete QUERY origin message: {}", e);
+            }
+
+            bot.answer_callback_query(q.id).await?;
+        }
+        Some("settings_my_channels") => {
+            // Set user state to ChannelsMenuView
+            if let Some(states) = &app_state.the_viper_room_bot_user_states {
+                let mut states_lock = states.lock().await;
+                states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsMenuView);
+            }
+
+            // TODO: Implement channels menu display
+            let temp_msg = "📋 Мои каналы\n\nУправление вашими каналами в разработке.";
+            bot.send_message(chat_id, temp_msg).await?;
+
+            if let Err(e) = bot.delete_message(chat_id, callback_query_message).await {
+                warn!("Failed to delete QUERY origin message: {}", e);
+            }
+
+            bot.answer_callback_query(q.id).await?;
+        }
+        Some("settings_podcast_time") => {
+            // Set user state to PodcastTimeMenuView
+            if let Some(states) = &app_state.the_viper_room_bot_user_states {
+                let mut states_lock = states.lock().await;
+                states_lock.insert(user_id.0, TheViperRoomBotUserState::PodcastTimeMenuView);
+            }
+
+            // TODO: Implement podcast time configuration
+            let temp_msg = "⏰ Время отправки подкаста\n\nНастройка времени отправки в разработке.";
+            bot.send_message(chat_id, temp_msg).await?;
 
             if let Err(e) = bot.delete_message(chat_id, callback_query_message).await {
                 warn!("Failed to delete QUERY origin message: {}", e);

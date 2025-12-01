@@ -3,6 +3,7 @@ use anyhow::Result;
 use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::TheViperRoomBotMessages;
+use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
 use core::state::tg_bot::app_state::BotAppState;
 use core::telegram_client::grammers_functionality::initialize_grammers_client;
 use core::utils::common::get_message;
@@ -18,8 +19,16 @@ use std::sync::Arc;
 use std::time::Duration;
 use teloxide::prelude::{ChatId, Requester};
 use teloxide::Bot;
-use teloxide_core::payloads::{SendAudioSetters, SendMessageSetters};
-use teloxide_core::types::{InputFile, KeyboardButton, KeyboardMarkup, UserId};
+use teloxide_core::payloads::{EditMessageReplyMarkupSetters, SendAudioSetters, SendMessageSetters};
+use teloxide_core::types::{
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputFile,
+    KeyboardButton,
+    KeyboardMarkup,
+    KeyboardRemove,
+    UserId
+};
 use tokio::time;
 use tokio::time::Instant;
 use tracing::error;
@@ -211,7 +220,19 @@ pub async fn stop_daily_podcasts(app_state: Arc<BotAppState>) -> Result<()> {
     Ok(())
 }
 
-pub async fn send_main_menu(bot: &Bot, _user_id: UserId, chat_id: ChatId) -> Result<()> {
+/// Sends the main menu and resets user state to Idle
+pub async fn send_main_menu(
+    bot: &Bot,
+    user_id: UserId,
+    chat_id: ChatId,
+    app_state: &Arc<BotAppState>,
+) -> Result<()> {
+    // Reset user state to Idle when returning to main menu
+    if let Some(states) = &app_state.the_viper_room_bot_user_states {
+        let mut states_lock = states.lock().await;
+        states_lock.insert(user_id.0, TheViperRoomBotUserState::Idle);
+    }
+
     let main_menu_text = get_message(AppsSystemMessages::TheViperRoomBot(
         TheViperRoomBotMessages::MainMenu,
     ))
@@ -232,6 +253,51 @@ pub async fn send_main_menu(bot: &Bot, _user_id: UserId, chat_id: ChatId) -> Res
 
     bot.send_message(chat_id, main_menu_text)
         .reply_markup(keyboard)
+        .await?;
+
+    Ok(())
+}
+
+/// Sends the settings menu with inline keyboard buttons
+/// Hides the reply keyboard to avoid distracting the user
+/// Sets user state to InSettingsMenu
+pub async fn send_settings_menu(
+    bot: &Bot,
+    user_id: UserId,
+    chat_id: ChatId,
+    app_state: &Arc<BotAppState>,
+) -> Result<()> {
+    // Set user state to InSettingsMenu
+    if let Some(states) = &app_state.the_viper_room_bot_user_states {
+        let mut states_lock = states.lock().await;
+        states_lock.insert(user_id.0, TheViperRoomBotUserState::InSettingsMenu);
+    }
+
+    let settings_text = "⚙️ Настройки\n\nВыберите действие:";
+
+    let inline_keyboard = InlineKeyboardMarkup::new(vec![
+        vec![InlineKeyboardButton::callback(
+            "📋 Мои каналы",
+            "settings_my_channels",
+        )],
+        vec![InlineKeyboardButton::callback(
+            "⏰ Время отправки подкаста",
+            "settings_podcast_time",
+        )],
+        vec![InlineKeyboardButton::callback(
+            "« Выйти в Главное меню",
+            "back_to_main_menu",
+        )],
+    ]);
+
+    // Hide the reply keyboard first with a message
+    let msg = bot.send_message(chat_id, settings_text)
+        .reply_markup(KeyboardRemove::new())
+        .await?;
+
+    // Edit the message to add inline keyboard
+    bot.edit_message_reply_markup(chat_id, msg.id)
+        .reply_markup(inline_keyboard)
         .await?;
 
     Ok(())

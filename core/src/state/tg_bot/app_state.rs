@@ -3,6 +3,7 @@ use crate::models::common::dialogue_cache::DialogueCache;
 use crate::models::tg_bot::groot_bot::groot_bot::{ChatMessageStats, ResourcesDialogState};
 use crate::models::tg_bot::groot_bot::groot_bot::{MessageCounts, MessageReports};
 use crate::models::tg_bot::the_viper_room_bot::podcast_manager::PodcastManager;
+use crate::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
 use crate::utils::tg_bot::groot_bot::subscription_utils::PaymentProcess;
 use crate::utils::tg_bot::tg_bot::is_localdb_implemented;
 use crate::utils::uniframe_studio::heleket_client::{HeleketClient, HeleketConfig};
@@ -29,6 +30,7 @@ pub struct BotAppState {
     pub message_reports: Option<Arc<Mutex<MessageReports>>>,
     pub db_pool: Option<Arc<SqlitePool>>,
     pub heleket_client: Option<HeleketClient>,
+    pub the_viper_room_bot_user_states: Option<Mutex<HashMap<u64, TheViperRoomBotUserState>>>,
 }
 
 impl BotAppState {
@@ -41,6 +43,13 @@ impl BotAppState {
         let temp_cache = Mutex::new(HashMap::new());
         let db_pool = if is_localdb_implemented(&app_name) {
             Some(Arc::new(setup_app_db_pool(&app_name).await?))
+        } else {
+            None
+        };
+
+        // Initialize The Viper Room Bot user states if this is The Viper Room Bot
+        let the_viper_room_bot_user_states = if matches!(app_name, AppName::TheViperRoomBot) {
+            Some(Mutex::new(HashMap::new()))
         } else {
             None
         };
@@ -58,6 +67,7 @@ impl BotAppState {
             message_reports: None,
             db_pool,
             heleket_client: None,
+            the_viper_room_bot_user_states,
         })
     }
 
@@ -112,6 +122,7 @@ impl BotAppState {
             message_reports: Some(message_reports),
             db_pool,
             heleket_client,
+            the_viper_room_bot_user_states: None,
         })
     }
 }

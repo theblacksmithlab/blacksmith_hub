@@ -1,4 +1,3 @@
-use crate::models::common::ai::LlmModel;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::split_text_into_chunks;
 use anyhow::anyhow;
