@@ -249,7 +249,8 @@ pub(crate) async fn the_viper_room_command_handler(
                 vec![KeyboardButton::new("❓ Задать вопрос")
                 ]
             ])
-            .resize_keyboard();
+            .resize_keyboard()
+            .one_time_keyboard();
 
             bot.send_photo(chat_id, InputFile::file(photo_path))
                 .caption(welcome_text)

@@ -248,7 +248,8 @@ pub async fn send_main_menu(
             KeyboardButton::new("⚙️ Настройки"),
         ],
     ])
-    .resize_keyboard();
+    .resize_keyboard()
+    .one_time_keyboard();
 
     bot.send_message(chat_id, main_menu_text)
         .reply_markup(keyboard)
@@ -272,7 +273,7 @@ pub async fn send_settings_menu(
         states_lock.insert(user_id.0, TheViperRoomBotUserState::InSettingsMenu);
     }
 
-    let settings_text = "⚙️ Настройки\n\nВыберите действие:";
+    let settings_text = "⚙️ Настройки";
 
     let inline_keyboard = InlineKeyboardMarkup::new(vec![
         vec![InlineKeyboardButton::callback(
