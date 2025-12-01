@@ -1,4 +1,3 @@
-use crate::local_db::tg_bot::tg_bot_local_db::setup_localdb_pool;
 use crate::models::common::app_name::AppName;
 use crate::models::tg_agent::agent_davon::ChatMessageStats;
 use anyhow::Result;
@@ -7,6 +6,7 @@ use async_openai::Client as LLM_Client;
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use crate::local_db::local_db::setup_app_db_pool;
 
 pub struct AgentAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,
@@ -17,7 +17,7 @@ pub struct AgentAppState {
 
 impl AgentAppState {
     pub async fn new(llm_client: LLM_Client<OpenAIConfig>, app_name: AppName) -> Result<Self> {
-        let db_pool = Arc::new(setup_localdb_pool(&app_name).await?);
+        let db_pool = Arc::new(setup_app_db_pool(&app_name).await?);
 
         Ok(Self {
             llm_client,

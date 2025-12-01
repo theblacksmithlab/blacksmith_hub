@@ -253,7 +253,7 @@ pub async fn get_block_recommendation<T: OpenAIClientInit + QdrantClientInit + S
     );
 
     let result =
-        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::ComplexMini)
+        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light)
             .await?;
 
     let parsed_json: Value = serde_json::from_str(&result)?;

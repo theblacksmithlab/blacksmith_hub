@@ -1,4 +1,3 @@
-use crate::local_db::tg_bot::tg_bot_local_db::setup_localdb_pool;
 use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::models::tg_bot::groot_bot::groot_bot::{ChatMessageStats, ResourcesDialogState};
@@ -15,6 +14,7 @@ use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use crate::local_db::local_db::setup_app_db_pool;
 
 pub struct BotAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,
@@ -40,7 +40,7 @@ impl BotAppState {
         let podcast_manager = Arc::new(PodcastManager::new());
         let temp_cache = Mutex::new(HashMap::new());
         let db_pool = if is_localdb_implemented(&app_name) {
-            Some(Arc::new(setup_localdb_pool(&app_name).await?))
+            Some(Arc::new(setup_app_db_pool(&app_name).await?))
         } else {
             None
         };
@@ -92,7 +92,7 @@ impl BotAppState {
         ));
 
         let db_pool = if is_localdb_implemented(&app_name) {
-            Some(Arc::new(setup_localdb_pool(&app_name).await?))
+            Some(Arc::new(setup_app_db_pool(&app_name).await?))
         } else {
             None
         };

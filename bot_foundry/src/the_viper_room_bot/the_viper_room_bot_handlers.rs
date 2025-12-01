@@ -83,11 +83,12 @@ pub(crate) async fn the_viper_room_message_handler(bot: Bot, msg: Message) -> Re
                 )],
             ]);
 
-            let message_text = "❓ Как мы можем помочь?\n\n\
-                       • Задайте вопрос в чате поддержки\n\
-                       • Изучите часто задаваемые вопросы";
+            let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
+                TheViperRoomBotMessages::SupportMessage,
+            ))
+                .await?;
 
-            bot.send_message(chat_id, message_text)
+            bot.send_message(chat_id, bot_system_message)
                 .reply_markup(keyboard)
                 .await?;
             Ok(())

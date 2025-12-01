@@ -2,9 +2,9 @@ use crate::groot_bot::chat_moderation::chat_moderation;
 use crate::groot_bot::chat_moderation_utils::handle_groot_report;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use core::local_db::tg_bot::groot_bot::subscription_management::check_chat_payment;
-use core::local_db::tg_bot::groot_bot::subscription_management::create_subscription;
-use core::local_db::tg_bot::groot_bot::subscription_management::get_subscription_info;
+use core::local_db::telegram::groot_bot::subscription_management::check_chat_payment;
+use core::local_db::telegram::groot_bot::subscription_management::create_subscription;
+use core::local_db::telegram::groot_bot::subscription_management::get_subscription_info;
 use core::models::common::system_messages::{
     AgentDavonMessages, AppsSystemMessages, GrootBotMessages,
 };

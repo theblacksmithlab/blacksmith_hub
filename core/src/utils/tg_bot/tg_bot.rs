@@ -43,31 +43,11 @@ pub async fn check_username_from_user(bot: &Bot, user: &User, chat_id: ChatId) -
     } else {
         let error_message = "Извините, но для использования приложения необходимо установить username в Telegram.\n\
                             Пожалуйста, установите username в настройках что бы получить доступ к приложению";
+        
         let _ = bot.send_message(chat_id, error_message).await;
         false
     }
 }
-
-// pub fn get_username_from_message(msg: &Message) -> String {
-//     msg.from
-//         .as_ref()
-//         .map(|user| {
-//             if let Some(username) = &user.username {
-//                 return username.to_string();
-//             }
-//
-//             let first_name = user.first_name.trim();
-//             let last_name = user.last_name.as_deref().unwrap_or("").trim();
-//
-//             match (first_name.is_empty(), last_name.is_empty()) {
-//                 (false, false) => format!("{} {}", first_name, last_name),
-//                 (false, true) => first_name.to_string(),
-//                 (true, false) => last_name.to_string(),
-//                 (true, true) => "mommy's_anon".to_string(),
-//             }
-//         })
-//         .unwrap_or_else(|| "mommy's_anon".to_string())
-// }
 
 pub fn get_username_from_message(msg: &Message) -> String {
     msg.from
@@ -336,5 +316,5 @@ pub fn create_app_tmp_dir(app_name: &AppName) -> std::io::Result<()> {
 }
 
 pub fn is_localdb_implemented(app_name: &AppName) -> bool {
-    matches!(app_name, AppName::GrootBot)
+    matches!(app_name, AppName::GrootBot | AppName::TheViperRoomBot | AppName::TheViperRoom)
 }

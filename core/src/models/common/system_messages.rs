@@ -106,6 +106,7 @@ pub enum CommonMessages {
     GlobalErrorProcessingVoiceMessage,
     InvalidRequestContent,
     PrivateCmdUsedInPublicChat,
+    NoUsernameWarning,
 }
 
 impl CommonMessages {
@@ -124,6 +125,7 @@ impl CommonMessages {
             }
             CommonMessages::InvalidRequestContent => "invalid_request_content",
             CommonMessages::PrivateCmdUsedInPublicChat => "private_cmd_used_in_public_chat",
+            CommonMessages::NoUsernameWarning => "no_username_warning",
         }
     }
 }
@@ -197,6 +199,7 @@ pub enum TheViperRoomBotMessages {
     FAQ,
     MainMenu,
     UnexpectedMessage,
+    SupportMessage
 }
 
 impl TheViperRoomBotMessages {
@@ -211,6 +214,7 @@ impl TheViperRoomBotMessages {
             TheViperRoomBotMessages::FAQ => "faq",
             TheViperRoomBotMessages::MainMenu => "main_menu_text",
             TheViperRoomBotMessages::UnexpectedMessage => "unexpected_message",
+            TheViperRoomBotMessages::SupportMessage => "support_message"
         }
     }
 }

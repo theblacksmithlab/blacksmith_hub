@@ -6,7 +6,8 @@ use anyhow::Result;
 use async_openai::Client as LLM_Client;
 use axum::routing::{get, post};
 use axum::Router;
-use core::local_db::local_db::setup_blacksmith_lab_db;
+use core::local_db::local_db::setup_app_db_pool;
+use core::models::common::app_name::AppName;
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use core::state::server_common::app_state::ServerAppState;
 use core::utils::server::server::start_server;
@@ -25,7 +26,7 @@ pub async fn start_blacksmith_web_server(server_app_state: Arc<ServerAppState>) 
 
     let llm_client = LLM_Client::new();
 
-    let blacksmith_lab_db_pool = setup_blacksmith_lab_db().await?;
+    let blacksmith_lab_db_pool = setup_app_db_pool(&AppName::BlacksmithWeb).await?;
 
     let blacksmith_web_app_state = Arc::new(BlacksmithWebAppState::new(
         llm_client,

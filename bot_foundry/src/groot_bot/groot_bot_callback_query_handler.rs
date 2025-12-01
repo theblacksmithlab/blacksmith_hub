@@ -1,5 +1,5 @@
 use anyhow::Result;
-use core::local_db::tg_bot::groot_bot::subscription_management::{
+use core::local_db::telegram::groot_bot::subscription_management::{
     create_subscription, has_active_subscription_for_other_chats,
 };
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
