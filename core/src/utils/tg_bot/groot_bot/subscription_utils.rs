@@ -1,3 +1,4 @@
+use crate::local_db::telegram::groot_bot::subscription_management::has_active_subscription_for_other_chats;
 use crate::state::tg_bot::app_state::BotAppState;
 use crate::utils::uniframe_studio::heleket_client::InvoiceResult;
 use anyhow::Result;
@@ -8,7 +9,6 @@ use teloxide::prelude::Requester;
 use teloxide::types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup};
 use teloxide::Bot;
 use url::Url;
-use crate::local_db::telegram::groot_bot::subscription_management::has_active_subscription_for_other_chats;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SubscriptionState {

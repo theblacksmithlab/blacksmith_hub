@@ -22,8 +22,8 @@ pub async fn setup_app_db_pool(app_name: &AppName) -> anyhow::Result<SqlitePool>
         }
     };
 
-    let database_url = env::var(env_var_name)
-        .with_context(|| format!("Error: {} must be set", env_var_name))?;
+    let database_url =
+        env::var(env_var_name).with_context(|| format!("Error: {} must be set", env_var_name))?;
 
     let db_path = match app_name {
         AppName::BlacksmithWeb | AppName::W3AWeb => "common_res/local_db/blacksmith_lab.db",
@@ -36,8 +36,9 @@ pub async fn setup_app_db_pool(app_name: &AppName) -> anyhow::Result<SqlitePool>
     if !Path::new(db_path).exists() {
         if let Some(parent) = Path::new(db_path).parent() {
             if !parent.exists() {
-                fs::create_dir_all(parent)
-                    .with_context(|| format!("Error creating directory for {} DB", app_name.as_str()))?;
+                fs::create_dir_all(parent).with_context(|| {
+                    format!("Error creating directory for {} DB", app_name.as_str())
+                })?;
             }
         }
         fs::File::create(db_path)

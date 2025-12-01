@@ -14,26 +14,28 @@ use core::utils::the_viper_room::news_block_creation_utils::{
 };
 use grammers_client::types::{attributes::Attribute, InputMessage};
 use grammers_client::Client as g_Client;
-use teloxide::types::{ChatKind, PublicChatKind};
 use std::fs::{read_dir, read_to_string, remove_file};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use teloxide::prelude::{ChatId, Requester};
+use teloxide::types::{ChatKind, PublicChatKind};
 use teloxide::Bot;
 use teloxide_core::payloads::{SendAudioSetters, SendMessageSetters};
 use teloxide_core::types::{
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    InputFile,
-    KeyboardButton,
-    KeyboardMarkup,
-    UserId
+    InlineKeyboardButton, InlineKeyboardMarkup, InputFile, KeyboardButton, KeyboardMarkup, UserId,
 };
 use tokio::time;
 use tokio::time::Instant;
 use tracing::error;
 use tracing::log::info;
+
+/// Type of message to display in main menu
+#[derive(Debug, Clone, Copy)]
+pub enum MainMenuMessageType {
+    Full,    // Full welcome message
+    Minimal, // Short message
+}
 
 pub async fn generate_podcast(
     g_client: g_Client,
@@ -56,14 +58,7 @@ pub async fn generate_podcast(
             .await?;
     }
 
-    let podcast = news_block_creation(
-        &g_client,
-        tg_agent_id,
-        app_state,
-        nickname,
-        true
-    )
-        .await?;
+    let podcast = news_block_creation(&g_client, tg_agent_id, app_state, nickname, true).await?;
 
     let uploaded_file = g_client.upload_file(&podcast).await?;
 
@@ -90,7 +85,7 @@ pub async fn generate_podcast(
 
     g_client.send_message(&chat, input_message).await?;
     g_client.send_message(&chat, podcast_caption).await?;
-    
+
     if let Err(e) = save_daily_public_podcast(&podcast, &podcast_caption_file).await {
         error!("Failed to save daily public podcast: {}", e);
     }
@@ -221,24 +216,32 @@ pub async fn stop_daily_podcasts(app_state: Arc<BotAppState>) -> Result<()> {
     Ok(())
 }
 
-/// Sends the main menu and resets user state to Idle
-/// Note: keyboard is NOT persistent - it will hide after button press
 pub async fn send_main_menu(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
     app_state: &Arc<BotAppState>,
+    message_type: MainMenuMessageType,
 ) -> Result<()> {
-    // Reset user state to Idle when returning to main menu
     if let Some(states) = &app_state.the_viper_room_bot_user_states {
         let mut states_lock = states.lock().await;
         states_lock.insert(user_id.0, TheViperRoomBotUserState::Idle);
     }
 
-    let main_menu_text = get_message(AppsSystemMessages::TheViperRoomBot(
-        TheViperRoomBotMessages::MainMenu,
-    ))
-    .await?;
+    let main_menu_text = match message_type {
+        MainMenuMessageType::Full => {
+            get_message(AppsSystemMessages::TheViperRoomBot(
+                TheViperRoomBotMessages::MainMenu,
+            ))
+            .await?
+        }
+        MainMenuMessageType::Minimal => {
+            get_message(AppsSystemMessages::TheViperRoomBot(
+                TheViperRoomBotMessages::MainMenuMinimal,
+            ))
+            .await?
+        }
+    };
 
     let keyboard = KeyboardMarkup::new(vec![
         vec![
@@ -260,16 +263,12 @@ pub async fn send_main_menu(
     Ok(())
 }
 
-/// Sends the settings menu with inline keyboard buttons
-/// Sets user state to InSettingsMenu
-/// Note: reply keyboard will hide automatically after button press (not persistent)
 pub async fn send_settings_menu(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
     app_state: &Arc<BotAppState>,
 ) -> Result<()> {
-    // Set user state to InSettingsMenu
     if let Some(states) = &app_state.the_viper_room_bot_user_states {
         let mut states_lock = states.lock().await;
         states_lock.insert(user_id.0, TheViperRoomBotUserState::InSettingsMenu);
@@ -283,7 +282,7 @@ pub async fn send_settings_menu(
             "settings_my_channels",
         )],
         vec![InlineKeyboardButton::callback(
-            "⏰ Время отправки подкаста",
+            "⏰ Время подкаста",
             "settings_podcast_time",
         )],
         vec![InlineKeyboardButton::callback(
@@ -292,8 +291,6 @@ pub async fn send_settings_menu(
         )],
     ]);
 
-    // Send settings menu with inline keyboard
-    // Reply keyboard will hide automatically since it's not persistent
     bot.send_message(chat_id, settings_text)
         .reply_markup(inline_keyboard)
         .await?;
@@ -301,15 +298,12 @@ pub async fn send_settings_menu(
     Ok(())
 }
 
-/// Sends the channels management menu with inline keyboard buttons
-/// Sets user state to ChannelsMenuView
 pub async fn send_channels_menu(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
     app_state: &Arc<BotAppState>,
 ) -> Result<()> {
-    // Set user state to ChannelsMenuView
     if let Some(states) = &app_state.the_viper_room_bot_user_states {
         let mut states_lock = states.lock().await;
         states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsMenuView);
@@ -331,7 +325,7 @@ pub async fn send_channels_menu(
             "channels_delete",
         )],
         vec![InlineKeyboardButton::callback(
-            "« Назад в настройки",
+            "« Назад в Настройки",
             "back_to_settings",
         )],
         vec![InlineKeyboardButton::callback(
@@ -347,14 +341,12 @@ pub async fn send_channels_menu(
     Ok(())
 }
 
-/// Shows the list of user's channels from database
 pub async fn show_user_channels(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
     app_state: &Arc<BotAppState>,
 ) -> Result<()> {
-    // Get database pool
     let db_pool = match &app_state.db_pool {
         Some(pool) => pool,
         None => {
@@ -364,15 +356,12 @@ pub async fn show_user_channels(
         }
     };
 
-    // Fetch user channels from database
     let user_id_i64 = user_id.0 as i64;
     let channels = channel_management::get_user_channels(db_pool.as_ref(), user_id_i64).await?;
 
-    // Format message
     let message = if channels.is_empty() {
-        "📋 Ваш список каналов пуст\n\nДобавьте каналы для персонального подкаста."
+        "📋 Твой список каналов пуст\n\nСначала добавь каналы для персонального подкаста"
     } else {
-        // Build channels list
         let channels_list = channels
             .iter()
             .enumerate()
@@ -380,12 +369,11 @@ pub async fn show_user_channels(
             .collect::<Vec<_>>()
             .join("\n");
 
-        &format!("📋 Ваши каналы:\n\n{}", channels_list)
+        &format!("📋 Твои каналы:\n\n{}", channels_list)
     };
 
-    // Send back to channels menu after showing the list
     let inline_keyboard = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
-        "« Назад в управление каналами",
+        "« Назад к меню управления каналами",
         "back_to_channels_menu",
     )]]);
 
@@ -396,33 +384,30 @@ pub async fn show_user_channels(
     Ok(())
 }
 
-/// Prompts user to add channels by sending instruction and reply keyboard
-/// Sets user state to ChannelsAdding and clears pending channels list
 pub async fn send_add_channel_prompt(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
     app_state: &Arc<BotAppState>,
 ) -> Result<()> {
-    // Set user state to ChannelsAdding
     if let Some(states) = &app_state.the_viper_room_bot_user_states {
         let mut states_lock = states.lock().await;
         states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsAdding);
     }
 
-    // Clear pending channels for this user (start fresh)
     if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
         let mut pending_lock = pending.lock().await;
         pending_lock.insert(user_id.0, Vec::new());
     }
 
-    // TODO: Replace with get_message() when message is added to system messages
-    let instruction_text = "➕ Добавление каналов\n\nИнструкция по добавлению канала";
+    let instruction_text = get_message(AppsSystemMessages::TheViperRoomBot(
+        TheViperRoomBotMessages::ChannelAddingInstruction,
+    ))
+    .await?;
 
-    // Send reply keyboard with save/exit buttons
     let keyboard = KeyboardMarkup::new(vec![
         vec![KeyboardButton::new("💾 Сохранить")],
-        vec![KeyboardButton::new("🏠 Выйти в главное меню")],
+        vec![KeyboardButton::new("🏠 Главное меню")],
     ])
     .resize_keyboard()
     .one_time_keyboard();
@@ -454,7 +439,7 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
                 match &public_chat.kind {
                     PublicChatKind::Channel(_) => {
                         let channel_id = forward.id.0;
-                        let channel_title = forward.title().unwrap_or("Unknown Channel").to_string();
+                        let channel_title = forward.title().unwrap_or("Без названия").to_string();
                         return Ok(ChannelInput::Forwarded(channel_id, channel_title));
                     }
                     _ => {
@@ -472,19 +457,16 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
         }
     }
 
-    // Check if message contains text input with channel username(s)
     if let Some(text) = msg.text() {
         let text = text.trim();
         if text.is_empty() {
             return Err(anyhow!("Пустое сообщение. Отправьте username канала."));
         }
 
-        // Parse comma-separated usernames
         let usernames: Vec<String> = text
             .split(',')
             .map(|s| {
                 let trimmed = s.trim();
-                // Remove @ if present
                 if trimmed.starts_with('@') {
                     trimmed[1..].to_string()
                 } else {
@@ -496,7 +478,7 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
 
         if usernames.is_empty() {
             return Err(anyhow!(
-                "Не удалось извлечь username каналов. Пример: @channelname или channelname1, channelname2"
+                "Не удалось извлечь username каналов. Пример: \"@channelname\" или \"channelname1, channelname2\""
             ));
         }
 

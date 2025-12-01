@@ -1,3 +1,4 @@
+use crate::local_db::local_db::setup_app_db_pool;
 use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::models::tg_bot::groot_bot::groot_bot::{ChatMessageStats, ResourcesDialogState};
@@ -16,7 +17,6 @@ use sqlx::SqlitePool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::local_db::local_db::setup_app_db_pool;
 
 pub struct BotAppState {
     pub llm_client: LLM_Client<OpenAIConfig>,

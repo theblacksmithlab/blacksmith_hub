@@ -8,5 +8,5 @@ pub enum TheViperRoomBotCommands {
     Test,
     Schedule,
     Stop,
-    Menu
+    Menu,
 }

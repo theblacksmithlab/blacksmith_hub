@@ -199,7 +199,11 @@ pub enum TheViperRoomBotMessages {
     FAQ,
     MainMenu,
     UnexpectedMessage,
-    SupportMessage
+    SupportMessage,
+    MainMenuMinimal,
+    PublicPodcastSendingIntroMessage,
+    ChannelAddingInstruction,
+    SettingsMenuUnexpectedMessage,
 }
 
 impl TheViperRoomBotMessages {
@@ -212,9 +216,17 @@ impl TheViperRoomBotMessages {
             }
             TheViperRoomBotMessages::StartMessage => "start_message",
             TheViperRoomBotMessages::FAQ => "faq",
-            TheViperRoomBotMessages::MainMenu => "main_menu_text",
+            TheViperRoomBotMessages::MainMenu => "main_menu_text_full",
             TheViperRoomBotMessages::UnexpectedMessage => "unexpected_message",
-            TheViperRoomBotMessages::SupportMessage => "support_message"
+            TheViperRoomBotMessages::SupportMessage => "support_message",
+            TheViperRoomBotMessages::MainMenuMinimal => "main_menu_text_minimal",
+            TheViperRoomBotMessages::PublicPodcastSendingIntroMessage => {
+                "public_podcast_sending_intro_message"
+            }
+            TheViperRoomBotMessages::ChannelAddingInstruction => "channel_adding_instruction",
+            TheViperRoomBotMessages::SettingsMenuUnexpectedMessage => {
+                "settings_menu_unexpected_message"
+            }
         }
     }
 }

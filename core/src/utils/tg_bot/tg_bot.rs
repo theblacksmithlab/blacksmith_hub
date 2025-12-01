@@ -43,7 +43,7 @@ pub async fn check_username_from_user(bot: &Bot, user: &User, chat_id: ChatId) -
     } else {
         let error_message = "Извините, но для использования приложения необходимо установить username в Telegram.\n\
                             Пожалуйста, установите username в настройках что бы получить доступ к приложению";
-        
+
         let _ = bot.send_message(chat_id, error_message).await;
         false
     }

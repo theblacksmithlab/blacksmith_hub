@@ -3,10 +3,9 @@ use crate::groot_bot::groot_bot_handlers::{groot_bot_command_handler, groot_bot_
 use crate::probiot_bot::probiot_bot_handlers::{
     probiot_callback_query_handler, probiot_command_handler,
 };
-use crate::the_viper_room_bot::the_viper_room_bot_handlers::{
-    the_viper_room_bor_callback_query_handler, the_viper_room_command_handler,
-    the_viper_room_message_handler,
-};
+use crate::the_viper_room_bot::the_viper_room_bot_callback_query_handler::the_viper_room_bor_callback_query_handler;
+use crate::the_viper_room_bot::the_viper_room_bot_command_handler::the_viper_room_command_handler;
+use crate::the_viper_room_bot::the_viper_room_bot_message_handler::the_viper_room_message_handler;
 use anyhow::{anyhow, Result};
 use async_openai::Client as LLM_Client;
 use core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;

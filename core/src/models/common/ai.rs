@@ -23,10 +23,7 @@ impl LlmModel {
     }
 
     pub fn is_gpt5_model(&self) -> bool {
-        matches!(
-            self,
-            LlmModel::Complex | LlmModel::ComplexFast
-        )
+        matches!(self, LlmModel::Complex | LlmModel::ComplexFast)
     }
 
     pub fn reasoning_effort(&self) -> Option<ReasoningEffort> {
