@@ -117,13 +117,16 @@ pub(crate) async fn the_viper_room_message_handler(
             Ok(())
         }
         "🎙 Сегодняшний подкаст" => {
-            send_actual_daily_public_podcast(bot, chat_id).await?;
+            send_actual_daily_public_podcast(bot.clone(), chat_id).await?;
+            // Show main menu again after sending podcast
+            send_main_menu(&bot, user_id, chat_id, &app_state).await?;
             Ok(())
         }
         "🎧 Персональный подкаст" => {
             let temp_message = "Этот функционал пока в разработке".to_string();
             bot.send_message(chat_id, temp_message).await?;
-
+            // Show main menu again after message
+            send_main_menu(&bot, user_id, chat_id, &app_state).await?;
             Ok(())
         }
         "⚙️ Настройки" => {
@@ -246,8 +249,7 @@ pub(crate) async fn the_viper_room_command_handler(
                 vec![KeyboardButton::new("❓ Задать вопрос")
                 ]
             ])
-            .resize_keyboard()
-            .persistent();
+            .resize_keyboard();
 
             bot.send_photo(chat_id, InputFile::file(photo_path))
                 .caption(welcome_text)

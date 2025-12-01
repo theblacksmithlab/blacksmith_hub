@@ -19,14 +19,13 @@ use std::sync::Arc;
 use std::time::Duration;
 use teloxide::prelude::{ChatId, Requester};
 use teloxide::Bot;
-use teloxide_core::payloads::{EditMessageReplyMarkupSetters, SendAudioSetters, SendMessageSetters};
+use teloxide_core::payloads::{SendAudioSetters, SendMessageSetters};
 use teloxide_core::types::{
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     InputFile,
     KeyboardButton,
     KeyboardMarkup,
-    KeyboardRemove,
     UserId
 };
 use tokio::time;
@@ -221,6 +220,7 @@ pub async fn stop_daily_podcasts(app_state: Arc<BotAppState>) -> Result<()> {
 }
 
 /// Sends the main menu and resets user state to Idle
+/// Note: keyboard is NOT persistent - it will hide after button press
 pub async fn send_main_menu(
     bot: &Bot,
     user_id: UserId,
@@ -248,8 +248,7 @@ pub async fn send_main_menu(
             KeyboardButton::new("⚙️ Настройки"),
         ],
     ])
-    .resize_keyboard()
-    .persistent();
+    .resize_keyboard();
 
     bot.send_message(chat_id, main_menu_text)
         .reply_markup(keyboard)
@@ -259,8 +258,8 @@ pub async fn send_main_menu(
 }
 
 /// Sends the settings menu with inline keyboard buttons
-/// Hides the reply keyboard to avoid distracting the user
 /// Sets user state to InSettingsMenu
+/// Note: reply keyboard will hide automatically after button press (not persistent)
 pub async fn send_settings_menu(
     bot: &Bot,
     user_id: UserId,
@@ -290,13 +289,9 @@ pub async fn send_settings_menu(
         )],
     ]);
 
-    // Hide the reply keyboard first with a message
-    let msg = bot.send_message(chat_id, settings_text)
-        .reply_markup(KeyboardRemove::new())
-        .await?;
-
-    // Edit the message to add inline keyboard
-    bot.edit_message_reply_markup(chat_id, msg.id)
+    // Send settings menu with inline keyboard
+    // Reply keyboard will hide automatically since it's not persistent
+    bot.send_message(chat_id, settings_text)
         .reply_markup(inline_keyboard)
         .await?;
 
