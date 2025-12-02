@@ -26,6 +26,7 @@ use teloxide_core::payloads::SendMessageSetters;
 use teloxide_core::types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, ParseMode, UserId};
 use tracing::info;
 use tracing::log::warn;
+use grammers_client::types::Chat;
 
 const MAX_CHANNELS_PER_USER: usize = 10;
 
@@ -128,7 +129,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
                         return Ok(());
                     }
-                    Ok(ChannelInput::Usernames(usernames)) => {
+                    Ok(ChannelInput::Usernames(usernames, invalid_inputs)) => {
                         let tg_agent_id = Arc::new(
                             env::var("TG_AGENT_ID")
                                 .expect("TG_AGENT_ID must be set in environment"),
@@ -138,6 +139,7 @@ pub(crate) async fn the_viper_room_message_handler(
                             tg_agent_id
                         );
 
+                        // TODO: Exit to the main menu with state reset
                         if !Path::new(&session_path).exists() {
                             bot.send_message(chat_id, "❌ Ошибка: сессия Telegram не найдена")
                                 .await?;
@@ -153,13 +155,10 @@ pub(crate) async fn the_viper_room_message_handler(
                         for username in usernames {
                             match g_client.resolve_username(&username).await {
                                 Ok(Some(chat)) => {
-                                    use grammers_client::types::Chat;
-
                                     if let Chat::Channel(channel) = chat {
                                         let channel_id = channel.id();
                                         let channel_title = channel.title().to_string();
 
-                                        // Add to pending storage
                                         if let Some(pending) =
                                             &app_state.the_viper_room_bot_pending_channels
                                         {
@@ -175,34 +174,47 @@ pub(crate) async fn the_viper_room_message_handler(
 
                                         added_count += 1;
                                     } else if let Chat::Group(_) = chat {
-                                        warn!("Username {} is a group, not a channel", username);
+                                        warn!("Username '@{}' is a group, not a channel", username);
                                         errors.push(format!("@{} - это группа, а не канал", username));
                                     } else {
-                                        warn!("Username {} is not a channel", username);
-                                        errors.push(format!("@{} - не является каналом", username));
+                                        warn!("Username '@{}' is not a channel", username);
+                                        errors.push(format!("@{} не является каналом", username));
                                     }
                                 }
                                 Ok(None) => {
-                                    warn!("Username {} not found", username);
-                                    errors.push(format!("@{} - не найден", username));
+                                    warn!("Username '@{}' not found", username);
+                                    errors.push(format!("@{} не найден", username));
                                 }
                                 Err(e) => {
-                                    warn!("Failed to resolve username {}: {}", username, e);
-                                    errors.push(format!("@{} - ошибка при проверке", username));
+                                    warn!("Failed to resolve username '@{}': {}", username, e);
+                                    errors.push(format!("Ошибка при проверке '@{}'", username));
                                 }
                             }
                         }
 
-                        let result_msg = if errors.is_empty() {
-                            format!("✅ Добавлено каналов: {}", added_count)
-                        } else if added_count == 0 {
-                            format!("❌ Не удалось добавить каналы:\n\n{}", errors.join("\n"))
+                        // Build result message
+                        let mut result_parts = Vec::new();
+
+                        if added_count > 0 {
+                            result_parts.push(format!("✅ Добавлено каналов: {}", added_count));
+                        }
+
+                        if !errors.is_empty() {
+                            result_parts.push(format!("❌ Не добавлены:\n{}", errors.join("\n")));
+                        }
+
+                        if !invalid_inputs.is_empty() {
+                            let invalid_list = invalid_inputs.iter()
+                                .map(|s| format!("{} (отсутствует @)", s))
+                                .collect::<Vec<_>>()
+                                .join(", ");
+                            result_parts.push(format!("⚠️ Проигнорированы:\n{}", invalid_list));
+                        }
+
+                        let result_msg = if result_parts.is_empty() {
+                            "❌ Не удалось добавить каналы".to_string()
                         } else {
-                            format!(
-                                "✅ Добавлено: {}\n\n❌ Не добавлены:\n{}",
-                                added_count,
-                                errors.join("\n")
-                            )
+                            result_parts.join("\n\n")
                         };
 
                         bot.send_message(chat_id, result_msg).await?;

@@ -424,8 +424,8 @@ pub async fn send_add_channel_prompt(
 pub enum ChannelInput {
     /// Channel forwarded from a post - contains (channel_id, channel_title)
     Forwarded(i64, String),
-    /// Text input with channel usernames (without @)
-    Usernames(Vec<String>),
+    /// Text input with channel usernames (without @) and list of ignored invalid inputs
+    Usernames(Vec<String>, Vec<String>),
 }
 
 /// Parses user input to extract channel information
@@ -489,36 +489,34 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
             return Err(anyhow!("Пустое сообщение. Отправьте username канала начиная с @"));
         }
 
-        // Parse comma-separated usernames
-        let parsed_usernames: Vec<String> = text
+        // Parse comma-separated usernames - separate valid (with @) and invalid (without @)
+        let parts: Vec<&str> = text
             .split(',')
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
-            .map(|s| {
-                if s.starts_with('@') {
-                    s[1..].to_string()
-                } else {
-                    s.to_string()
-                }
-            })
             .collect();
 
-        // Validate that at least one username starts with @
-        let has_at_sign = text.split(',').any(|s| s.trim().starts_with('@'));
+        let mut valid_usernames: Vec<String> = Vec::new();
+        let mut invalid_inputs: Vec<String> = Vec::new();
 
-        if !has_at_sign {
+        for part in parts {
+            if part.starts_with('@') {
+                // Valid - remove @ and add
+                valid_usernames.push(part[1..].to_string());
+            } else {
+                // Invalid - no @, add to ignored list
+                invalid_inputs.push(part.to_string());
+            }
+        }
+
+        // If no valid usernames at all, return error
+        if valid_usernames.is_empty() {
             return Err(anyhow!(
-                "Username канала должен начинаться с @\n\nПример: @channelname\nИли несколько: @channel1, @channel2"
+                "Не найдено ни одного валидного username.\n\nUsername канала должен начинаться с @\n\nПример: @channelname\nИли несколько: @channel1, @channel2"
             ));
         }
 
-        if parsed_usernames.is_empty() {
-            return Err(anyhow!(
-                "Не удалось извлечь usernames. Пример: @channelname"
-            ));
-        }
-
-        return Ok(ChannelInput::Usernames(parsed_usernames));
+        return Ok(ChannelInput::Usernames(valid_usernames, invalid_inputs));
     }
 
     Err(anyhow!(
