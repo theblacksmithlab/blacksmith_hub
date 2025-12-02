@@ -11,7 +11,8 @@ use core::utils::tg_bot::tg_bot::{check_username_from_user, get_username_from_us
 use std::sync::Arc;
 use teloxide::prelude::Requester;
 use teloxide::Bot;
-use teloxide_core::types::{CallbackQuery, UserId};
+use teloxide_core::payloads::SendMessageSetters;
+use teloxide_core::types::{CallbackQuery, ParseMode, UserId};
 use tracing::info;
 use tracing::log::warn;
 
@@ -130,13 +131,24 @@ pub(crate) async fn the_viper_room_bor_callback_query_handler(
                 TheViperRoomBotMessages::FAQ,
             ))
             .await?;
-            bot.send_message(chat_id, faq_text).await?;
+            bot.send_message(chat_id, faq_text)
+                .parse_mode(ParseMode::Html)
+                .await?;
 
             if let Err(e) = bot.delete_message(chat_id, callback_query_message).await {
                 warn!("Failed to delete query origin message: {}", e);
             }
 
             bot.answer_callback_query(q.id).await?;
+
+            send_main_menu(
+                &bot,
+                user_id,
+                chat_id,
+                &app_state,
+                MainMenuMessageType::Minimal,
+            )
+                .await?;
         }
         _ => {}
     }

@@ -2,6 +2,7 @@ use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     parse_channel_input, send_actual_daily_public_podcast, send_channels_menu, send_main_menu,
     send_settings_menu, ChannelInput, MainMenuMessageType,
 };
+use core::utils::tg_bot::tg_bot::{auto_delete_message, auto_delete_messages_batch};
 use anyhow::Result;
 use core::local_db::the_viper_room::channel_management;
 use core::models::common::system_messages::AppsSystemMessages;
@@ -18,6 +19,7 @@ use grammers_client::types::Chat;
 use std::path::Path;
 use std::sync::Arc;
 use std::{env, fs};
+use std::time::Duration;
 use teloxide::prelude::{Message, Requester};
 use teloxide::sugar::request::RequestReplyExt;
 use teloxide::Bot;
@@ -374,11 +376,18 @@ pub(crate) async fn the_viper_room_message_handler(
             Ok(())
         }
         _ => {
-            let bot_msg = get_message(AppsSystemMessages::TheViperRoomBot(
+            let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
                 TheViperRoomBotMessages::UnexpectedMessage,
             ))
             .await?;
-            bot.send_message(chat_id, bot_msg).reply_to(msg.id).await?;
+
+            let sent_system_message = bot.send_message(chat_id, bot_system_message).reply_to(msg.id).await?;
+
+            let messages_to_delete =
+                vec![(chat_id, msg.id), (chat_id, sent_system_message.id)];
+            
+            auto_delete_messages_batch(bot.clone(), messages_to_delete, Some(Duration::from_secs(10))).await;
+
             Ok(())
         }
     }

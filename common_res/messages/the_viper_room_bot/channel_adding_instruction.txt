@@ -8,7 +8,8 @@
 Примеры отправки:
 "@mychannel" + Enter
 "mychannel" + Enter
-"@mychannel1, mychannel2, mychannel3" + Enter
+"@mychannel1, mychannel2, @mychannel3" + Enter
+
 И, как я уже сказал, ты можешь просто переслать пост из канала
 
 Как видишь, я обработаю любой ввод 😁

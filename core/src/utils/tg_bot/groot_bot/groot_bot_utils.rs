@@ -19,6 +19,7 @@ use teloxide::Bot;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 use unicode_segmentation::UnicodeSegmentation;
+use crate::utils::tg_bot::tg_bot;
 
 pub fn load_super_admins(app_name: &AppName) -> HashSet<u64> {
     let path = build_resource_file_path(app_name, "super_admins_list.json");
@@ -137,11 +138,11 @@ pub async fn paid_chat_spam_warning(
                 .message_thread_id(thread_id)
                 .await?;
 
-            auto_delete_message(
+            tg_bot::auto_delete_message(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(120),
+                Some(Duration::from_secs(120)),
             )
             .await;
         } else {
@@ -154,11 +155,11 @@ pub async fn paid_chat_spam_warning(
                 .send_message(msg.chat.id, bot_system_message_text)
                 .await?;
 
-            auto_delete_message(
+            tg_bot::auto_delete_message(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(120),
+                Some(Duration::from_secs(120)),
             )
             .await;
         }
@@ -171,11 +172,11 @@ pub async fn paid_chat_spam_warning(
             .send_message(msg.chat.id, bot_system_message_text)
             .await?;
 
-        auto_delete_message(
+        tg_bot::auto_delete_message(
             bot.clone(),
             sent_message.chat.id,
             sent_message.id,
-            Duration::from_secs(120),
+            Some(Duration::from_secs(120)),
         )
         .await;
     }
@@ -206,11 +207,11 @@ pub async fn unpaid_chat_spam_warning(
                 .message_thread_id(thread_id)
                 .await?;
 
-            auto_delete_message(
+            tg_bot::auto_delete_message(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(30),
+                Some(Duration::from_secs(30)),
             )
             .await;
         } else {
@@ -219,11 +220,11 @@ pub async fn unpaid_chat_spam_warning(
                 .send_message(msg.chat.id, demo_bot_system_message)
                 .await?;
 
-            auto_delete_message(
+            tg_bot::auto_delete_message(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(30),
+                Some(Duration::from_secs(30)),
             )
             .await;
         }
@@ -232,11 +233,11 @@ pub async fn unpaid_chat_spam_warning(
             .send_message(msg.chat.id, demo_bot_system_message)
             .await?;
 
-        auto_delete_message(
+        tg_bot::auto_delete_message(
             bot.clone(),
             bot_system_message.chat.id,
             bot_system_message.id,
-            Duration::from_secs(30),
+            Some(Duration::from_secs(30)),
         )
         .await;
     }
@@ -501,18 +502,6 @@ pub fn add_chat_to_file(app_name: &AppName, chat_object: ChatObject) -> Result<(
     );
 
     Ok(())
-}
-
-pub async fn auto_delete_message(
-    bot: Bot,
-    chat_id: ChatId,
-    message_id: MessageId,
-    delay: Duration,
-) {
-    tokio::spawn(async move {
-        sleep(delay).await;
-        bot.delete_message(chat_id, message_id).await.ok();
-    });
 }
 
 pub fn get_chat_username(msg: &Message) -> String {

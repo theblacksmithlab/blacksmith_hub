@@ -14,14 +14,13 @@ use teloxide::error_handlers::LoggingErrorHandler;
 use teloxide::net::Download;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::sugar::request::RequestReplyExt;
-use teloxide::types::{
-    ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntityKind, User,
-};
+use teloxide::types::{ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntityKind, MessageId, User};
 use teloxide::{dptree, Bot};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
+use tracing::warn;
 
 pub async fn check_username_from_message(bot: &Bot, msg: &Message) -> bool {
     if msg.chat.username().is_some() {
@@ -317,4 +316,45 @@ pub fn create_app_tmp_dir(app_name: &AppName) -> std::io::Result<()> {
 
 pub fn is_localdb_implemented(app_name: &AppName) -> bool {
     matches!(app_name, AppName::GrootBot | AppName::TheViperRoomBot)
+}
+
+pub async fn auto_delete_message(
+    bot: Bot,
+    chat_id: ChatId,
+    message_id: MessageId,
+    delay: Option<Duration>,
+) {
+    tokio::spawn(async move {
+        if let Some(d) = delay {
+            sleep(d).await;
+        }
+
+        if let Err(e) = bot.delete_message(chat_id, message_id).await {
+            warn!(
+                    "Failed to delete message {:?} in chat {:?}: {}",
+                    message_id, chat_id, e
+                );
+        }
+    });
+}
+
+pub async fn auto_delete_messages_batch(
+    bot: Bot,
+    messages: Vec<(ChatId, MessageId)>,
+    delay: Option<Duration>,
+) {
+    let bot_clone = bot.clone();
+    tokio::spawn(async move {
+        if let Some(d) = delay {
+            sleep(d).await;
+        }
+        for (chat_id, message_id) in messages {
+            if let Err(e) = bot_clone.delete_message(chat_id, message_id).await {
+                warn!(
+                    "Failed to delete message {:?} in chat {:?}: {}",
+                    message_id, chat_id, e
+                );
+            }
+        }
+    });
 }

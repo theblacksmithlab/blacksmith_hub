@@ -13,13 +13,13 @@ use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState,
 use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
-    auto_delete_message, get_chat_username, is_message_from_linked_channel, load_super_admins,
+    get_chat_username, is_message_from_linked_channel, load_super_admins,
     read_admins_from_csv,
 };
 use core::utils::tg_bot::groot_bot::subscription_utils::{
     show_plan_selection, PaymentProcess, SubscriptionState,
 };
-use core::utils::tg_bot::tg_bot::{get_chat_title, get_username_from_message};
+use core::utils::tg_bot::tg_bot::{auto_delete_message, get_chat_title, get_username_from_message};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -110,7 +110,7 @@ pub async fn groot_bot_command_handler(
                     bot.clone(),
                     bot_system_message.chat.id,
                     bot_system_message.id,
-                    Duration::from_secs(120),
+                    Some(Duration::from_secs(120)),
                 )
                 .await;
 
@@ -147,7 +147,7 @@ pub async fn groot_bot_command_handler(
             bot.clone(),
             bot_system_message.chat.id,
             bot_system_message.id,
-            Duration::from_secs(120),
+            Some(Duration::from_secs(120)),
         )
         .await;
 
@@ -199,7 +199,7 @@ pub async fn groot_bot_command_handler(
             bot.clone(),
             bot_system_message.chat.id,
             bot_system_message.id,
-            Duration::from_secs(120),
+            Some(Duration::from_secs(120)),
         )
         .await;
 
@@ -228,7 +228,7 @@ pub async fn groot_bot_command_handler(
             bot.clone(),
             bot_system_message.chat.id,
             bot_system_message.id,
-            Duration::from_secs(120),
+            Some(Duration::from_secs(120)),
         )
         .await;
 
@@ -256,7 +256,7 @@ pub async fn groot_bot_command_handler(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(120),
+                Some(Duration::from_secs(120)),
             )
             .await;
 
@@ -280,7 +280,7 @@ pub async fn groot_bot_command_handler(
             bot.clone(),
             bot_system_message.chat.id,
             bot_system_message.id,
-            Duration::from_secs(120),
+            Some(Duration::from_secs(120)),
         )
         .await;
 
@@ -308,7 +308,7 @@ pub async fn groot_bot_command_handler(
             bot.clone(),
             bot_system_message.chat.id,
             bot_system_message.id,
-            Duration::from_secs(120),
+            Some(Duration::from_secs(120)),
         )
         .await;
 
@@ -459,7 +459,7 @@ pub async fn groot_bot_command_handler(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(120),
+                Some(Duration::from_secs(120)),
             )
             .await;
         }
@@ -519,7 +519,7 @@ pub async fn groot_bot_command_handler(
                     bot.clone(),
                     bot_system_message.chat.id,
                     bot_system_message.id,
-                    Duration::from_secs(120),
+                    Some(Duration::from_secs(120)),
                 )
                 .await;
             }
@@ -740,7 +740,7 @@ pub async fn handle_subscription_command(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(60),
+                Some(Duration::from_secs(60)),
             )
             .await;
 
@@ -767,7 +767,7 @@ pub async fn handle_subscription_command(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(60),
+                Some(Duration::from_secs(60)),
             )
             .await;
 
@@ -847,7 +847,7 @@ pub async fn handle_subscription_command(
             bot.clone(),
             bot_system_message.chat.id,
             bot_system_message.id,
-            Duration::from_secs(60),
+            Some(Duration::from_secs(60)),
         )
         .await;
 
@@ -876,7 +876,7 @@ pub async fn handle_subscription_command(
                     bot.clone(),
                     bot_system_message.chat.id,
                     bot_system_message.id,
-                    Duration::from_secs(60),
+                    Some(Duration::from_secs(60)),
                 )
                 .await;
 
@@ -914,7 +914,7 @@ pub async fn handle_subscription_command(
             bot.clone(),
             bot_system_message.chat.id,
             bot_system_message.id,
-            Duration::from_secs(30),
+            Some(Duration::from_secs(30)),
         )
         .await;
 
@@ -1034,7 +1034,7 @@ pub async fn handle_status_command(
                     bot.clone(),
                     bot_system_message.chat.id,
                     bot_system_message.id,
-                    Duration::from_secs(120),
+                    Some(Duration::from_secs(120)),
                 )
                 .await;
             }
@@ -1052,7 +1052,7 @@ pub async fn handle_status_command(
                     bot.clone(),
                     bot_system_message.chat.id,
                     bot_system_message.id,
-                    Duration::from_secs(120),
+                    Some(Duration::from_secs(120)),
                 )
                 .await;
             }
@@ -1068,7 +1068,7 @@ pub async fn handle_status_command(
                     bot.clone(),
                     bot_system_message.chat.id,
                     bot_system_message.id,
-                    Duration::from_secs(120),
+                    Some(Duration::from_secs(120)),
                 )
                 .await;
             }
@@ -1082,7 +1082,7 @@ pub async fn handle_status_command(
             bot.clone(),
             bot_system_message.chat.id,
             bot_system_message.id,
-            Duration::from_secs(120),
+            Some(Duration::from_secs(120)),
         )
         .await;
     }

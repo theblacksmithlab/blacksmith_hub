@@ -22,9 +22,7 @@ use teloxide::prelude::{ChatId, Requester};
 use teloxide::types::{ChatKind, PublicChatKind};
 use teloxide::Bot;
 use teloxide_core::payloads::{SendAudioSetters, SendMessageSetters};
-use teloxide_core::types::{
-    InlineKeyboardButton, InlineKeyboardMarkup, InputFile, KeyboardButton, KeyboardMarkup, UserId,
-};
+use teloxide_core::types::{InlineKeyboardButton, InlineKeyboardMarkup, InputFile, KeyboardButton, KeyboardMarkup, ParseMode, UserId};
 use tokio::time;
 use tokio::time::Instant;
 use tracing::error;
@@ -258,6 +256,7 @@ pub async fn send_main_menu(
 
     bot.send_message(chat_id, main_menu_text)
         .reply_markup(keyboard)
+        .parse_mode(ParseMode::Html)
         .await?;
 
     Ok(())
@@ -430,6 +429,12 @@ pub enum ChannelInput {
 /// Parses user input to extract channel information
 /// Supports: forwarded posts from channels, @username, username, comma-separated usernames
 pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInput> {
+    // Debug logging
+    info!("parse_channel_input: forward_from_chat={:?}, forward_date={:?}, forward_from_sender_name={:?}",
+          msg.forward_from_chat().is_some(),
+          msg.forward_date().is_some(),
+          msg.forward_from_sender_name());
+
     // Check if message is forwarded from a channel
     if let Some(forward) = &msg.forward_from_chat() {
         // Check that it's a channel (not group or private chat)
@@ -457,6 +462,15 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
         }
     }
 
+    // Check if message has any forward information but didn't match above
+    // This prevents processing text from forwarded messages that aren't from channels
+    if msg.forward_date().is_some() {
+        return Err(anyhow!(
+            "Пересланное сообщение не подходит. Пожалуйста, перешлите пост напрямую из канала."
+        ));
+    }
+
+    // Only process text if message is definitely NOT forwarded
     if let Some(text) = msg.text() {
         let text = text.trim();
         if text.is_empty() {
@@ -478,7 +492,7 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
 
         if usernames.is_empty() {
             return Err(anyhow!(
-                "Не удалось извлечь username каналов. Пример: \"@channelname\" или \"channelname1, channelname2\""
+                "Не удалось извлечь username каналов. Пример: \"@channelname\" или \"@channelname1, channelname2\""
             ));
         }
 
