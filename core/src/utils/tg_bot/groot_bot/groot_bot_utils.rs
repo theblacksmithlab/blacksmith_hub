@@ -2,6 +2,7 @@ use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use crate::models::tg_bot::groot_bot::groot_bot::ChatObject;
 pub use crate::utils::common::{build_resource_file_path, get_message};
+use crate::utils::tg_bot::tg_bot;
 use anyhow::{Context, Result};
 use serde_json::{from_reader, Value};
 use std::collections::{HashMap, HashSet};
@@ -14,12 +15,10 @@ use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::types::ChatKind::Public;
 use teloxide::types::PublicChatKind::Supergroup;
-use teloxide::types::{ChatPublic, MessageId, ThreadId};
+use teloxide::types::{ChatPublic, ThreadId};
 use teloxide::Bot;
-use tokio::time::sleep;
 use tracing::{error, info, warn};
 use unicode_segmentation::UnicodeSegmentation;
-use crate::utils::tg_bot::tg_bot;
 
 pub fn load_super_admins(app_name: &AppName) -> HashSet<u64> {
     let path = build_resource_file_path(app_name, "super_admins_list.json");

@@ -8,10 +8,10 @@ use core::state::tg_bot::app_state::BotAppState;
 use core::utils::common::get_message;
 use core::utils::common::get_system_role_or_fallback;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
-    count_emojis, load_black_listed_users, load_scam_domains,
-    load_white_listed_users, paid_chat_spam_warning, parsing_restricted_words,
-    unpaid_chat_spam_warning,
+    count_emojis, load_black_listed_users, load_scam_domains, load_white_listed_users,
+    paid_chat_spam_warning, parsing_restricted_words, unpaid_chat_spam_warning,
 };
+use core::utils::tg_bot::tg_bot::auto_delete_message;
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -21,7 +21,6 @@ use teloxide::types::{MediaKind, Message, MessageKind};
 use teloxide::Bot;
 use teloxide_core::requests::Request;
 use tracing::{error, info, warn};
-use core::utils::tg_bot::tg_bot::auto_delete_message;
 
 pub async fn check_sender(
     bot: Bot,

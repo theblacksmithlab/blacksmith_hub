@@ -14,7 +14,9 @@ use teloxide::error_handlers::LoggingErrorHandler;
 use teloxide::net::Download;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::sugar::request::RequestReplyExt;
-use teloxide::types::{ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntityKind, MessageId, User};
+use teloxide::types::{
+    ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntityKind, MessageId, User,
+};
 use teloxide::{dptree, Bot};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -331,9 +333,9 @@ pub async fn auto_delete_message(
 
         if let Err(e) = bot.delete_message(chat_id, message_id).await {
             warn!(
-                    "Failed to delete message {:?} in chat {:?}: {}",
-                    message_id, chat_id, e
-                );
+                "Failed to delete message {:?} in chat {:?}: {}",
+                message_id, chat_id, e
+            );
         }
     });
 }

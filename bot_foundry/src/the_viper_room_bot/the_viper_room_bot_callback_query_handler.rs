@@ -148,7 +148,7 @@ pub(crate) async fn the_viper_room_bor_callback_query_handler(
                 &app_state,
                 MainMenuMessageType::Minimal,
             )
-                .await?;
+            .await?;
         }
         _ => {}
     }

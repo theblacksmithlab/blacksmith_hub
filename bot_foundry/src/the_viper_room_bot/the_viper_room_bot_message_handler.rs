@@ -2,7 +2,6 @@ use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     parse_channel_input, send_actual_daily_public_podcast, send_channels_menu, send_main_menu,
     send_settings_menu, ChannelInput, MainMenuMessageType,
 };
-use core::utils::tg_bot::tg_bot::{auto_delete_message, auto_delete_messages_batch};
 use anyhow::Result;
 use core::local_db::the_viper_room::channel_management;
 use core::models::common::system_messages::AppsSystemMessages;
@@ -12,14 +11,15 @@ use core::models::the_viper_room::db_models::PendingChannel;
 use core::state::tg_bot::app_state::BotAppState;
 use core::telegram_client::grammers_functionality::initialize_grammers_client;
 use core::utils::common::get_message;
+use core::utils::tg_bot::tg_bot::auto_delete_messages_batch;
 use core::utils::tg_bot::tg_bot::{
     check_username_from_message, get_chat_title, get_username_from_message, is_bot_addressed,
 };
 use grammers_client::types::Chat;
 use std::path::Path;
 use std::sync::Arc;
-use std::{env, fs};
 use std::time::Duration;
+use std::{env, fs};
 use teloxide::prelude::{Message, Requester};
 use teloxide::sugar::request::RequestReplyExt;
 use teloxide::Bot;
@@ -48,11 +48,6 @@ pub(crate) async fn the_viper_room_message_handler(
         .ok_or_else(|| anyhow::anyhow!("No user in message"))?;
     let user_id = UserId(user.id.0);
     let chat_title = get_chat_title(&msg);
-
-    let msg_text = match msg.text() {
-        Some(t) => t,
-        None => return Ok(()),
-    };
 
     if !msg.chat.is_private() {
         let is_bot_mentioned = is_bot_addressed(&bot, &msg).await?;
@@ -85,110 +80,159 @@ pub(crate) async fn the_viper_room_message_handler(
     };
 
     if current_state.is_in_settings() && !current_state.expects_text_input() {
-        let warning_msg = get_message(AppsSystemMessages::TheViperRoomBot(
-            TheViperRoomBotMessages::SettingsMenuUnexpectedMessage,
-        ))
-        .await?;
-        bot.send_message(chat_id, warning_msg).await?;
-        return Ok(());
+        if msg.text().is_some() {
+            let warning_msg = get_message(AppsSystemMessages::TheViperRoomBot(
+                TheViperRoomBotMessages::SettingsMenuUnexpectedMessage,
+            ))
+            .await?;
+            bot.send_message(chat_id, warning_msg).await?;
+            return Ok(());
+        }
     }
 
-    if matches!(current_state, TheViperRoomBotUserState::ChannelsAdding)
-        && msg_text != "💾 Сохранить"
-        && msg_text != "🏠 Главное меню"
-    {
-        match parse_channel_input(&msg) {
-            Ok(ChannelInput::Forwarded(channel_id, channel_title)) => {
-                if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
-                    let mut pending_lock = pending.lock().await;
-                    let user_channels = pending_lock.entry(user_id.0).or_insert_with(Vec::new);
-                    user_channels.push(PendingChannel {
-                        channel_id,
-                        channel_title: channel_title.clone(),
-                    });
+    // Handle channel adding state (supports messages without text, e.g. forwarded media)
+    if matches!(current_state, TheViperRoomBotUserState::ChannelsAdding) {
+        // Check if this is a button press (Save or Exit)
+        if let Some(text) = msg.text() {
+            if text == "💾 Сохранить" || text == "🏠 Главное меню" {
+                // Let it fall through to the main match statement below
+            } else {
+                // Try to parse as channel input (text username or forwarded message)
+                match parse_channel_input(&msg) {
+                    Ok(ChannelInput::Forwarded(channel_id, channel_title)) => {
+                        if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
+                            let mut pending_lock = pending.lock().await;
+                            let user_channels =
+                                pending_lock.entry(user_id.0).or_insert_with(Vec::new);
+                            user_channels.push(PendingChannel {
+                                channel_id,
+                                channel_title: channel_title.clone(),
+                            });
+                        }
+
+                        bot.send_message(
+                            chat_id,
+                            format!("✅ Канал \"{}\" добавлен", channel_title),
+                        )
+                        .await?;
+
+                        return Ok(());
+                    }
+                    Ok(ChannelInput::Usernames(usernames)) => {
+                        let tg_agent_id = Arc::new(
+                            env::var("TG_AGENT_ID")
+                                .expect("TG_AGENT_ID must be set in environment"),
+                        );
+                        let session_path = format!(
+                            "common_res/the_viper_room/grammers_system_session/{}.session",
+                            tg_agent_id
+                        );
+
+                        if !Path::new(&session_path).exists() {
+                            bot.send_message(chat_id, "❌ Ошибка: сессия Telegram не найдена")
+                                .await?;
+                            return Ok(());
+                        }
+
+                        let session_data = fs::read(Path::new(&session_path))?;
+                        let g_client = initialize_grammers_client(session_data).await?;
+
+                        let mut added_count = 0;
+                        let mut error_count = 0;
+
+                        for username in usernames {
+                            match g_client.resolve_username(&username).await {
+                                Ok(Some(chat)) => {
+                                    if let Chat::Channel(channel) = chat {
+                                        let channel_id = channel.id();
+                                        let channel_title = channel.title().to_string();
+
+                                        // Add to pending storage
+                                        if let Some(pending) =
+                                            &app_state.the_viper_room_bot_pending_channels
+                                        {
+                                            let mut pending_lock = pending.lock().await;
+                                            let user_channels = pending_lock
+                                                .entry(user_id.0)
+                                                .or_insert_with(Vec::new);
+                                            user_channels.push(PendingChannel {
+                                                channel_id,
+                                                channel_title,
+                                            });
+                                        }
+
+                                        added_count += 1;
+                                    } else {
+                                        warn!("Username {} is not a channel", username);
+                                        error_count += 1;
+                                    }
+                                }
+                                Ok(None) => {
+                                    warn!("Username {} not found", username);
+                                    error_count += 1;
+                                }
+                                Err(e) => {
+                                    warn!("Failed to resolve username {}: {}", username, e);
+                                    error_count += 1;
+                                }
+                            }
+                        }
+
+                        let result_msg = if error_count == 0 {
+                            format!("✅ Добавлено каналов: {}", added_count)
+                        } else if added_count == 0 {
+                            "❌ Не удалось добавить каналы. Проверьте правильность имён."
+                                .to_string()
+                        } else {
+                            format!("✅ Добавлено: {}\n❌ Ошибок: {}", added_count, error_count)
+                        };
+
+                        bot.send_message(chat_id, result_msg).await?;
+
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        bot.send_message(chat_id, format!("❌ {}", e)).await?;
+                        return Ok(());
+                    }
                 }
-
-                bot.send_message(chat_id, format!("✅ Канал \"{}\" добавлен", channel_title))
-                    .await?;
-
-                return Ok(());
             }
-            Ok(ChannelInput::Usernames(usernames)) => {
-                let tg_agent_id = Arc::new(
-                    env::var("TG_AGENT_ID").expect("TG_AGENT_ID must be set in environment"),
-                );
-                let session_path = format!(
-                    "common_res/the_viper_room/grammers_system_session/{}.session",
-                    tg_agent_id
-                );
+        } else {
+            // No text - try to parse forwarded message (e.g., forwarded media)
+            match parse_channel_input(&msg) {
+                Ok(ChannelInput::Forwarded(channel_id, channel_title)) => {
+                    if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
+                        let mut pending_lock = pending.lock().await;
+                        let user_channels = pending_lock.entry(user_id.0).or_insert_with(Vec::new);
+                        user_channels.push(PendingChannel {
+                            channel_id,
+                            channel_title: channel_title.clone(),
+                        });
+                    }
 
-                if !Path::new(&session_path).exists() {
-                    bot.send_message(chat_id, "❌ Ошибка: сессия Telegram не найдена")
+                    bot.send_message(chat_id, format!("✅ Канал \"{}\" добавлен", channel_title))
+                        .await?;
+
+                    return Ok(());
+                }
+                Err(e) => {
+                    bot.send_message(chat_id, format!("❌ {}", e)).await?;
+                    return Ok(());
+                }
+                _ => {
+                    // Unexpected case
+                    bot.send_message(chat_id, "❌ Неподдерживаемый тип сообщения")
                         .await?;
                     return Ok(());
                 }
-
-                let session_data = fs::read(Path::new(&session_path))?;
-                let g_client = initialize_grammers_client(session_data).await?;
-
-                let mut added_count = 0;
-                let mut error_count = 0;
-
-                for username in usernames {
-                    match g_client.resolve_username(&username).await {
-                        Ok(Some(chat)) => {
-                            if let Chat::Channel(channel) = chat {
-                                let channel_id = channel.id();
-                                let channel_title = channel.title().to_string();
-
-                                // Add to pending storage
-                                if let Some(pending) =
-                                    &app_state.the_viper_room_bot_pending_channels
-                                {
-                                    let mut pending_lock = pending.lock().await;
-                                    let user_channels =
-                                        pending_lock.entry(user_id.0).or_insert_with(Vec::new);
-                                    user_channels.push(PendingChannel {
-                                        channel_id,
-                                        channel_title,
-                                    });
-                                }
-
-                                added_count += 1;
-                            } else {
-                                warn!("Username {} is not a channel", username);
-                                error_count += 1;
-                            }
-                        }
-                        Ok(None) => {
-                            warn!("Username {} not found", username);
-                            error_count += 1;
-                        }
-                        Err(e) => {
-                            warn!("Failed to resolve username {}: {}", username, e);
-                            error_count += 1;
-                        }
-                    }
-                }
-
-                let result_msg = if error_count == 0 {
-                    format!("✅ Добавлено каналов: {}", added_count)
-                } else if added_count == 0 {
-                    "❌ Не удалось добавить каналы. Проверьте правильность имён.".to_string()
-                } else {
-                    format!("✅ Добавлено: {}\n❌ Ошибок: {}", added_count, error_count)
-                };
-
-                bot.send_message(chat_id, result_msg).await?;
-
-                return Ok(());
-            }
-            Err(e) => {
-                bot.send_message(chat_id, format!("❌ {}", e)).await?;
-                return Ok(());
             }
         }
     }
+
+    let msg_text = match msg.text() {
+        Some(t) => t,
+        None => return Ok(()),
+    };
 
     match msg_text {
         "🏠 Главное меню" => {
@@ -381,12 +425,19 @@ pub(crate) async fn the_viper_room_message_handler(
             ))
             .await?;
 
-            let sent_system_message = bot.send_message(chat_id, bot_system_message).reply_to(msg.id).await?;
+            let sent_system_message = bot
+                .send_message(chat_id, bot_system_message)
+                .reply_to(msg.id)
+                .await?;
 
-            let messages_to_delete =
-                vec![(chat_id, msg.id), (chat_id, sent_system_message.id)];
-            
-            auto_delete_messages_batch(bot.clone(), messages_to_delete, Some(Duration::from_secs(10))).await;
+            let messages_to_delete = vec![(chat_id, msg.id), (chat_id, sent_system_message.id)];
+
+            auto_delete_messages_batch(
+                bot.clone(),
+                messages_to_delete,
+                Some(Duration::from_secs(10)),
+            )
+            .await;
 
             Ok(())
         }
