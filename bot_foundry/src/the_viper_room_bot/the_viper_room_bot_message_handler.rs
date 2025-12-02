@@ -98,11 +98,8 @@ pub(crate) async fn the_viper_room_message_handler(
     // Handle channel adding state (supports messages without text, e.g. forwarded media)
     if matches!(current_state, TheViperRoomBotUserState::ChannelsAdding) {
         // Debug logging for forward fields
-        info!("DEBUG ChannelsAdding: forward_from_chat={:?}, forward_date={:?}, forward_author_signature={:?}, forward_from_sender_name={:?}, has_text={:?}",
-              msg.forward_from_chat().is_some(),
-              msg.forward_date().is_some(),
-              msg.forward_author_signature(),
-              msg.forward_from_sender_name(),
+        info!("DEBUG ChannelsAdding: forward_origin={:?}, has_text={:?}",
+              msg.forward_origin(),
               msg.text().is_some());
 
         // Check if this is a button press (Save or Exit)

@@ -319,12 +319,11 @@ pub async fn send_channels_menu(
             "channels_show_list",
         )],
         vec![InlineKeyboardButton::callback(
+            "➖ Удалить канал",
+            "channels_delete"),
+             InlineKeyboardButton::callback(
             "➕ Добавить канал",
             "channels_add",
-        )],
-        vec![InlineKeyboardButton::callback(
-            "➖ Удалить канал",
-            "channels_delete",
         )],
         vec![InlineKeyboardButton::callback(
             "« Назад в Настройки",
@@ -430,67 +429,100 @@ pub enum ChannelInput {
 }
 
 /// Parses user input to extract channel information
-/// Supports: forwarded posts from channels, @username, username, comma-separated usernames
+/// Supports: forwarded posts from channels, @username (multiple comma-separated)
 pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInput> {
-    // Check if message is forwarded from a channel
-    if let Some(forward) = &msg.forward_from_chat() {
-        // Check that it's a channel (not group or private chat)
-        match &forward.kind {
-            ChatKind::Public(public_chat) => {
-                // Check if it's a channel (not a group/supergroup)
-                match &public_chat.kind {
-                    PublicChatKind::Channel(_) => {
-                        let channel_id = forward.id.0;
-                        let channel_title = forward.title().unwrap_or("Без названия").to_string();
-                        return Ok(ChannelInput::Forwarded(channel_id, channel_title));
+    use teloxide::types::MessageOrigin;
+
+    // Check if message is forwarded using new forward_origin field
+    if let Some(origin) = msg.forward_origin() {
+        match origin {
+            MessageOrigin::Channel { chat, .. } => {
+                // Extract channel info
+                match &chat.kind {
+                    ChatKind::Public(public_chat) => {
+                        match &public_chat.kind {
+                            PublicChatKind::Channel(_) => {
+                                let channel_id = chat.id.0;
+                                let channel_title = chat.title().unwrap_or("Без названия").to_string();
+                                return Ok(ChannelInput::Forwarded(channel_id, channel_title));
+                            }
+                            _ => {
+                                return Err(anyhow!(
+                                    "Источник не является каналом. Перешлите сообщение именно из канала."
+                                ));
+                            }
+                        }
                     }
                     _ => {
                         return Err(anyhow!(
-                            "Источник сообщения не подходит для обработки. Пожалуйста, перешлите сообщение из канала, а не из группы."
+                            "Источник не является публичным каналом."
                         ));
                     }
                 }
             }
-            ChatKind::Private(_) => {
+            MessageOrigin::Chat { .. } => {
+                // Forwarded from chat (could be channel with hidden source)
                 return Err(anyhow!(
-                    "Источник сообщения не подходит для обработки. Пожалуйста, перешлите сообщение из канала."
+                    "Сообщение переслано из чата. Пожалуйста, перешлите пост непосредственно из канала."
+                ));
+            }
+            _ => {
+                // Forwarded from user or hidden user
+                return Err(anyhow!(
+                    "Сообщение переслано от пользователя, а не из канала."
                 ));
             }
         }
     }
 
-    // If we're here, the message wasn't forwarded from a channel
-    // Now try to parse text input with usernames
+    // Check if this is legacy forwarded message (shouldn't happen with new API but just in case)
+    if msg.forward_date().is_some() {
+        return Err(anyhow!(
+            "Не удалось определить источник пересланного сообщения. Попробуйте добавить канал по username."
+        ));
+    }
+
+    // Not a forwarded message - try to parse text with @username
     if let Some(text) = msg.text() {
         let text = text.trim();
         if text.is_empty() {
-            return Err(anyhow!("Пустое сообщение. Отправьте username канала."));
+            return Err(anyhow!("Пустое сообщение. Отправьте username канала начиная с @"));
         }
 
-        let usernames: Vec<String> = text
+        // Parse comma-separated usernames
+        let parsed_usernames: Vec<String> = text
             .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
             .map(|s| {
-                let trimmed = s.trim();
-                if trimmed.starts_with('@') {
-                    trimmed[1..].to_string()
+                if s.starts_with('@') {
+                    s[1..].to_string()
                 } else {
-                    trimmed.to_string()
+                    s.to_string()
                 }
             })
-            .filter(|s| !s.is_empty())
             .collect();
 
-        if usernames.is_empty() {
+        // Validate that at least one username starts with @
+        let has_at_sign = text.split(',').any(|s| s.trim().starts_with('@'));
+
+        if !has_at_sign {
             return Err(anyhow!(
-                "Не удалось извлечь username каналов. Пример: \"@channelname\" или \"@channelname1, channelname2\""
+                "Username канала должен начинаться с @\n\nПример: @channelname\nИли несколько: @channel1, @channel2"
             ));
         }
 
-        return Ok(ChannelInput::Usernames(usernames));
+        if parsed_usernames.is_empty() {
+            return Err(anyhow!(
+                "Не удалось извлечь usernames. Пример: @channelname"
+            ));
+        }
+
+        return Ok(ChannelInput::Usernames(parsed_usernames));
     }
 
     Err(anyhow!(
-        "Неподдерживаемый тип сообщения. Отправьте username канала или перешлите пост из канала."
+        "Неподдерживаемый тип сообщения. Отправьте username канала (@channelname) или перешлите пост из канала."
     ))
 }
 
