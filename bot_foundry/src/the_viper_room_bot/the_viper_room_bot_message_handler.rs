@@ -15,7 +15,6 @@ use core::utils::tg_bot::tg_bot::auto_delete_messages_batch;
 use core::utils::tg_bot::tg_bot::{
     check_username_from_message, get_chat_title, get_username_from_message, is_bot_addressed,
 };
-use grammers_client::types::Chat;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -24,9 +23,7 @@ use teloxide::prelude::{Message, Requester};
 use teloxide::sugar::request::RequestReplyExt;
 use teloxide::Bot;
 use teloxide_core::payloads::SendMessageSetters;
-use teloxide_core::types::{
-    InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, UserId,
-};
+use teloxide_core::types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, ParseMode, UserId};
 use tracing::info;
 use tracing::log::warn;
 
@@ -85,13 +82,29 @@ pub(crate) async fn the_viper_room_message_handler(
                 TheViperRoomBotMessages::SettingsMenuUnexpectedMessage,
             ))
             .await?;
-            bot.send_message(chat_id, warning_msg).await?;
+            let sent_system_message = bot.send_message(chat_id, warning_msg).await?;
+            let messages_to_delete = vec![(chat_id, msg.id), (chat_id, sent_system_message.id)];
+            auto_delete_messages_batch(
+                bot.clone(),
+                messages_to_delete,
+                Some(Duration::from_secs(20)),
+            )
+                .await;
+
             return Ok(());
         }
     }
 
     // Handle channel adding state (supports messages without text, e.g. forwarded media)
     if matches!(current_state, TheViperRoomBotUserState::ChannelsAdding) {
+        // Debug logging for forward fields
+        info!("DEBUG ChannelsAdding: forward_from_chat={:?}, forward_date={:?}, forward_author_signature={:?}, forward_from_sender_name={:?}, has_text={:?}",
+              msg.forward_from_chat().is_some(),
+              msg.forward_date().is_some(),
+              msg.forward_author_signature(),
+              msg.forward_from_sender_name(),
+              msg.text().is_some());
+
         // Check if this is a button press (Save or Exit)
         if let Some(text) = msg.text() {
             if text == "💾 Сохранить" || text == "🏠 Главное меню" {
@@ -138,11 +151,13 @@ pub(crate) async fn the_viper_room_message_handler(
                         let g_client = initialize_grammers_client(session_data).await?;
 
                         let mut added_count = 0;
-                        let mut error_count = 0;
+                        let mut errors: Vec<String> = Vec::new();
 
                         for username in usernames {
                             match g_client.resolve_username(&username).await {
                                 Ok(Some(chat)) => {
+                                    use grammers_client::types::Chat;
+
                                     if let Chat::Channel(channel) = chat {
                                         let channel_id = channel.id();
                                         let channel_title = channel.title().to_string();
@@ -162,29 +177,35 @@ pub(crate) async fn the_viper_room_message_handler(
                                         }
 
                                         added_count += 1;
+                                    } else if let Chat::Group(_) = chat {
+                                        warn!("Username {} is a group, not a channel", username);
+                                        errors.push(format!("@{} - это группа, а не канал", username));
                                     } else {
                                         warn!("Username {} is not a channel", username);
-                                        error_count += 1;
+                                        errors.push(format!("@{} - не является каналом", username));
                                     }
                                 }
                                 Ok(None) => {
                                     warn!("Username {} not found", username);
-                                    error_count += 1;
+                                    errors.push(format!("@{} - не найден", username));
                                 }
                                 Err(e) => {
                                     warn!("Failed to resolve username {}: {}", username, e);
-                                    error_count += 1;
+                                    errors.push(format!("@{} - ошибка при проверке", username));
                                 }
                             }
                         }
 
-                        let result_msg = if error_count == 0 {
+                        let result_msg = if errors.is_empty() {
                             format!("✅ Добавлено каналов: {}", added_count)
                         } else if added_count == 0 {
-                            "❌ Не удалось добавить каналы. Проверьте правильность имён."
-                                .to_string()
+                            format!("❌ Не удалось добавить каналы:\n\n{}", errors.join("\n"))
                         } else {
-                            format!("✅ Добавлено: {}\n❌ Ошибок: {}", added_count, error_count)
+                            format!(
+                                "✅ Добавлено: {}\n\n❌ Не добавлены:\n{}",
+                                added_count,
+                                errors.join("\n")
+                            )
                         };
 
                         bot.send_message(chat_id, result_msg).await?;
@@ -220,7 +241,6 @@ pub(crate) async fn the_viper_room_message_handler(
                     return Ok(());
                 }
                 _ => {
-                    // Unexpected case
                     bot.send_message(chat_id, "❌ Неподдерживаемый тип сообщения")
                         .await?;
                     return Ok(());
@@ -382,6 +402,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
             bot.send_message(chat_id, bot_system_message)
                 .reply_markup(keyboard)
+                .parse_mode(ParseMode::Html)
                 .await?;
             Ok(())
         }
