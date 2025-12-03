@@ -30,12 +30,35 @@ use tokio::time;
 use tokio::time::Instant;
 use tracing::error;
 use tracing::log::info;
+use teloxide::types::MessageOrigin;
 
-/// Type of message to display in main menu
+/// Normalizes Telegram channel ID to raw positive format.
+///
+/// Telegram uses two formats for channel IDs:
+/// - Teloxide/Bot API: `-100XXXXXXXXX` (full format with -100 prefix)
+/// - Grammers/MTProto: `XXXXXXXXX` (raw format, positive)
+///
+/// This function converts both formats to the canonical raw format.
+///
+/// # Examples
+/// - `-1001403170292` → `1403170292`
+/// - `1403170292` → `1403170292`
+pub fn normalize_channel_id(id: i64) -> i64 {
+    // Check if ID is in full format (negative with -100 prefix)
+    // The -100 prefix means the number is less than -10^12
+    if id < -1_000_000_000_000 {
+        // Strip the -100 prefix: abs(id) - 10^12
+        id.abs() - 1_000_000_000_000
+    } else {
+        // Already in raw format or positive - just ensure it's positive
+        id.abs()
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum MainMenuMessageType {
-    Full,    // Full welcome message
-    Minimal, // Short message
+    Full,
+    Minimal,
 }
 
 pub async fn generate_podcast(
@@ -366,7 +389,13 @@ pub async fn show_user_channels(
         let channels_list = channels
             .iter()
             .enumerate()
-            .map(|(i, ch)| format!("{}. {} (ID: {})", i + 1, ch.channel_title, ch.channel_id))
+            .map(|(i, ch)| {
+                let username_info = ch.channel_username
+                    .as_ref()
+                    .map(|u| format!(" @{}", u))
+                    .unwrap_or_default();
+                format!("{}. {}{} (ID: {})", i + 1, ch.channel_title, username_info, ch.channel_id)
+            })
             .collect::<Vec<_>>()
             .join("\n");
 
@@ -420,10 +449,9 @@ pub async fn send_add_channel_prompt(
     Ok(())
 }
 
-/// Represents parsed channel input from user
 pub enum ChannelInput {
-    /// Channel forwarded from a post - contains (channel_id, channel_title)
-    Forwarded(i64, String),
+    /// Channel forwarded from a post - contains (channel_id, channel_title, channel_username)
+    Forwarded(i64, String, Option<String>),
     /// Text input with channel usernames (without @) and list of ignored invalid inputs
     Usernames(Vec<String>, Vec<String>),
 }
@@ -431,24 +459,27 @@ pub enum ChannelInput {
 /// Parses user input to extract channel information
 /// Supports: forwarded posts from channels, @username (multiple comma-separated)
 pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInput> {
-    use teloxide::types::MessageOrigin;
-
-    // Check if message is forwarded using new forward_origin field
     if let Some(origin) = msg.forward_origin() {
         match origin {
             MessageOrigin::Channel { chat, .. } => {
-                // Extract channel info
                 match &chat.kind {
                     ChatKind::Public(public_chat) => {
                         match &public_chat.kind {
-                            PublicChatKind::Channel(_) => {
-                                let channel_id = chat.id.0;
+                            PublicChatKind::Channel(channel_info) => {
+                                let channel_id = normalize_channel_id(chat.id.0);
                                 let channel_title = chat.title().unwrap_or("Без названия").to_string();
-                                return Ok(ChannelInput::Forwarded(channel_id, channel_title));
+                                let channel_username = channel_info.username.clone();
+
+                                info!(
+                                    "Forwarded from channel: ID={}, title='{}', username={:?}",
+                                    channel_id, channel_title, channel_username
+                                );
+
+                                return Ok(ChannelInput::Forwarded(channel_id, channel_title, channel_username));
                             }
                             _ => {
                                 return Err(anyhow!(
-                                    "Источник не является каналом. Перешлите сообщение именно из канала."
+                                    "Источник не является каналом. Перешли сообщение именно из канала."
                                 ));
                             }
                         }
@@ -461,13 +492,11 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
                 }
             }
             MessageOrigin::Chat { .. } => {
-                // Forwarded from chat (could be channel with hidden source)
                 return Err(anyhow!(
-                    "Сообщение переслано из чата. Пожалуйста, перешлите пост непосредственно из канала."
+                    "Сообщение переслано из чата. Пожалуйста, перешли пост непосредственно из канала."
                 ));
             }
             _ => {
-                // Forwarded from user or hidden user
                 return Err(anyhow!(
                     "Сообщение переслано от пользователя, а не из канала."
                 ));
@@ -475,21 +504,18 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
         }
     }
 
-    // Check if this is legacy forwarded message (shouldn't happen with new API but just in case)
     if msg.forward_date().is_some() {
         return Err(anyhow!(
-            "Не удалось определить источник пересланного сообщения. Попробуйте добавить канал по username."
+            "Не удалось определить источник пересланного сообщения. Попробуй добавить канал по username."
         ));
     }
 
-    // Not a forwarded message - try to parse text with @username
     if let Some(text) = msg.text() {
         let text = text.trim();
         if text.is_empty() {
-            return Err(anyhow!("Пустое сообщение. Отправьте username канала начиная с @"));
+            return Err(anyhow!("Я получил пустое сообщение. Отправь username канала начиная с @"));
         }
 
-        // Parse comma-separated usernames - separate valid (with @) and invalid (without @)
         let parts: Vec<&str> = text
             .split(',')
             .map(|s| s.trim())
@@ -501,18 +527,15 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
 
         for part in parts {
             if part.starts_with('@') {
-                // Valid - remove @ and add
                 valid_usernames.push(part[1..].to_string());
             } else {
-                // Invalid - no @, add to ignored list
                 invalid_inputs.push(part.to_string());
             }
         }
 
-        // If no valid usernames at all, return error
         if valid_usernames.is_empty() {
             return Err(anyhow!(
-                "Не найдено ни одного валидного username.\n\nUsername канала должен начинаться с @\n\nПример: @channelname\nИли несколько: @channel1, @channel2"
+                "Не найдено ни одного валидного username.\n\nUsername канала должен начинаться с '@'\n\nПример: @channelname\nИли несколько: @channel1, @channel2"
             ));
         }
 
@@ -520,7 +543,7 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
     }
 
     Err(anyhow!(
-        "Неподдерживаемый тип сообщения. Отправьте username канала (@channelname) или перешлите пост из канала."
+        "Неподдерживаемый тип сообщения. Отправь username канала (@channelname) или перешли пост из канала."
     ))
 }
 

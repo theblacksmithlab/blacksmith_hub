@@ -12,6 +12,7 @@ pub struct UserChannel {
     pub user_id: i64,
     pub channel_id: i64,
     pub channel_title: String,
+    pub channel_username: Option<String>,
 }
 
 /// Temporary channel data for adding channels workflow
@@ -20,4 +21,5 @@ pub struct UserChannel {
 pub struct PendingChannel {
     pub channel_id: i64,
     pub channel_title: String,
+    pub channel_username: Option<String>,
 }

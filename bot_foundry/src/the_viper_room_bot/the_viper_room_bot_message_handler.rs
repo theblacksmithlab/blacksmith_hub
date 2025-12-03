@@ -1,6 +1,6 @@
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
-    parse_channel_input, send_actual_daily_public_podcast, send_channels_menu, send_main_menu,
-    send_settings_menu, ChannelInput, MainMenuMessageType,
+    normalize_channel_id, parse_channel_input, send_actual_daily_public_podcast,
+    send_channels_menu, send_main_menu, send_settings_menu, ChannelInput, MainMenuMessageType,
 };
 use anyhow::Result;
 use core::local_db::the_viper_room::channel_management;
@@ -96,21 +96,13 @@ pub(crate) async fn the_viper_room_message_handler(
         }
     }
 
-    // Handle channel adding state (supports messages without text, e.g. forwarded media)
     if matches!(current_state, TheViperRoomBotUserState::ChannelsAdding) {
-        // Debug logging for forward fields
-        info!("DEBUG ChannelsAdding: forward_origin={:?}, has_text={:?}",
-              msg.forward_origin(),
-              msg.text().is_some());
-
-        // Check if this is a button press (Save or Exit)
         if let Some(text) = msg.text() {
             if text == "💾 Сохранить" || text == "🏠 Главное меню" {
                 // Let it fall through to the main match statement below
             } else {
-                // Try to parse as channel input (text username or forwarded message)
                 match parse_channel_input(&msg) {
-                    Ok(ChannelInput::Forwarded(channel_id, channel_title)) => {
+                    Ok(ChannelInput::Forwarded(channel_id, channel_title, channel_username)) => {
                         if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
                             let mut pending_lock = pending.lock().await;
                             let user_channels =
@@ -118,12 +110,13 @@ pub(crate) async fn the_viper_room_message_handler(
                             user_channels.push(PendingChannel {
                                 channel_id,
                                 channel_title: channel_title.clone(),
+                                channel_username,
                             });
                         }
 
                         bot.send_message(
                             chat_id,
-                            format!("✅ Канал \"{}\" добавлен", channel_title),
+                            format!("✅ Канал \"{}\" принят\nДобавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню", channel_title),
                         )
                         .await?;
 
@@ -139,10 +132,12 @@ pub(crate) async fn the_viper_room_message_handler(
                             tg_agent_id
                         );
 
-                        // TODO: Exit to the main menu with state reset
                         if !Path::new(&session_path).exists() {
                             bot.send_message(chat_id, "❌ Ошибка: сессия Telegram не найдена")
                                 .await?;
+
+                            send_main_menu(&bot, user_id, chat_id, &app_state, MainMenuMessageType::Minimal).await?;
+
                             return Ok(());
                         }
 
@@ -156,8 +151,9 @@ pub(crate) async fn the_viper_room_message_handler(
                             match g_client.resolve_username(&username).await {
                                 Ok(Some(chat)) => {
                                     if let Chat::Channel(channel) = chat {
-                                        let channel_id = channel.id();
+                                        let channel_id = normalize_channel_id(channel.id());
                                         let channel_title = channel.title().to_string();
+                                        let channel_username = Some(username.clone());
 
                                         if let Some(pending) =
                                             &app_state.the_viper_room_bot_pending_channels
@@ -169,6 +165,7 @@ pub(crate) async fn the_viper_room_message_handler(
                                             user_channels.push(PendingChannel {
                                                 channel_id,
                                                 channel_title,
+                                                channel_username,
                                             });
                                         }
 
@@ -192,15 +189,14 @@ pub(crate) async fn the_viper_room_message_handler(
                             }
                         }
 
-                        // Build result message
                         let mut result_parts = Vec::new();
 
                         if added_count > 0 {
-                            result_parts.push(format!("✅ Добавлено каналов: {}", added_count));
+                            result_parts.push(format!("✅ Принято каналов: {}", added_count));
                         }
 
                         if !errors.is_empty() {
-                            result_parts.push(format!("❌ Не добавлены:\n{}", errors.join("\n")));
+                            result_parts.push(format!("❌ Не принято:\n{}", errors.join("\n")));
                         }
 
                         if !invalid_inputs.is_empty() {
@@ -208,11 +204,11 @@ pub(crate) async fn the_viper_room_message_handler(
                                 .map(|s| format!("{} (отсутствует @)", s))
                                 .collect::<Vec<_>>()
                                 .join(", ");
-                            result_parts.push(format!("⚠️ Проигнорированы:\n{}", invalid_list));
+                            result_parts.push(format!("⚠️ Пропущены:\n{}", invalid_list));
                         }
 
                         let result_msg = if result_parts.is_empty() {
-                            "❌ Не удалось добавить каналы".to_string()
+                            "❌ Не удалось обработать каналы".to_string()
                         } else {
                             result_parts.join("\n\n")
                         };
@@ -228,19 +224,19 @@ pub(crate) async fn the_viper_room_message_handler(
                 }
             }
         } else {
-            // No text - try to parse forwarded message (e.g., forwarded media)
             match parse_channel_input(&msg) {
-                Ok(ChannelInput::Forwarded(channel_id, channel_title)) => {
+                Ok(ChannelInput::Forwarded(channel_id, channel_title, channel_username)) => {
                     if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
                         let mut pending_lock = pending.lock().await;
                         let user_channels = pending_lock.entry(user_id.0).or_insert_with(Vec::new);
                         user_channels.push(PendingChannel {
                             channel_id,
                             channel_title: channel_title.clone(),
+                            channel_username,
                         });
                     }
 
-                    bot.send_message(chat_id, format!("✅ Канал \"{}\" добавлен", channel_title))
+                    bot.send_message(chat_id, format!("✅ Канал \"{}\" принят\nДобавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню", channel_title))
                         .await?;
 
                     return Ok(());
@@ -304,7 +300,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
                 bot.send_message(
                     chat_id,
-                    "Отправьте username канала или перешлите пост из канала",
+                    "Отправь username канала (начиная с \"@\") или перешли мне пост из канала",
                 )
                 .reply_markup(keyboard)
                 .await?;
@@ -315,8 +311,11 @@ pub(crate) async fn the_viper_room_message_handler(
             let db_pool = match &app_state.db_pool {
                 Some(pool) => pool,
                 None => {
-                    bot.send_message(chat_id, "Ошибка: база данных недоступна")
+                    bot.send_message(chat_id, "Ошибка: база данных недоступна в данный момент.\nПопробуй повторить попытку позже")
                         .await?;
+
+                    send_main_menu(&bot, user_id, chat_id, &app_state, MainMenuMessageType::Minimal).await?;
+
                     return Ok(());
                 }
             };
@@ -332,7 +331,7 @@ pub(crate) async fn the_viper_room_message_handler(
             if available_slots == 0 {
                 bot.send_message(
                     chat_id,
-                    format!("❌ Достигнут лимит каналов ({}).\n\nУдалите старые каналы, чтобы добавить новые.", MAX_CHANNELS_PER_USER)
+                    format!("❌ Достигнут лимит каналов ({}).\n\nДля освобождения слотов воспользуйся пунктом \"➖ Удалить канал\" в меню управления каналами", MAX_CHANNELS_PER_USER)
                 ).await?;
 
                 if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
@@ -356,6 +355,7 @@ pub(crate) async fn the_viper_room_message_handler(
                     user_id_i64,
                     channel.channel_id,
                     &channel.channel_title,
+                    channel.channel_username.as_deref(),
                 )
                 .await
                 {
@@ -374,7 +374,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
             let result_msg = if skipped_count > 0 {
                 format!(
-                    "⚠️ Достигнут лимит каналов (максимум {}).\n\n✅ Добавлено каналов: {}\n❌ Не добавлено: {}\n\nДля освобождения слотов воспользуйтесь пунктом '➖ Удалить канал' в меню управления каналами.",
+                    "⚠️ Достигнут лимит каналов (максимум {}).\n\n✅ Добавлено каналов: {}\n❌ Не добавлено: {}\n\nДля освобождения слотов воспользуйся пунктом \"➖ Удалить канал\" в меню управления каналами",
                     MAX_CHANNELS_PER_USER, saved_count, skipped_count
                 )
             } else if error_count == 0 {

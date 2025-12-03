@@ -149,6 +149,7 @@ async fn create_app_db_tables(pool: &SqlitePool, app_name: &AppName) -> Result<(
                     user_id INTEGER NOT NULL,
                     channel_id INTEGER NOT NULL,
                     channel_title TEXT NOT NULL,
+                    channel_username TEXT,
                     UNIQUE(user_id, channel_id)
                 );
             ";
