@@ -46,7 +46,10 @@ impl TheViperRoomBotUserState {
 
     /// Check if user state expects text input
     pub fn expects_text_input(&self) -> bool {
-        matches!(self, Self::ChannelsAdding | Self::PodcastTimeSetting)
+        matches!(
+            self,
+            Self::ChannelsAdding | Self::ChannelsDeleting | Self::PodcastTimeSetting
+        )
     }
 
     /// Check if user is in channel management flow

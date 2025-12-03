@@ -174,8 +174,8 @@ pub(crate) async fn the_viper_room_message_handler(
                                         warn!("Username '@{}' is a group, not a channel", username);
                                         errors.push(format!("@{} - это группа, а не канал", username));
                                     } else {
-                                        warn!("Username '@{}' is not a channel", username);
-                                        errors.push(format!("@{} не является каналом", username));
+                                        warn!("Username '@{}' is not a channel (some person's username provided)", username);
+                                        errors.push(format!("@{} не является каналом, похоже, что это пользователь", username));
                                     }
                                 }
                                 Ok(None) => {
@@ -210,6 +210,8 @@ pub(crate) async fn the_viper_room_message_handler(
                         let result_msg = if result_parts.is_empty() {
                             "❌ Не удалось обработать каналы".to_string()
                         } else {
+                            let result_footer = "Добавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню".to_string();
+                            result_parts.push(result_footer);
                             result_parts.join("\n\n")
                         };
 
@@ -249,6 +251,122 @@ pub(crate) async fn the_viper_room_message_handler(
                     bot.send_message(chat_id, "❌ Неподдерживаемый тип сообщения")
                         .await?;
                     return Ok(());
+                }
+            }
+        }
+    }
+
+    if matches!(current_state, TheViperRoomBotUserState::ChannelsDeleting) {
+        if let Some(text) = msg.text() {
+            if text == "🏠 Главное меню" {
+                // Let it fall through to the main match statement below
+            } else if text == "🗑 Удалить все каналы" {
+                // Delete all user channels
+                let db_pool = match &app_state.db_pool {
+                    Some(pool) => pool,
+                    None => {
+                        bot.send_message(
+                            chat_id,
+                            "❌ Ошибка: база данных недоступна в данный момент.",
+                        )
+                        .await?;
+
+                        send_channels_menu(&bot, user_id, chat_id, &app_state).await?;
+                        return Ok(());
+                    }
+                };
+
+                let user_id_i64 = user_id.0 as i64;
+
+                // Get current channels count for message
+                let channels = channel_management::get_user_channels(db_pool.as_ref(), user_id_i64).await?;
+                let channels_count = channels.len();
+
+                if channels_count == 0 {
+                    bot.send_message(chat_id, "ℹ️ У тебя нет каналов для удаления")
+                        .await?;
+                } else {
+                    // Delete all channels
+                    channel_management::clear_user_channels(db_pool.as_ref(), user_id_i64).await?;
+
+                    bot.send_message(
+                        chat_id,
+                        format!("✅ Все каналы ({}) успешно удалены", channels_count),
+                    )
+                    .await?;
+                }
+
+                send_channels_menu(&bot, user_id, chat_id, &app_state).await?;
+                return Ok(());
+            } else {
+                // Parse channel ID
+                let channel_id = match text.trim().parse::<i64>() {
+                    Ok(id) => id,
+                    Err(_) => {
+                        bot.send_message(
+                            chat_id,
+                            "❌ Неверный формат ID канала. ID должен быть числом.\n\nПопробуй снова или нажми \"🏠 Главное меню\"",
+                        )
+                        .await?;
+                        return Ok(());
+                    }
+                };
+
+                // Check if channel exists in user's list
+                let db_pool = match &app_state.db_pool {
+                    Some(pool) => pool,
+                    None => {
+                        bot.send_message(
+                            chat_id,
+                            "❌ Ошибка: база данных недоступна в данный момент.",
+                        )
+                        .await?;
+
+                        send_channels_menu(&bot, user_id, chat_id, &app_state).await?;
+                        return Ok(());
+                    }
+                };
+
+                let user_id_i64 = user_id.0 as i64;
+
+                match channel_management::get_channel(db_pool.as_ref(), user_id_i64, channel_id)
+                    .await?
+                {
+                    Some(channel) => {
+                        // Channel found - delete it
+                        channel_management::remove_channel(
+                            db_pool.as_ref(),
+                            user_id_i64,
+                            channel_id,
+                        )
+                        .await?;
+
+                        bot.send_message(
+                            chat_id,
+                            format!(
+                                "✅ Канал \"{}\" (ID: {}) успешно удалён",
+                                channel.channel_title, channel_id
+                            ),
+                        )
+                        .await?;
+
+                        send_channels_menu(&bot, user_id, chat_id, &app_state).await?;
+                        return Ok(());
+                    }
+                    None => {
+                        // Channel not found
+                        bot.send_message(
+                            chat_id,
+                            format!(
+                                "❌ Канал с ID {} не найден в твоём списке.\n\nПроверь ID и попробуй снова",
+                                channel_id
+                            ),
+                        )
+                        .await?;
+
+                        send_channels_menu(&bot, user_id, chat_id, &app_state).await?;
+                        return Ok(());
+                    }
                 }
             }
         }
@@ -300,7 +418,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
                 bot.send_message(
                     chat_id,
-                    "Отправь username канала (начиная с \"@\") или перешли мне пост из канала",
+                    "Отправь username канала (@channelname), ссылку (https://t.me/channelname) или перешли пост из канала",
                 )
                 .reply_markup(keyboard)
                 .await?;

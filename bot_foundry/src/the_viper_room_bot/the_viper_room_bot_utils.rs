@@ -55,6 +55,34 @@ pub fn normalize_channel_id(id: i64) -> i64 {
     }
 }
 
+/// Extracts username from Telegram channel link
+///
+/// Supports formats:
+/// - `https://t.me/username` → `username`
+/// - `http://t.me/username` → `username`
+/// - `t.me/username` → `username`
+///
+/// Returns None if link is invalid or username is empty
+fn extract_username_from_link(input: &str) -> Option<String> {
+    // Try to strip common prefixes
+    let after_tme = input
+        .strip_prefix("https://t.me/")
+        .or_else(|| input.strip_prefix("http://t.me/"))
+        .or_else(|| input.strip_prefix("t.me/"))?;
+
+    // Username is everything before first slash, space or special char
+    let username = after_tme
+        .split(&['/', ' ', '?', '#'][..])
+        .next()?
+        .trim();
+
+    if username.is_empty() {
+        None
+    } else {
+        Some(username.to_string())
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum MainMenuMessageType {
     Full,
@@ -449,6 +477,33 @@ pub async fn send_add_channel_prompt(
     Ok(())
 }
 
+pub async fn send_delete_channel_prompt(
+    bot: &Bot,
+    user_id: UserId,
+    chat_id: ChatId,
+    app_state: &Arc<BotAppState>,
+) -> Result<()> {
+    if let Some(states) = &app_state.the_viper_room_bot_user_states {
+        let mut states_lock = states.lock().await;
+        states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsDeleting);
+    }
+
+    let instruction_text = "📋 Удаление канала\n\nОтправь ID канала, который хочешь удалить.\n\nID можно найти в списке твоих каналов (пункт \"👁 Показать мои каналы\")";
+
+    let keyboard = KeyboardMarkup::new(vec![
+        vec![KeyboardButton::new("🗑 Удалить все каналы")],
+        vec![KeyboardButton::new("🏠 Главное меню")],
+    ])
+    .resize_keyboard()
+    .one_time_keyboard();
+
+    bot.send_message(chat_id, instruction_text)
+        .reply_markup(keyboard)
+        .await?;
+
+    Ok(())
+}
+
 pub enum ChannelInput {
     /// Channel forwarded from a post - contains (channel_id, channel_title, channel_username)
     Forwarded(i64, String, Option<String>),
@@ -513,7 +568,7 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
     if let Some(text) = msg.text() {
         let text = text.trim();
         if text.is_empty() {
-            return Err(anyhow!("Я получил пустое сообщение. Отправь username канала начиная с @"));
+            return Err(anyhow!("Я получил пустое сообщение. Отправь username канала (@channelname) или ссылку (https://t.me/channelname)"));
         }
 
         let parts: Vec<&str> = text
@@ -526,16 +581,26 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
         let mut invalid_inputs: Vec<String> = Vec::new();
 
         for part in parts {
-            if part.starts_with('@') {
-                valid_usernames.push(part[1..].to_string());
-            } else {
-                invalid_inputs.push(part.to_string());
+            // Split each part by whitespace to handle cases like "https://t.me/username srgs"
+            let tokens: Vec<&str> = part.split_whitespace().collect();
+
+            for token in tokens {
+                // Try to extract from t.me link first
+                if let Some(username) = extract_username_from_link(token) {
+                    valid_usernames.push(username);
+                } else if token.starts_with('@') {
+                    // Username with @ prefix
+                    valid_usernames.push(token[1..].to_string());
+                } else {
+                    // Invalid input (no @ prefix, not a link)
+                    invalid_inputs.push(token.to_string());
+                }
             }
         }
 
         if valid_usernames.is_empty() {
             return Err(anyhow!(
-                "Не найдено ни одного валидного username.\n\nUsername канала должен начинаться с '@'\n\nПример: @channelname\nИли несколько: @channel1, @channel2"
+                "Не найдено ни одного валидного username.\n\nUsername канала должен начинаться с '@' или быть ссылкой https://t.me/channelname\n\nПримеры:\n• @channelname\n• https://t.me/channelname\n• Несколько: @channel1, https://t.me/channel2"
             ));
         }
 
@@ -543,7 +608,7 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
     }
 
     Err(anyhow!(
-        "Неподдерживаемый тип сообщения. Отправь username канала (@channelname) или перешли пост из канала."
+        "Неподдерживаемый тип сообщения. Отправь username канала (@channelname), ссылку (https://t.me/channelname) или перешли пост из канала."
     ))
 }
 

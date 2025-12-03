@@ -1,6 +1,6 @@
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
-    send_add_channel_prompt, send_channels_menu, send_main_menu, send_settings_menu,
-    show_user_channels, MainMenuMessageType,
+    send_add_channel_prompt, send_channels_menu, send_delete_channel_prompt, send_main_menu,
+    send_settings_menu, show_user_channels, MainMenuMessageType,
 };
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::TheViperRoomBotMessages;
@@ -103,6 +103,15 @@ pub(crate) async fn the_viper_room_bor_callback_query_handler(
         }
         Some("channels_add") => {
             send_add_channel_prompt(&bot, user_id, chat_id, &app_state).await?;
+
+            if let Err(e) = bot.delete_message(chat_id, callback_query_message).await {
+                warn!("Failed to delete query origin message: {}", e);
+            }
+
+            bot.answer_callback_query(q.id).await?;
+        }
+        Some("channels_delete") => {
+            send_delete_channel_prompt(&bot, user_id, chat_id, &app_state).await?;
 
             if let Err(e) = bot.delete_message(chat_id, callback_query_message).await {
                 warn!("Failed to delete query origin message: {}", e);
