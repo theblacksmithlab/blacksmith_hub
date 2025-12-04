@@ -65,7 +65,11 @@ pub async fn default_message_handler(
         }
         Err(err) => {
             error!("Error processing text request from user: {}", err);
-            (err.to_string(), Vec::new())
+
+            let error_msg_for_user = "В данный момент на сервере проводятся технические работы.\n\
+            Пожалуйста, повторите попытку позднее, мы работаем для Вас 🙏".to_string();
+
+            (error_msg_for_user, Vec::new())
         }
     }
 }
