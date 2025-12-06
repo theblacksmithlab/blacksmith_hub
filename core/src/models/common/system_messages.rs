@@ -204,6 +204,7 @@ pub enum TheViperRoomBotMessages {
     PublicPodcastSendingIntroMessage,
     ChannelAddingInstruction,
     SettingsMenuUnexpectedMessage,
+    GeminiTTSInstruction,
 }
 
 impl TheViperRoomBotMessages {
@@ -227,6 +228,7 @@ impl TheViperRoomBotMessages {
             TheViperRoomBotMessages::SettingsMenuUnexpectedMessage => {
                 "settings_menu_unexpected_message"
             }
+            TheViperRoomBotMessages::GeminiTTSInstruction => "gemini_tts_instruction",
         }
     }
 }

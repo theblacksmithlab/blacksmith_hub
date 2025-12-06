@@ -1,5 +1,6 @@
+use crate::models::common::system_messages::{AppsSystemMessages, TheViperRoomBotMessages};
 use crate::state::llm_client_init_trait::OpenAIClientInit;
-use crate::utils::common::split_text_into_chunks;
+use crate::utils::common::{get_message, split_text_into_chunks};
 use anyhow::anyhow;
 use async_openai::types::{CreateSpeechRequestArgs, CreateSpeechResponse, SpeechModel, Voice};
 use base64::{engine::general_purpose, Engine as _};
@@ -384,6 +385,12 @@ pub async fn podcast_tts_via_google(
     let api_key = std::env::var("GOOGLE_API_KEY")
         .map_err(|_| anyhow::anyhow!("GOOGLE_API_KEY not found"))?;
 
+    // Get TTS instruction from messages
+    let tts_instruction = get_message(AppsSystemMessages::TheViperRoomBot(
+        TheViperRoomBotMessages::GeminiTTSInstruction,
+    ))
+    .await?;
+
     let now = Utc::now();
     let utc_plus_3 = now + Duration::hours(3);
     let date_only = utc_plus_3.date_naive();
@@ -399,17 +406,14 @@ pub async fn podcast_tts_via_google(
             char_count
         );
 
-        let audio_data = generate_gemini_speech(&text, &api_key).await?;
+        let audio_data = generate_gemini_speech(&text, &api_key, &tts_instruction).await?;
         let pcm_path = format!("{}/{}_pcm.wav", user_tmp_dir, file_name);
         let mp3_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
 
-        // Save PCM audio
         fs::write(&pcm_path, audio_data)?;
 
-        // Convert PCM to MP3 using ffmpeg
         convert_pcm_to_mp3(&pcm_path, &mp3_path)?;
 
-        // Remove temporary PCM file
         if let Err(e) = fs::remove_file(&pcm_path) {
             warn!("Could not delete temporary PCM file {}: {}", pcm_path, e);
         }
@@ -431,22 +435,19 @@ pub async fn podcast_tts_via_google(
             chunk.chars().count()
         );
 
-        let audio_data = generate_gemini_speech(chunk, &api_key).await?;
+        let audio_data = generate_gemini_speech(chunk, &api_key, &tts_instruction).await?;
         let pcm_part_path = format!("{}/part_{}_pcm.wav", user_tmp_dir, i);
         let mp3_part_path = format!("{}/part_{}.mp3", user_tmp_dir, i);
 
-        // Save and convert each chunk
         fs::write(&pcm_part_path, audio_data)?;
         convert_pcm_to_mp3(&pcm_part_path, &mp3_part_path)?;
 
-        // Remove PCM file
         if let Err(e) = fs::remove_file(&pcm_part_path) {
             warn!("Could not delete temporary PCM file {}: {}", pcm_part_path, e);
         }
 
         audio_parts.push(mp3_part_path);
 
-        // Rate limiting - small delay between requests
         if i < chunks.len() - 1 {
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         }
@@ -454,7 +455,6 @@ pub async fn podcast_tts_via_google(
 
     let final_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
 
-    // Merge all MP3 parts
     let mut command = Command::new("ffmpeg");
     command
         .arg("-i")
@@ -468,7 +468,6 @@ pub async fn podcast_tts_via_google(
         return Err(anyhow::anyhow!("Failed to merge audio files"));
     }
 
-    // Clean up part files
     for part in audio_parts {
         if let Err(e) = fs::remove_file(&part) {
             warn!("Could not delete temporary file {}: {}", part, e);
@@ -479,7 +478,11 @@ pub async fn podcast_tts_via_google(
     Ok(PathBuf::from(final_path))
 }
 
-async fn generate_gemini_speech(text: &str, api_key: &str) -> anyhow::Result<Vec<u8>> {
+async fn generate_gemini_speech(
+    text: &str,
+    api_key: &str,
+    tts_instruction: &str,
+) -> anyhow::Result<Vec<u8>> {
     let client = ReqwestClient::new();
 
     let url = format!(
@@ -487,11 +490,13 @@ async fn generate_gemini_speech(text: &str, api_key: &str) -> anyhow::Result<Vec
         api_key
     );
 
+    let full_text = format!("{}\n{}", tts_instruction, text);
+
     let payload = json!({
         "contents": [{
             "role": "user",
             "parts": [{
-                "text": text
+                "text": full_text
             }]
         }],
         "generationConfig": {
@@ -520,7 +525,6 @@ async fn generate_gemini_speech(text: &str, api_key: &str) -> anyhow::Result<Vec
 
     let response_json: serde_json::Value = response.json().await?;
 
-    // Extract base64 audio data from response
     let audio_base64 = response_json
         .get("candidates")
         .and_then(|c| c.get(0))
@@ -532,12 +536,10 @@ async fn generate_gemini_speech(text: &str, api_key: &str) -> anyhow::Result<Vec
         .and_then(|d| d.as_str())
         .ok_or_else(|| anyhow::anyhow!("Failed to extract audio data from Gemini response"))?;
 
-    // Decode base64 to bytes
     let audio_bytes = general_purpose::STANDARD
         .decode(audio_base64)
         .map_err(|e| anyhow::anyhow!("Failed to decode base64 audio: {}", e))?;
 
-    // Convert L16 PCM to WAV format
     let wav_data = pcm_to_wav(&audio_bytes, 24000, 1, 16)?;
 
     Ok(wav_data)
@@ -546,13 +548,11 @@ async fn generate_gemini_speech(text: &str, api_key: &str) -> anyhow::Result<Vec
 fn pcm_to_wav(pcm_data: &[u8], sample_rate: u32, channels: u16, bits_per_sample: u16) -> anyhow::Result<Vec<u8>> {
     let mut wav_data = Vec::new();
 
-    // RIFF header
     wav_data.extend_from_slice(b"RIFF");
     let file_size = (36 + pcm_data.len()) as u32;
     wav_data.extend_from_slice(&(file_size - 8).to_le_bytes());
     wav_data.extend_from_slice(b"WAVE");
 
-    // fmt chunk
     wav_data.extend_from_slice(b"fmt ");
     wav_data.extend_from_slice(&16u32.to_le_bytes()); // fmt chunk size
     wav_data.extend_from_slice(&1u16.to_le_bytes()); // audio format (PCM)
@@ -564,7 +564,6 @@ fn pcm_to_wav(pcm_data: &[u8], sample_rate: u32, channels: u16, bits_per_sample:
     wav_data.extend_from_slice(&block_align.to_le_bytes());
     wav_data.extend_from_slice(&bits_per_sample.to_le_bytes());
 
-    // data chunk
     wav_data.extend_from_slice(b"data");
     wav_data.extend_from_slice(&(pcm_data.len() as u32).to_le_bytes());
     wav_data.extend_from_slice(pcm_data);
@@ -580,7 +579,7 @@ fn convert_pcm_to_mp3(input_path: &str, output_path: &str) -> anyhow::Result<()>
         .arg("libmp3lame")
         .arg("-b:a")
         .arg("128k")
-        .arg("-y") // Overwrite output file
+        .arg("-y")
         .arg(output_path)
         .status()?;
 
