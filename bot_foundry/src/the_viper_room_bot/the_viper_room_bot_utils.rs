@@ -677,15 +677,42 @@ pub async fn send_private_daily_podcast(
     }
 
     let podcast_path = match podcast_file {
-        Some(path) => path,
+        Some(path) => {
+            let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
+                TheViperRoomBotMessages::GrabAFreshPersonalPodcast,
+            ))
+                .await?;
+            bot.send_message(chat_id, bot_system_message).await?;
+            
+            path
+        },
         None => {
             let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
-                TheViperRoomBotMessages::PublicPodcastSendingIntroMessage,
+                TheViperRoomBotMessages::PleaseWaitForPersonalPodcastSearch,
             ))
             .await?;
             bot.send_message(chat_id, bot_system_message).await?;
 
-            generate_podcast(app_state.clone(), user_id.0 as i64, recipient).await?
+            let generated_personal_podcast = generate_podcast(
+                app_state.clone(),
+                user_id.0 as i64,
+                recipient
+            )
+                .await?;
+
+            if let Err(e) =
+                save_daily_podcast(
+                    &generated_personal_podcast,
+                    &generated_personal_podcast
+                        .with_extension("txt"),
+                    Recipient::Public
+                )
+                    .await
+            {
+                error!("Failed to save daily public podcast: {}", e);
+            }
+
+            generated_personal_podcast
         }
     };
 
@@ -703,7 +730,7 @@ pub async fn send_private_daily_podcast(
         "Твой сегодняшний подкаст".to_string()
     };
 
-    info!("Sending daily podcast to user...");
+    info!("Sending personal daily podcast to user: {} [{}]...", username, user_id);
 
     let thumbnail_path = "common_res/the_viper_room/podcast_cover.jpg";
 

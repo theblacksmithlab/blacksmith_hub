@@ -205,7 +205,9 @@ pub enum TheViperRoomBotMessages {
     ChannelAddingInstruction,
     SettingsMenuUnexpectedMessage,
     GeminiTTSInstruction,
-    PleaseWaitForPersonalPodcast,
+    PleaseWaitForPersonalPodcastSearch,
+    PleaseWaitForPersonalPodcastRecord,
+    GrabAFreshPersonalPodcast
 }
 
 impl TheViperRoomBotMessages {
@@ -230,9 +232,11 @@ impl TheViperRoomBotMessages {
                 "settings_menu_unexpected_message"
             }
             TheViperRoomBotMessages::GeminiTTSInstruction => "gemini_tts_instruction",
-            TheViperRoomBotMessages::PleaseWaitForPersonalPodcast => {
-                "please_wait_for_personal_podcast"
+            TheViperRoomBotMessages::PleaseWaitForPersonalPodcastSearch => {
+                "please_wait_for_personal_podcast_search"
             }
+            TheViperRoomBotMessages::PleaseWaitForPersonalPodcastRecord => {"please_wait_for_personal_podcast_record"},
+            TheViperRoomBotMessages::GrabAFreshPersonalPodcast => {"grab_a_fresh_personal_podcast"}
         }
     }
 }

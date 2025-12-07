@@ -567,7 +567,7 @@ pub(crate) async fn the_viper_room_message_handler(
         }
         "🎧 Персональный подкаст" => {
             let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
-                TheViperRoomBotMessages::PleaseWaitForPersonalPodcast,
+                TheViperRoomBotMessages::PleaseWaitForPersonalPodcastSearch,
             ))
             .await?;
             bot.send_message(chat_id, bot_system_message).await?;
