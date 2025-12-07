@@ -376,14 +376,11 @@ async fn generate_elevenlabs_speech(text: &str, api_key: &str) -> anyhow::Result
     Ok(response)
 }
 
-pub async fn podcast_tts_via_google(
-    text: String,
-    user_tmp_dir: String,
-) -> anyhow::Result<PathBuf> {
+pub async fn podcast_tts_via_google(text: String, user_tmp_dir: String) -> anyhow::Result<PathBuf> {
     info!("Starting Google Gemini TTS podcast recording...");
 
-    let api_key = std::env::var("GOOGLE_API_KEY")
-        .map_err(|_| anyhow::anyhow!("GOOGLE_API_KEY not found"))?;
+    let api_key =
+        std::env::var("GOOGLE_API_KEY").map_err(|_| anyhow::anyhow!("GOOGLE_API_KEY not found"))?;
 
     // Get TTS instruction from messages
     let tts_instruction = get_message(AppsSystemMessages::TheViperRoomBot(
@@ -443,7 +440,10 @@ pub async fn podcast_tts_via_google(
         convert_pcm_to_mp3(&pcm_part_path, &mp3_part_path)?;
 
         if let Err(e) = fs::remove_file(&pcm_part_path) {
-            warn!("Could not delete temporary PCM file {}: {}", pcm_part_path, e);
+            warn!(
+                "Could not delete temporary PCM file {}: {}",
+                pcm_part_path, e
+            );
         }
 
         audio_parts.push(mp3_part_path);
@@ -545,7 +545,12 @@ async fn generate_gemini_speech(
     Ok(wav_data)
 }
 
-fn pcm_to_wav(pcm_data: &[u8], sample_rate: u32, channels: u16, bits_per_sample: u16) -> anyhow::Result<Vec<u8>> {
+fn pcm_to_wav(
+    pcm_data: &[u8],
+    sample_rate: u32,
+    channels: u16,
+    bits_per_sample: u16,
+) -> anyhow::Result<Vec<u8>> {
     let mut wav_data = Vec::new();
 
     wav_data.extend_from_slice(b"RIFF");

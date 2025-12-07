@@ -3,7 +3,7 @@ use core::local_db::telegram::groot_bot::subscription_management::{
     create_subscription, has_active_subscription_for_other_chats,
 };
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
-use core::state::tg_bot::app_state::BotAppState;
+use core::state::tg_bot::GrootBotState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::subscription_utils::get_plan_by_id;
 use core::utils::tg_bot::groot_bot::subscription_utils::{
@@ -17,7 +17,7 @@ use tracing::{error, info};
 pub async fn groot_bot_callback_query_handler(
     bot: Bot,
     callback_query: CallbackQuery,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
     let callback_data = callback_query
@@ -53,13 +53,13 @@ pub async fn groot_bot_callback_query_handler(
 async fn handle_pay_cancel(
     bot: Bot,
     callback_query: CallbackQuery,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
 
-    if let Some(payment_states_mutex) = &app_state.payment_states {
-        let mut payment_states = payment_states_mutex.lock().await;
+    {
+        let mut payment_states = app_state.payment_states.lock().await;
         payment_states.remove(&user_id);
     }
 
@@ -84,7 +84,7 @@ async fn handle_pay_cancel(
 async fn handle_plan_selection(
     bot: Bot,
     callback_query: CallbackQuery,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
     plan_id: &str,
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
@@ -101,30 +101,27 @@ async fn handle_plan_selection(
     };
 
     let (target_chat_title, target_chat_username, target_chat_id) = {
-        if let Some(payment_states_mutex) = &app_state.payment_states {
-            let payment_states = payment_states_mutex.lock().await;
-            if let Some(payment_process) = payment_states.get(&user_id) {
-                (
-                    payment_process
-                        .target_chat_title
-                        .clone()
-                        .unwrap_or_default(),
-                    payment_process
-                        .target_chat_username
-                        .clone()
-                        .unwrap_or_default(),
-                    payment_process.target_chat_id.unwrap_or(0),
-                )
-            } else {
-                return handle_expired_session(bot, callback_query).await;
-            }
+        let payment_states = app_state.payment_states.lock().await;
+        if let Some(payment_process) = payment_states.get(&user_id) {
+            (
+                payment_process
+                    .target_chat_title
+                    .clone()
+                    .unwrap_or_default(),
+                payment_process
+                    .target_chat_username
+                    .clone()
+                    .unwrap_or_default(),
+                payment_process.target_chat_id.unwrap_or(0),
+            )
         } else {
-            return Ok(());
+            return handle_expired_session(bot, callback_query).await;
         }
     };
 
     let original_price = plan.price_usd;
-    let (discount_percent, discount_reason, final_price) = if let Some(db_pool) = &app_state.db_pool
+    let (discount_percent, discount_reason, final_price) = if let Some(db_pool) =
+        &app_state.core.db_pool
     {
         match has_active_subscription_for_other_chats(db_pool, user_id as i64, target_chat_id).await
         {
@@ -187,8 +184,8 @@ async fn handle_plan_selection(
     };
 
     {
-        if let Some(payment_states_mutex) = &app_state.payment_states {
-            let mut payment_states = payment_states_mutex.lock().await;
+        {
+            let mut payment_states = app_state.payment_states.lock().await;
             if let Some(payment_process) = payment_states.get_mut(&user_id) {
                 payment_process.state = SubscriptionState::AwaitingPaymentConfirmation;
                 payment_process.selected_plan = Some(plan_id.to_string());
@@ -237,39 +234,35 @@ async fn handle_plan_selection(
 async fn handle_back_to_plans(
     bot: Bot,
     callback_query: CallbackQuery,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
 
     let (chat_username, target_chat_title, target_chat_id) = {
-        if let Some(payment_states_mutex) = &app_state.payment_states {
-            let mut payment_states = payment_states_mutex.lock().await;
-            if let Some(payment_process) = payment_states.get_mut(&user_id) {
-                payment_process.state = SubscriptionState::AwaitingPlanSelection;
-                payment_process.selected_plan = None;
-                payment_process.payment_amount = None;
-                payment_process.original_price = None;
-                payment_process.discount_percent = None;
-                payment_process.final_price = None;
-                payment_process.discount_reason = None;
+        let mut payment_states = app_state.payment_states.lock().await;
+        if let Some(payment_process) = payment_states.get_mut(&user_id) {
+            payment_process.state = SubscriptionState::AwaitingPlanSelection;
+            payment_process.selected_plan = None;
+            payment_process.payment_amount = None;
+            payment_process.original_price = None;
+            payment_process.discount_percent = None;
+            payment_process.final_price = None;
+            payment_process.discount_reason = None;
 
-                (
-                    payment_process
-                        .target_chat_username
-                        .clone()
-                        .unwrap_or_default(),
-                    payment_process
-                        .target_chat_title
-                        .clone()
-                        .unwrap_or_default(),
-                    payment_process.target_chat_id.unwrap_or(0),
-                )
-            } else {
-                return handle_expired_session(bot, callback_query).await;
-            }
+            (
+                payment_process
+                    .target_chat_username
+                    .clone()
+                    .unwrap_or_default(),
+                payment_process
+                    .target_chat_title
+                    .clone()
+                    .unwrap_or_default(),
+                payment_process.target_chat_id.unwrap_or(0),
+            )
         } else {
-            return Ok(());
+            return handle_expired_session(bot, callback_query).await;
         }
     };
 
@@ -318,27 +311,23 @@ async fn handle_expired_session(bot: Bot, callback_query: CallbackQuery) -> Resu
 async fn handle_payment_confirm(
     bot: Bot,
     callback_query: CallbackQuery,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
 
     let (target_chat_username, final_price, target_chat_title) = {
-        if let Some(payment_states_mutex) = &app_state.payment_states {
-            let mut payment_states = payment_states_mutex.lock().await;
-            if let Some(payment_process) = payment_states.get_mut(&user_id) {
-                payment_process.state = SubscriptionState::ProcessingPayment;
+        let mut payment_states = app_state.payment_states.lock().await;
+        if let Some(payment_process) = payment_states.get_mut(&user_id) {
+            payment_process.state = SubscriptionState::ProcessingPayment;
 
-                (
-                    payment_process.target_chat_username.clone(),
-                    payment_process.final_price.clone(),
-                    payment_process.target_chat_title.clone(),
-                )
-            } else {
-                return handle_expired_session(bot, callback_query).await;
-            }
+            (
+                payment_process.target_chat_username.clone(),
+                payment_process.final_price.clone(),
+                payment_process.target_chat_title.clone(),
+            )
         } else {
-            return Ok(());
+            return handle_expired_session(bot, callback_query).await;
         }
     };
 
@@ -350,7 +339,7 @@ async fn handle_payment_confirm(
     let target_chat_title =
         target_chat_title.ok_or_else(|| anyhow::anyhow!("Missing target_chat_username"))?;
 
-    let heleket_client = app_state.heleket_client.as_ref().unwrap();
+    let heleket_client = &app_state.heleket_client;
     let invoice = match heleket_client
         .create_invoice(payment_amount as f64, &user_id.to_string())
         .await
@@ -365,8 +354,8 @@ async fn handle_payment_confirm(
         }
     };
 
-    if let Some(payment_states_mutex) = &app_state.payment_states {
-        let mut payment_states = payment_states_mutex.lock().await;
+    {
+        let mut payment_states = app_state.payment_states.lock().await;
         if let Some(payment_process) = payment_states.get_mut(&user_id) {
             payment_process.heleket_order_id = Some(invoice.order_id.clone());
             payment_process.heleket_invoice_uuid = Some(invoice.uuid.clone());
@@ -397,24 +386,20 @@ async fn handle_payment_confirm(
 async fn handle_check_payment(
     bot: Bot,
     callback_query: CallbackQuery,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
 ) -> Result<()> {
     let user_id = callback_query.from.id.0;
     let chat_id = callback_query.message.as_ref().unwrap().chat().id;
 
     let (invoice_uuid, payment_process) = {
-        if let Some(payment_states_mutex) = &app_state.payment_states {
-            let payment_states = payment_states_mutex.lock().await;
-            if let Some(payment_process) = payment_states.get(&user_id) {
-                (
-                    payment_process.heleket_invoice_uuid.clone(),
-                    payment_process.clone(),
-                )
-            } else {
-                return handle_expired_session(bot, callback_query).await;
-            }
+        let payment_states = app_state.payment_states.lock().await;
+        if let Some(payment_process) = payment_states.get(&user_id) {
+            (
+                payment_process.heleket_invoice_uuid.clone(),
+                payment_process.clone(),
+            )
         } else {
-            return Ok(());
+            return handle_expired_session(bot, callback_query).await;
         }
     };
 
@@ -428,7 +413,7 @@ async fn handle_check_payment(
         }
     };
 
-    let heleket_client = app_state.heleket_client.as_ref().unwrap();
+    let heleket_client = &app_state.heleket_client;
     let status = match heleket_client.check_invoice_status(&invoice_uuid).await {
         Ok(status) => status,
         Err(e) => {
@@ -441,7 +426,7 @@ async fn handle_check_payment(
     };
 
     if status.payment_status == "paid" {
-        if let Some(db_pool) = &app_state.db_pool {
+        if let Some(db_pool) = &app_state.core.db_pool {
             let plan_type = match payment_process.selected_plan.as_ref().unwrap().as_str() {
                 "monthly" => "monthly",
                 "yearly" => "yearly",
@@ -500,8 +485,8 @@ async fn handle_check_payment(
             .await?;
         }
 
-        if let Some(payment_states_mutex) = &app_state.payment_states {
-            let mut payment_states = payment_states_mutex.lock().await;
+        {
+            let mut payment_states = app_state.payment_states.lock().await;
             payment_states.remove(&user_id);
         }
 
@@ -536,11 +521,11 @@ async fn handle_check_payment(
 
         bot.send_message(chat_id, important_instructions).await?;
 
-        if let Some(chat_stats_mutex) = &app_state.chat_message_stats {
-            let mut chat_stats = chat_stats_mutex.lock().await;
+        {
+            let mut chat_stats = app_state.chat_message_stats.lock().await;
             if let Err(err) = chat_stats
                 .fetch_chat_history_for_new_chat(
-                    &app_state.app_name,
+                    &app_state.core.app_name,
                     ChatId(payment_process.target_chat_id.unwrap()),
                     &payment_process.target_chat_username.clone().unwrap(),
                 )

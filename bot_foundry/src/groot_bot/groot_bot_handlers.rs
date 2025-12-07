@@ -10,7 +10,7 @@ use core::models::common::system_messages::{
 };
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ResourcesDialogState, ShowType};
-use core::state::tg_bot::app_state::BotAppState;
+use core::state::tg_bot::GrootBotState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
     get_chat_username, is_message_from_linked_channel, load_super_admins, read_admins_from_csv,
@@ -34,9 +34,9 @@ pub async fn groot_bot_command_handler(
     bot: Bot,
     msg: Message,
     cmd: GrootBotCommands,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
 ) -> Result<()> {
-    let app_name = &app_state.app_name;
+    let app_name = &app_state.core.app_name;
     let super_admins = load_super_admins(app_name);
     let user_id = msg.clone().from.unwrap().id.0;
     let chat_title = get_chat_title(&msg);
@@ -47,7 +47,7 @@ pub async fn groot_bot_command_handler(
     let mut is_from_linked_channel = false;
 
     // Checking subscription
-    let is_paid_chat = if let Some(db_pool) = &app_state.db_pool {
+    let is_paid_chat = if let Some(db_pool) = &app_state.core.db_pool {
         check_chat_payment(db_pool, msg.chat.id.0)
             .await
             .unwrap_or(false)
@@ -327,7 +327,7 @@ pub async fn groot_bot_command_handler(
             };
             let plan_type = parts[5];
 
-            if let Some(db_pool) = &app_state.db_pool {
+            if let Some(db_pool) = &app_state.core.db_pool {
                 create_subscription(
                     db_pool,
                     chat_id,
@@ -338,11 +338,11 @@ pub async fn groot_bot_command_handler(
                 )
                 .await?;
 
-                if let Some(chat_stats_mutex) = &app_state.chat_message_stats {
-                    let mut chat_stats = chat_stats_mutex.lock().await;
+                {
+                    let mut chat_stats = app_state.chat_message_stats.lock().await;
                     let _ = chat_stats
                         .fetch_chat_history_for_new_chat(
-                            &app_state.app_name,
+                            &app_state.core.app_name,
                             ChatId(chat_id),
                             chat_username,
                         )
@@ -386,10 +386,10 @@ pub async fn groot_bot_command_handler(
                     chat_username, msg.chat.id
                 );
 
-                let mut chat_stats = app_state.chat_message_stats.as_ref().unwrap().lock().await;
+                let mut chat_stats = app_state.chat_message_stats.lock().await;
                 if let Err(err) = chat_stats
                     .fetch_chat_history_for_new_chat(
-                        &app_state.app_name,
+                        &app_state.core.app_name,
                         msg.chat.id,
                         chat_username,
                     )
@@ -411,33 +411,31 @@ pub async fn groot_bot_command_handler(
             bot.send_message(msg.chat.id, bot_msg).await?;
         }
         GrootBotCommands::Resources => {
-            if let Some(dialog_states_mutex) = &app_state.dialog_states {
-                let mut dialog_states = dialog_states_mutex.lock().await;
+            let mut dialog_states = app_state.dialog_states.lock().await;
 
-                let state = dialog_states
-                    .entry(user_id)
-                    .or_insert(ResourcesDialogState {
-                        awaiting_option_choice: false,
-                        awaiting_edit_type: false,
-                        awaiting_show_type: false,
-                        edit_type: EditType::None,
-                        show_type: ShowType::None,
-                        awaiting_data_entry: false,
-                        awaiting_ask_message: false,
-                    });
+            let state = dialog_states
+                .entry(user_id)
+                .or_insert(ResourcesDialogState {
+                    awaiting_option_choice: false,
+                    awaiting_edit_type: false,
+                    awaiting_show_type: false,
+                    edit_type: EditType::None,
+                    show_type: ShowType::None,
+                    awaiting_data_entry: false,
+                    awaiting_ask_message: false,
+                });
 
-                state.awaiting_option_choice = true;
+            state.awaiting_option_choice = true;
 
-                let keyboard = KeyboardMarkup::new(vec![
-                    vec![KeyboardButton::new("ПОКАЗАТЬ resources")],
-                    vec![KeyboardButton::new("ДОБАВИТЬ resources")],
-                    vec![KeyboardButton::new("Cancel")],
-                ]);
+            let keyboard = KeyboardMarkup::new(vec![
+                vec![KeyboardButton::new("ПОКАЗАТЬ resources")],
+                vec![KeyboardButton::new("ДОБАВИТЬ resources")],
+                vec![KeyboardButton::new("Cancel")],
+            ]);
 
-                bot.send_message(msg.chat.id, "Choose an option:")
-                    .reply_markup(keyboard)
-                    .await?;
-            }
+            bot.send_message(msg.chat.id, "Choose an option:")
+                .reply_markup(keyboard)
+                .await?;
         }
         GrootBotCommands::Manual => {
             let bot_msg = get_message(AppsSystemMessages::GrootBot(
@@ -691,7 +689,7 @@ pub async fn groot_bot_command_handler(
 pub async fn groot_bot_message_handler(
     bot: Bot,
     update: Update,
-    bot_app_state: Arc<BotAppState>,
+    bot_app_state: Arc<GrootBotState>,
 ) -> Result<()> {
     let msg = match update {
         Update {
@@ -706,7 +704,7 @@ pub async fn groot_bot_message_handler(
     };
 
     // Checking subscription
-    let is_paid_chat = if let Some(db_pool) = &bot_app_state.db_pool {
+    let is_paid_chat = if let Some(db_pool) = &bot_app_state.core.db_pool {
         check_chat_payment(db_pool, msg.chat.id.0)
             .await
             .unwrap_or(false)
@@ -724,7 +722,7 @@ pub async fn groot_bot_message_handler(
 pub async fn handle_subscription_command(
     bot: Bot,
     msg: Message,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
 ) -> Result<()> {
     let target_chat_id = msg.chat.id.0;
     let target_chat_title = get_chat_title(&msg);
@@ -747,7 +745,7 @@ pub async fn handle_subscription_command(
         }
     };
 
-    if let Some(db_pool) = &app_state.db_pool {
+    if let Some(db_pool) = &app_state.core.db_pool {
         if check_chat_payment(db_pool, target_chat_id)
             .await
             .unwrap_or(false)
@@ -816,8 +814,8 @@ pub async fn handle_subscription_command(
             }
         };
 
-        if let Some(payment_states_mutex) = &app_state.payment_states {
-            let mut payment_states = payment_states_mutex.lock().await;
+        {
+            let mut payment_states = app_state.payment_states.lock().await;
 
             payment_states.insert(
                 owner.id.0,
@@ -883,8 +881,8 @@ pub async fn handle_subscription_command(
             }
         };
 
-        if let Some(payment_states_mutex) = &app_state.payment_states {
-            let mut payment_states = payment_states_mutex.lock().await;
+        {
+            let mut payment_states = app_state.payment_states.lock().await;
 
             payment_states.insert(
                 user_id,
@@ -933,7 +931,7 @@ pub async fn handle_subscription_command(
 pub async fn handle_status_command(
     bot: Bot,
     msg: Message,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
 ) -> Result<()> {
     let chat_id = msg.chat.id.0;
 
@@ -957,7 +955,7 @@ pub async fn handle_status_command(
 
     let chat_title = get_chat_title(&msg);
 
-    if let Some(db_pool) = &app_state.db_pool {
+    if let Some(db_pool) = &app_state.core.db_pool {
         match get_subscription_info(db_pool, chat_id).await {
             Ok(Some(subscription)) => {
                 let end_date = DateTime::parse_from_rfc3339(&subscription.end_date)

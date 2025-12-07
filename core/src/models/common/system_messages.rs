@@ -205,6 +205,7 @@ pub enum TheViperRoomBotMessages {
     ChannelAddingInstruction,
     SettingsMenuUnexpectedMessage,
     GeminiTTSInstruction,
+    PleaseWaitForPersonalPodcast,
 }
 
 impl TheViperRoomBotMessages {
@@ -229,6 +230,9 @@ impl TheViperRoomBotMessages {
                 "settings_menu_unexpected_message"
             }
             TheViperRoomBotMessages::GeminiTTSInstruction => "gemini_tts_instruction",
+            TheViperRoomBotMessages::PleaseWaitForPersonalPodcast => {
+                "please_wait_for_personal_podcast"
+            }
         }
     }
 }

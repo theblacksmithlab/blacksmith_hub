@@ -5,12 +5,14 @@ use core::local_db::the_viper_room::channel_management;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::TheViperRoomBotMessages;
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
-use core::state::tg_bot::app_state::BotAppState;
-use core::telegram_client::grammers_functionality::initialize_grammers_client;
+use core::models::the_viper_room::db_models::Recipient;
+use core::models::the_viper_room::the_viper_room_bot;
+use core::models::the_viper_room::the_viper_room_bot::MainMenuMessageType;
+use core::state::tg_bot::TheViperRoomBotState;
 use core::utils::common::get_message;
 use core::utils::the_viper_room::news_block_creation::news_block_creation;
 use core::utils::the_viper_room::news_block_creation_utils::{
-    generate_waveform, save_daily_public_podcast,
+    generate_waveform, save_daily_podcast,
 };
 use grammers_client::types::{attributes::Attribute, InputMessage};
 use grammers_client::Client as g_Client;
@@ -19,6 +21,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use teloxide::prelude::{ChatId, Requester};
+use teloxide::types::MessageOrigin;
 use teloxide::types::{ChatKind, PublicChatKind};
 use teloxide::Bot;
 use teloxide_core::payloads::{SendAudioSetters, SendMessageSetters};
@@ -30,40 +33,8 @@ use tokio::time;
 use tokio::time::Instant;
 use tracing::error;
 use tracing::log::info;
-use teloxide::types::MessageOrigin;
 
-/// Normalizes Telegram channel ID to raw positive format.
-///
-/// Telegram uses two formats for channel IDs:
-/// - Teloxide/Bot API: `-100XXXXXXXXX` (full format with -100 prefix)
-/// - Grammers/MTProto: `XXXXXXXXX` (raw format, positive)
-///
-/// This function converts both formats to the canonical raw format.
-///
-/// # Examples
-/// - `-1001403170292` → `1403170292`
-/// - `1403170292` → `1403170292`
-pub fn normalize_channel_id(id: i64) -> i64 {
-    // Check if ID is in full format (negative with -100 prefix)
-    // The -100 prefix means the number is less than -10^12
-    if id < -1_000_000_000_000 {
-        // Strip the -100 prefix: abs(id) - 10^12
-        id.abs() - 1_000_000_000_000
-    } else {
-        // Already in raw format or positive - just ensure it's positive
-        id.abs()
-    }
-}
-
-/// Extracts username from Telegram channel link
-///
-/// Supports formats:
-/// - `https://t.me/username` → `username`
-/// - `http://t.me/username` → `username`
-/// - `t.me/username` → `username`
-///
-/// Returns None if link is invalid or username is empty
-fn extract_username_from_link(input: &str) -> Option<String> {
+fn extract_channel_username_from_link(input: &str) -> Option<String> {
     // Try to strip common prefixes
     let after_tme = input
         .strip_prefix("https://t.me/")
@@ -71,10 +42,7 @@ fn extract_username_from_link(input: &str) -> Option<String> {
         .or_else(|| input.strip_prefix("t.me/"))?;
 
     // Username is everything before first slash, space or special char
-    let username = after_tme
-        .split(&['/', ' ', '?', '#'][..])
-        .next()?
-        .trim();
+    let username = after_tme.split(&['/', ' ', '?', '#'][..]).next()?.trim();
 
     if username.is_empty() {
         None
@@ -83,43 +51,49 @@ fn extract_username_from_link(input: &str) -> Option<String> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum MainMenuMessageType {
-    Full,
-    Minimal,
-}
-
 pub async fn generate_podcast(
-    g_client: g_Client,
-    bot: Bot,
-    chat_id: ChatId,
-    app_state: Arc<BotAppState>,
-    tg_agent_id: &str,
-    nickname: String,
-    chat_username: &str,
-) -> Result<()> {
-    info!("Starting podcast generation by /podcast cmd...");
+    app_state: Arc<TheViperRoomBotState>,
+    user_id: i64, // make u64
+    recipient: Recipient,
+) -> Result<PathBuf> {
+    info!("Starting podcast generation for recipient: {:?}", recipient);
 
-    if !g_client.is_authorized().await? {
-        bot.send_message(chat_id, "System g_Client is NOT okay!")
-            .await?;
+    let telegram_client = &app_state.telegram_agent.client;
 
-        return Ok(());
-    } else {
-        bot.send_message(chat_id, "System g_Client is okay!")
-            .await?;
+    if !telegram_client.is_authorized().await? {
+        return Err(anyhow::anyhow!("Telegram agent is not authorized!"));
     }
 
-    let podcast = news_block_creation(&g_client, tg_agent_id, app_state, nickname, true).await?;
+    let podcast_path = news_block_creation(
+        &telegram_client,
+        &user_id.to_string(),
+        app_state.clone(),
+        recipient,
+        true,
+        app_state.core.db_pool.as_ref().map(|v| v.as_ref()),
+    )
+    .await?;
 
-    let uploaded_file = g_client.upload_file(&podcast).await?;
+    info!("Podcast generated successfully: {:?}", podcast_path);
 
-    let podcast_caption_file = podcast.with_extension("txt");
+    Ok(podcast_path)
+}
+
+pub async fn send_generated_podcast_via_telegram_agent(
+    podcast_file_path: PathBuf,
+    telegram_client: &g_Client,
+    chat_username: &str,
+) -> Result<()> {
+    info!("Sending podcast via Telegram agent to @{}", chat_username);
+
+    let uploaded_file = telegram_client.upload_file(&podcast_file_path).await?;
+
+    let podcast_caption_file = podcast_file_path.with_extension("txt");
 
     let podcast_caption = read_to_string(&podcast_caption_file)
         .map_err(|e| anyhow::anyhow!("Failed to read podcast caption from file: {}", e))?;
 
-    let waveform = generate_waveform(&podcast).await?;
+    let waveform = generate_waveform(&podcast_file_path).await?;
 
     let input_message_default = InputMessage::default();
 
@@ -130,19 +104,23 @@ pub async fn generate_podcast(
             waveform: Option::from(waveform),
         });
 
-    let chat = g_client
+    let chat = telegram_client
         .resolve_username(chat_username)
         .await?
-        .ok_or_else(|| anyhow!("Channel for broadcasting not found"))?;
+        .ok_or_else(|| anyhow!("Chat for broadcasting not found"))?;
 
-    g_client.send_message(&chat, input_message).await?;
-    g_client.send_message(&chat, podcast_caption).await?;
+    telegram_client.send_message(&chat, input_message).await?;
+    telegram_client.send_message(&chat, podcast_caption).await?;
 
-    if let Err(e) = save_daily_public_podcast(&podcast, &podcast_caption_file).await {
+    info!("Podcast sent successfully to @{}", chat_username);
+
+    if let Err(e) =
+        save_daily_podcast(&podcast_file_path, &podcast_caption_file, Recipient::Public).await
+    {
         error!("Failed to save daily public podcast: {}", e);
     }
 
-    for file in [&podcast, &podcast_caption_file] {
+    for file in [&podcast_file_path, &podcast_caption_file] {
         match remove_file(file) {
             Ok(_) => info!("File {} deleted after broadcast!", file.display()),
             Err(e) => info!("Could not delete {}: {}", file.display(), e),
@@ -152,13 +130,71 @@ pub async fn generate_podcast(
     Ok(())
 }
 
+pub async fn send_generated_podcast_via_bot(
+    bot: &Bot,
+    chat_id: ChatId,
+    podcast_file_path: PathBuf,
+    username: &str,
+    user_id: i64,
+) -> Result<()> {
+    info!("Sending podcast via bot to user {} [{}]", username, chat_id);
+
+    let podcast_caption_file = podcast_file_path.with_extension("txt");
+
+    let caption = if podcast_caption_file.exists() {
+        read_to_string(&podcast_caption_file).unwrap_or_else(|e| {
+            error!("Failed to read caption file: {}", e);
+            "Твой персональный подкаст".to_string()
+        })
+    } else {
+        "Твой персональный подкаст".to_string()
+    };
+
+    let title = extract_podcast_title(&podcast_file_path);
+    let thumbnail_path = "common_res/the_viper_room/podcast_cover.jpg";
+
+    bot.send_audio(chat_id, InputFile::file(&podcast_file_path))
+        .title(title)
+        .performer("The Viper Room")
+        .thumbnail(InputFile::file(thumbnail_path))
+        .caption(&caption)
+        .await?;
+
+    info!(
+        "Podcast sent successfully to user {} [{}]",
+        username, chat_id
+    );
+
+    if let Err(e) = save_daily_podcast(
+        &podcast_file_path,
+        &podcast_caption_file,
+        Recipient::Private(user_id),
+    )
+    .await
+    {
+        error!(
+            "Failed to save daily private podcast for user {}: {}",
+            user_id, e
+        );
+    }
+
+    for file in [&podcast_file_path, &podcast_caption_file] {
+        if file.exists() {
+            match remove_file(file) {
+                Ok(_) => info!("File {} deleted after sending!", file.display()),
+                Err(e) => info!("Could not delete {}: {}", file.display(), e),
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn schedule_podcast(
-    bot: Bot,
-    user_id: ChatId,
-    app_state: Arc<BotAppState>,
-    app_tg_account_id: Arc<String>,
-    nickname: String,
-    session_data: Vec<u8>,
+    _bot: Bot,
+    _user_id: ChatId,
+    app_state: Arc<TheViperRoomBotState>,
+    app_tg_account_id: i64,
 ) -> Result<()> {
     info!("Starting podcast scheduling task by /schedule cmd...");
     {
@@ -171,7 +207,7 @@ pub async fn schedule_podcast(
         *is_running = true;
     }
 
-    let chat_username = "the_viper_room".to_string();
+    let chat_username = "the_viper_room";
 
     let offset = FixedOffset::east_opt(3 * 3600).unwrap();
     let now: DateTime<FixedOffset> = Utc::now().with_timezone(&offset);
@@ -199,36 +235,30 @@ pub async fn schedule_podcast(
     let mut stop_rx = app_state.podcast_manager.stop_rx.clone();
 
     tokio::spawn({
-        let app_tg_account_id = Arc::clone(&app_tg_account_id);
+        let app_state = app_state.clone();
 
         async move {
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
-                        let g_client = match initialize_grammers_client(session_data.clone()).await {
-                            Ok(g_client) => {
-                                if let Err(e) = g_client.is_authorized().await {
-                                    error!("Client authorization failed: {:?}", e);
-                                    continue;
-                                }
-                                g_client
-                            },
+                        let podcast_path = match generate_podcast(
+                            app_state.clone(),
+                            app_tg_account_id,
+                            Recipient::Public,
+                        ).await {
+                            Ok(path) => path,
                             Err(e) => {
-                                error!("Failed to initialize grammers client: {:?}", e);
+                                error!("Error in podcast generation: {:?}", e);
                                 continue;
                             }
                         };
 
-                        if let Err(e) = generate_podcast(
-                            g_client,
-                            bot.clone(),
-                            user_id,
-                            app_state.clone(),
-                            &app_tg_account_id,
-                            nickname.clone(),
-                            &chat_username
-                         ).await {
-                            error!("Error in podcast generation: {:?}", e);
+                        if let Err(e) = send_generated_podcast_via_telegram_agent(
+                            podcast_path,
+                            &app_state.telegram_agent.client,
+                            chat_username,
+                        ).await {
+                            error!("Error sending podcast: {:?}", e);
                         }
                     }
                     Ok(_) = stop_rx.changed() => {
@@ -250,7 +280,7 @@ pub async fn schedule_podcast(
     Ok(())
 }
 
-pub async fn stop_daily_podcasts(app_state: Arc<BotAppState>) -> Result<()> {
+pub async fn stop_daily_podcasts(app_state: Arc<TheViperRoomBotState>) -> Result<()> {
     info!("Stopping podcast scheduling task by /stop cmd...");
     let is_running = {
         let running = app_state.podcast_manager.state.is_running.lock().await;
@@ -272,11 +302,11 @@ pub async fn send_main_menu(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
-    app_state: &Arc<BotAppState>,
+    app_state: &Arc<TheViperRoomBotState>,
     message_type: MainMenuMessageType,
 ) -> Result<()> {
-    if let Some(states) = &app_state.the_viper_room_bot_user_states {
-        let mut states_lock = states.lock().await;
+    {
+        let mut states_lock = app_state.user_states.lock().await;
         states_lock.insert(user_id.0, TheViperRoomBotUserState::Idle);
     }
 
@@ -320,10 +350,10 @@ pub async fn send_settings_menu(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
-    app_state: &Arc<BotAppState>,
+    app_state: &Arc<TheViperRoomBotState>,
 ) -> Result<()> {
-    if let Some(states) = &app_state.the_viper_room_bot_user_states {
-        let mut states_lock = states.lock().await;
+    {
+        let mut states_lock = app_state.user_states.lock().await;
         states_lock.insert(user_id.0, TheViperRoomBotUserState::InSettingsMenu);
     }
 
@@ -355,10 +385,10 @@ pub async fn send_channels_menu(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
-    app_state: &Arc<BotAppState>,
+    app_state: &Arc<TheViperRoomBotState>,
 ) -> Result<()> {
-    if let Some(states) = &app_state.the_viper_room_bot_user_states {
-        let mut states_lock = states.lock().await;
+    {
+        let mut states_lock = app_state.user_states.lock().await;
         states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsMenuView);
     }
 
@@ -369,13 +399,10 @@ pub async fn send_channels_menu(
             "👁 Показать мои каналы",
             "channels_show_list",
         )],
-        vec![InlineKeyboardButton::callback(
-            "➖ Удалить канал",
-            "channels_delete"),
-             InlineKeyboardButton::callback(
-            "➕ Добавить канал",
-            "channels_add",
-        )],
+        vec![
+            InlineKeyboardButton::callback("➖ Удалить канал", "channels_delete"),
+            InlineKeyboardButton::callback("➕ Добавить канал", "channels_add"),
+        ],
         vec![InlineKeyboardButton::callback(
             "« Назад в Настройки",
             "back_to_settings",
@@ -397,9 +424,9 @@ pub async fn show_user_channels(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
-    app_state: &Arc<BotAppState>,
+    app_state: &Arc<TheViperRoomBotState>,
 ) -> Result<()> {
-    let db_pool = match &app_state.db_pool {
+    let db_pool = match &app_state.core.db_pool {
         Some(pool) => pool,
         None => {
             bot.send_message(chat_id, "Ошибка: база данных недоступна")
@@ -418,11 +445,18 @@ pub async fn show_user_channels(
             .iter()
             .enumerate()
             .map(|(i, ch)| {
-                let username_info = ch.channel_username
+                let username_info = ch
+                    .channel_username
                     .as_ref()
                     .map(|u| format!(" @{}", u))
                     .unwrap_or_default();
-                format!("{}. {}{} (ID: {})", i + 1, ch.channel_title, username_info, ch.channel_id)
+                format!(
+                    "{}. {}{} (ID: {})",
+                    i + 1,
+                    ch.channel_title,
+                    username_info,
+                    ch.channel_id
+                )
             })
             .collect::<Vec<_>>()
             .join("\n");
@@ -446,15 +480,15 @@ pub async fn send_add_channel_prompt(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
-    app_state: &Arc<BotAppState>,
+    app_state: &Arc<TheViperRoomBotState>,
 ) -> Result<()> {
-    if let Some(states) = &app_state.the_viper_room_bot_user_states {
-        let mut states_lock = states.lock().await;
+    {
+        let mut states_lock = app_state.user_states.lock().await;
         states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsAdding);
     }
 
-    if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
-        let mut pending_lock = pending.lock().await;
+    {
+        let mut pending_lock = app_state.pending_channels.lock().await;
         pending_lock.insert(user_id.0, Vec::new());
     }
 
@@ -481,10 +515,10 @@ pub async fn send_delete_channel_prompt(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
-    app_state: &Arc<BotAppState>,
+    app_state: &Arc<TheViperRoomBotState>,
 ) -> Result<()> {
-    if let Some(states) = &app_state.the_viper_room_bot_user_states {
-        let mut states_lock = states.lock().await;
+    {
+        let mut states_lock = app_state.user_states.lock().await;
         states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsDeleting);
     }
 
@@ -505,47 +539,41 @@ pub async fn send_delete_channel_prompt(
 }
 
 pub enum ChannelInput {
-    /// Channel forwarded from a post - contains (channel_id, channel_title, channel_username)
     Forwarded(i64, String, Option<String>),
-    /// Text input with channel usernames (without @) and list of ignored invalid inputs
     Usernames(Vec<String>, Vec<String>),
 }
 
-/// Parses user input to extract channel information
-/// Supports: forwarded posts from channels, @username (multiple comma-separated)
 pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInput> {
     if let Some(origin) = msg.forward_origin() {
         match origin {
-            MessageOrigin::Channel { chat, .. } => {
-                match &chat.kind {
-                    ChatKind::Public(public_chat) => {
-                        match &public_chat.kind {
-                            PublicChatKind::Channel(channel_info) => {
-                                let channel_id = normalize_channel_id(chat.id.0);
-                                let channel_title = chat.title().unwrap_or("Без названия").to_string();
-                                let channel_username = channel_info.username.clone();
+            MessageOrigin::Channel { chat, .. } => match &chat.kind {
+                ChatKind::Public(public_chat) => match &public_chat.kind {
+                    PublicChatKind::Channel(channel_info) => {
+                        let channel_id = the_viper_room_bot::normalize_channel_id(chat.id.0);
+                        let channel_title = chat.title().unwrap_or("Без названия").to_string();
+                        let channel_username = channel_info.username.clone();
 
-                                info!(
-                                    "Forwarded from channel: ID={}, title='{}', username={:?}",
-                                    channel_id, channel_title, channel_username
-                                );
+                        info!(
+                            "Forwarded from channel: ID={}, title='{}', username={:?}",
+                            channel_id, channel_title, channel_username
+                        );
 
-                                return Ok(ChannelInput::Forwarded(channel_id, channel_title, channel_username));
-                            }
-                            _ => {
-                                return Err(anyhow!(
-                                    "Источник не является каналом. Перешли сообщение именно из канала."
-                                ));
-                            }
-                        }
+                        return Ok(ChannelInput::Forwarded(
+                            channel_id,
+                            channel_title,
+                            channel_username,
+                        ));
                     }
                     _ => {
                         return Err(anyhow!(
-                            "Источник не является публичным каналом."
+                            "Источник не является каналом. Перешли сообщение именно из канала."
                         ));
                     }
+                },
+                _ => {
+                    return Err(anyhow!("Источник не является публичным каналом."));
                 }
-            }
+            },
             MessageOrigin::Chat { .. } => {
                 return Err(anyhow!(
                     "Сообщение переслано из чата. Пожалуйста, перешли пост непосредственно из канала."
@@ -586,7 +614,7 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
 
             for token in tokens {
                 // Try to extract from t.me link first
-                if let Some(username) = extract_username_from_link(token) {
+                if let Some(username) = extract_channel_username_from_link(token) {
                     valid_usernames.push(username);
                 } else if token.starts_with('@') {
                     // Username with @ prefix
@@ -612,7 +640,89 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
     ))
 }
 
-pub(crate) async fn send_actual_daily_public_podcast(bot: Bot, chat_id: ChatId) -> Result<()> {
+pub async fn send_private_daily_podcast(
+    bot: &Bot,
+    user_id: UserId,
+    chat_id: ChatId,
+    username: String,
+    app_state: Arc<TheViperRoomBotState>,
+    recipient: Recipient,
+) -> Result<()> {
+    let personal_daily_podcast_dir = format!(
+        "common_res/the_viper_room/{}/daily_personal_podcast",
+        user_id.0
+    );
+
+    info!(
+        "Looking for personal daily podcast in: {}",
+        personal_daily_podcast_dir
+    );
+
+    let mut podcast_file: Option<PathBuf> = None;
+    let mut caption_file: Option<PathBuf> = None;
+
+    if let Ok(entries) = read_dir(personal_daily_podcast_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(extension) = path.extension() {
+                    match extension.to_str() {
+                        Some("mp3") => podcast_file = Some(path),
+                        Some("txt") => caption_file = Some(path),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    let podcast_path = match podcast_file {
+        Some(path) => path,
+        None => {
+            let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
+                TheViperRoomBotMessages::PublicPodcastSendingIntroMessage,
+            ))
+            .await?;
+            bot.send_message(chat_id, bot_system_message).await?;
+
+            generate_podcast(app_state.clone(), user_id.0 as i64, recipient).await?
+        }
+    };
+
+    info!("Found daily personal podcast: {:?}", podcast_path);
+
+    let title = extract_podcast_title(&podcast_path);
+
+    let caption = if let Some(caption_path) = caption_file {
+        info!("Found caption: {:?}", caption_path);
+        read_to_string(&caption_path).unwrap_or_else(|e| {
+            error!("Failed to read caption file: {}", e);
+            "Твой сегодняшний подкаст".to_string()
+        })
+    } else {
+        "Твой сегодняшний подкаст".to_string()
+    };
+
+    info!("Sending daily podcast to user...");
+
+    let thumbnail_path = "common_res/the_viper_room/podcast_cover.jpg";
+
+    bot.send_audio(chat_id, InputFile::file(&podcast_path))
+        .title(title)
+        .performer("The Viper Room")
+        .thumbnail(InputFile::file(thumbnail_path))
+        .caption(&caption)
+        .await?;
+
+    info!(
+        "Personal daily podcast for user: {} [{}] sent successfully!",
+        username, user_id
+    );
+
+    Ok(())
+}
+
+pub async fn send_actual_daily_public_podcast(bot: Bot, chat_id: ChatId) -> Result<()> {
     let daily_podcast_dir = "common_res/the_viper_room/daily_public_podcast";
 
     info!("Looking for daily public podcast in: {}", daily_podcast_dir);

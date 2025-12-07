@@ -1,6 +1,6 @@
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
-    normalize_channel_id, parse_channel_input, send_actual_daily_public_podcast,
-    send_channels_menu, send_main_menu, send_settings_menu, ChannelInput, MainMenuMessageType,
+    parse_channel_input, send_actual_daily_public_podcast, send_channels_menu, send_main_menu,
+    send_private_daily_podcast, send_settings_menu, ChannelInput,
 };
 use anyhow::Result;
 use core::local_db::the_viper_room::channel_management;
@@ -8,13 +8,16 @@ use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::TheViperRoomBotMessages;
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
 use core::models::the_viper_room::db_models::PendingChannel;
-use core::state::tg_bot::app_state::BotAppState;
+use core::models::the_viper_room::db_models::Recipient;
+use core::models::the_viper_room::the_viper_room_bot::{normalize_channel_id, MainMenuMessageType};
+use core::state::tg_bot::TheViperRoomBotState;
 use core::telegram_client::grammers_functionality::initialize_grammers_client;
 use core::utils::common::get_message;
 use core::utils::tg_bot::tg_bot::auto_delete_messages_batch;
 use core::utils::tg_bot::tg_bot::{
     check_username_from_message, get_chat_title, get_username_from_message, is_bot_addressed,
 };
+use grammers_client::types::Chat;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -23,17 +26,18 @@ use teloxide::prelude::{Message, Requester};
 use teloxide::sugar::request::RequestReplyExt;
 use teloxide::Bot;
 use teloxide_core::payloads::SendMessageSetters;
-use teloxide_core::types::{InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, ParseMode, UserId};
+use teloxide_core::types::{
+    InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, ParseMode, UserId,
+};
 use tracing::info;
 use tracing::log::warn;
-use grammers_client::types::Chat;
 
 const MAX_CHANNELS_PER_USER: usize = 10;
 
 pub(crate) async fn the_viper_room_message_handler(
     bot: Bot,
     msg: Message,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<TheViperRoomBotState>,
 ) -> Result<()> {
     if check_username_from_message(&bot, &msg).await == false {
         return Ok(());
@@ -67,14 +71,12 @@ pub(crate) async fn the_viper_room_message_handler(
         return Ok(());
     }
 
-    let current_state = if let Some(states) = &app_state.the_viper_room_bot_user_states {
-        let states_lock = states.lock().await;
+    let current_state = {
+        let states_lock = app_state.user_states.lock().await;
         states_lock
             .get(&user_id.0)
             .cloned()
             .unwrap_or(TheViperRoomBotUserState::Idle)
-    } else {
-        TheViperRoomBotUserState::Idle
     };
 
     if current_state.is_in_settings() && !current_state.expects_text_input() {
@@ -90,7 +92,7 @@ pub(crate) async fn the_viper_room_message_handler(
                 messages_to_delete,
                 Some(Duration::from_secs(20)),
             )
-                .await;
+            .await;
 
             return Ok(());
         }
@@ -103,8 +105,8 @@ pub(crate) async fn the_viper_room_message_handler(
             } else {
                 match parse_channel_input(&msg) {
                     Ok(ChannelInput::Forwarded(channel_id, channel_title, channel_username)) => {
-                        if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
-                            let mut pending_lock = pending.lock().await;
+                        {
+                            let mut pending_lock = app_state.pending_channels.lock().await;
                             let user_channels =
                                 pending_lock.entry(user_id.0).or_insert_with(Vec::new);
                             user_channels.push(PendingChannel {
@@ -136,7 +138,14 @@ pub(crate) async fn the_viper_room_message_handler(
                             bot.send_message(chat_id, "❌ Ошибка: сессия Telegram не найдена")
                                 .await?;
 
-                            send_main_menu(&bot, user_id, chat_id, &app_state, MainMenuMessageType::Minimal).await?;
+                            send_main_menu(
+                                &bot,
+                                user_id,
+                                chat_id,
+                                &app_state,
+                                MainMenuMessageType::Minimal,
+                            )
+                            .await?;
 
                             return Ok(());
                         }
@@ -155,10 +164,9 @@ pub(crate) async fn the_viper_room_message_handler(
                                         let channel_title = channel.title().to_string();
                                         let channel_username = Some(username.clone());
 
-                                        if let Some(pending) =
-                                            &app_state.the_viper_room_bot_pending_channels
                                         {
-                                            let mut pending_lock = pending.lock().await;
+                                            let mut pending_lock =
+                                                app_state.pending_channels.lock().await;
                                             let user_channels = pending_lock
                                                 .entry(user_id.0)
                                                 .or_insert_with(Vec::new);
@@ -172,10 +180,16 @@ pub(crate) async fn the_viper_room_message_handler(
                                         added_count += 1;
                                     } else if let Chat::Group(_) = chat {
                                         warn!("Username '@{}' is a group, not a channel", username);
-                                        errors.push(format!("@{} - это группа, а не канал", username));
+                                        errors.push(format!(
+                                            "@{} - это группа, а не канал",
+                                            username
+                                        ));
                                     } else {
                                         warn!("Username '@{}' is not a channel (some person's username provided)", username);
-                                        errors.push(format!("@{} не является каналом, похоже, что это пользователь", username));
+                                        errors.push(format!(
+                                            "@{} не является каналом, похоже, что это пользователь",
+                                            username
+                                        ));
                                     }
                                 }
                                 Ok(None) => {
@@ -200,7 +214,8 @@ pub(crate) async fn the_viper_room_message_handler(
                         }
 
                         if !invalid_inputs.is_empty() {
-                            let invalid_list = invalid_inputs.iter()
+                            let invalid_list = invalid_inputs
+                                .iter()
                                 .map(|s| format!("{} (отсутствует @)", s))
                                 .collect::<Vec<_>>()
                                 .join(", ");
@@ -210,7 +225,9 @@ pub(crate) async fn the_viper_room_message_handler(
                         let result_msg = if result_parts.is_empty() {
                             "❌ Не удалось обработать каналы".to_string()
                         } else {
-                            let result_footer = "Добавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню".to_string();
+                            let result_footer =
+                                "Добавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню"
+                                    .to_string();
                             result_parts.push(result_footer);
                             result_parts.join("\n\n")
                         };
@@ -228,8 +245,8 @@ pub(crate) async fn the_viper_room_message_handler(
         } else {
             match parse_channel_input(&msg) {
                 Ok(ChannelInput::Forwarded(channel_id, channel_title, channel_username)) => {
-                    if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
-                        let mut pending_lock = pending.lock().await;
+                    {
+                        let mut pending_lock = app_state.pending_channels.lock().await;
                         let user_channels = pending_lock.entry(user_id.0).or_insert_with(Vec::new);
                         user_channels.push(PendingChannel {
                             channel_id,
@@ -261,8 +278,7 @@ pub(crate) async fn the_viper_room_message_handler(
             if text == "🏠 Главное меню" {
                 // Let it fall through to the main match statement below
             } else if text == "🗑 Удалить все каналы" {
-                // Delete all user channels
-                let db_pool = match &app_state.db_pool {
+                let db_pool = match &app_state.core.db_pool {
                     Some(pool) => pool,
                     None => {
                         bot.send_message(
@@ -278,15 +294,14 @@ pub(crate) async fn the_viper_room_message_handler(
 
                 let user_id_i64 = user_id.0 as i64;
 
-                // Get current channels count for message
-                let channels = channel_management::get_user_channels(db_pool.as_ref(), user_id_i64).await?;
+                let channels =
+                    channel_management::get_user_channels(db_pool.as_ref(), user_id_i64).await?;
                 let channels_count = channels.len();
 
                 if channels_count == 0 {
                     bot.send_message(chat_id, "ℹ️ У тебя нет каналов для удаления")
                         .await?;
                 } else {
-                    // Delete all channels
                     channel_management::clear_user_channels(db_pool.as_ref(), user_id_i64).await?;
 
                     bot.send_message(
@@ -299,7 +314,6 @@ pub(crate) async fn the_viper_room_message_handler(
                 send_channels_menu(&bot, user_id, chat_id, &app_state).await?;
                 return Ok(());
             } else {
-                // Parse channel ID
                 let channel_id = match text.trim().parse::<i64>() {
                     Ok(id) => id,
                     Err(_) => {
@@ -312,13 +326,12 @@ pub(crate) async fn the_viper_room_message_handler(
                     }
                 };
 
-                // Check if channel exists in user's list
-                let db_pool = match &app_state.db_pool {
+                let db_pool = match &app_state.core.db_pool {
                     Some(pool) => pool,
                     None => {
                         bot.send_message(
                             chat_id,
-                            "❌ Ошибка: база данных недоступна в данный момент.",
+                            "❌ Ошибка: база данных недоступна в данный момент",
                         )
                         .await?;
 
@@ -333,7 +346,6 @@ pub(crate) async fn the_viper_room_message_handler(
                     .await?
                 {
                     Some(channel) => {
-                        // Channel found - delete it
                         channel_management::remove_channel(
                             db_pool.as_ref(),
                             user_id_i64,
@@ -354,7 +366,6 @@ pub(crate) async fn the_viper_room_message_handler(
                         return Ok(());
                     }
                     None => {
-                        // Channel not found
                         bot.send_message(
                             chat_id,
                             format!(
@@ -380,8 +391,8 @@ pub(crate) async fn the_viper_room_message_handler(
     match msg_text {
         "🏠 Главное меню" => {
             if matches!(current_state, TheViperRoomBotUserState::ChannelsAdding) {
-                if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
-                    let mut pending_lock = pending.lock().await;
+                {
+                    let mut pending_lock = app_state.pending_channels.lock().await;
                     pending_lock.remove(&user_id.0);
                 }
             }
@@ -397,13 +408,10 @@ pub(crate) async fn the_viper_room_message_handler(
         }
         "💾 Сохранить" if matches!(current_state, TheViperRoomBotUserState::ChannelsAdding) =>
         {
-            let channels_to_add =
-                if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
-                    let pending_lock = pending.lock().await;
-                    pending_lock.get(&user_id.0).cloned().unwrap_or_default()
-                } else {
-                    Vec::new()
-                };
+            let channels_to_add = {
+                let pending_lock = app_state.pending_channels.lock().await;
+                pending_lock.get(&user_id.0).cloned().unwrap_or_default()
+            };
 
             if channels_to_add.is_empty() {
                 bot.send_message(chat_id, "❌ Нет каналов для сохранения")
@@ -426,13 +434,20 @@ pub(crate) async fn the_viper_room_message_handler(
                 return Ok(());
             }
 
-            let db_pool = match &app_state.db_pool {
+            let db_pool = match &app_state.core.db_pool {
                 Some(pool) => pool,
                 None => {
                     bot.send_message(chat_id, "Ошибка: база данных недоступна в данный момент.\nПопробуй повторить попытку позже")
                         .await?;
 
-                    send_main_menu(&bot, user_id, chat_id, &app_state, MainMenuMessageType::Minimal).await?;
+                    send_main_menu(
+                        &bot,
+                        user_id,
+                        chat_id,
+                        &app_state,
+                        MainMenuMessageType::Minimal,
+                    )
+                    .await?;
 
                     return Ok(());
                 }
@@ -452,8 +467,8 @@ pub(crate) async fn the_viper_room_message_handler(
                     format!("❌ Достигнут лимит каналов ({}).\n\nДля освобождения слотов воспользуйся пунктом \"➖ Удалить канал\" в меню управления каналами", MAX_CHANNELS_PER_USER)
                 ).await?;
 
-                if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
-                    let mut pending_lock = pending.lock().await;
+                {
+                    let mut pending_lock = app_state.pending_channels.lock().await;
                     pending_lock.remove(&user_id.0);
                 }
 
@@ -485,8 +500,8 @@ pub(crate) async fn the_viper_room_message_handler(
                 }
             }
 
-            if let Some(pending) = &app_state.the_viper_room_bot_pending_channels {
-                let mut pending_lock = pending.lock().await;
+            {
+                let mut pending_lock = app_state.pending_channels.lock().await;
                 pending_lock.remove(&user_id.0);
             }
 
@@ -551,8 +566,22 @@ pub(crate) async fn the_viper_room_message_handler(
             Ok(())
         }
         "🎧 Персональный подкаст" => {
-            let temp_message = "Этот функционал пока в разработке".to_string();
-            bot.send_message(chat_id, temp_message).await?;
+            let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
+                TheViperRoomBotMessages::PleaseWaitForPersonalPodcast,
+            ))
+            .await?;
+            bot.send_message(chat_id, bot_system_message).await?;
+
+            send_private_daily_podcast(
+                &bot,
+                user_id,
+                chat_id,
+                username,
+                app_state.clone(),
+                Recipient::Private(user_id.0 as i64),
+            )
+            .await?;
+
             send_main_menu(
                 &bot,
                 user_id,

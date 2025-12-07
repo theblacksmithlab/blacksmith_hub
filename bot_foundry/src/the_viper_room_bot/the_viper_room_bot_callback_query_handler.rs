@@ -1,11 +1,12 @@
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     send_add_channel_prompt, send_channels_menu, send_delete_channel_prompt, send_main_menu,
-    send_settings_menu, show_user_channels, MainMenuMessageType,
+    send_settings_menu, show_user_channels,
 };
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::TheViperRoomBotMessages;
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
-use core::state::tg_bot::app_state::BotAppState;
+use core::models::the_viper_room::the_viper_room_bot::MainMenuMessageType;
+use core::state::tg_bot::TheViperRoomBotState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::tg_bot::{check_username_from_user, get_username_from_user};
 use std::sync::Arc;
@@ -19,7 +20,7 @@ use tracing::log::warn;
 pub(crate) async fn the_viper_room_bor_callback_query_handler(
     bot: Bot,
     q: CallbackQuery,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<TheViperRoomBotState>,
 ) -> anyhow::Result<()> {
     let user = &q.from;
     let chat_id = match &q.message {
@@ -120,8 +121,8 @@ pub(crate) async fn the_viper_room_bor_callback_query_handler(
             bot.answer_callback_query(q.id).await?;
         }
         Some("settings_podcast_time") => {
-            if let Some(states) = &app_state.the_viper_room_bot_user_states {
-                let mut states_lock = states.lock().await;
+            {
+                let mut states_lock = app_state.user_states.lock().await;
                 states_lock.insert(user_id.0, TheViperRoomBotUserState::PodcastTimeMenuView);
             }
 

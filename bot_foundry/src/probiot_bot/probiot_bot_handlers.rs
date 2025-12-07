@@ -3,7 +3,7 @@ use core::ai::common::voice_processing::simple_tts;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::ProbiotBotMessages;
 use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
-use core::state::tg_bot::app_state::BotAppState;
+use core::state::tg_bot::ProbiotBotState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::tg_bot::get_and_remove_tts_payload;
 use core::utils::tg_bot::tg_bot::{start_bots_chat_action, stop_bots_chat_action};
@@ -20,7 +20,7 @@ pub(crate) async fn probiot_command_handler(
     bot: Bot,
     msg: Message,
     cmd: ProbiotBotCommands,
-    _app_state: Arc<BotAppState>,
+    _app_state: Arc<ProbiotBotState>,
 ) -> Result<()> {
     let chat_id = msg.chat.id;
 
@@ -40,7 +40,7 @@ pub(crate) async fn probiot_command_handler(
 pub(crate) async fn probiot_callback_query_handler(
     bot: Bot,
     query: CallbackQuery,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<ProbiotBotState>,
 ) -> Result<()> {
     if let Some(data) = query.data {
         if let Some(data) = data.strip_prefix("tts:") {

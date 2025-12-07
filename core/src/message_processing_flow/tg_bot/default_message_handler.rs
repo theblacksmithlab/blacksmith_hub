@@ -2,7 +2,10 @@ use crate::message_processing_flow::message_processing_flow::process_user_raw_re
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::{CommonMessages, ProbiotBotMessages};
-use crate::state::tg_bot::app_state::BotAppState;
+use crate::state::llm_client_init_trait::OpenAIClientInit;
+use crate::state::qdrant_client_init_trait::QdrantClientInit;
+use crate::state::tg_bot::app_state::AppNameProvider;
+use crate::temp_cache::temp_cache_traits::TempCacheInit;
 use crate::utils::common::{convert_markdown_to_telegram, get_message, transcribe_voice_message};
 use crate::utils::tg_bot::tg_bot::{
     add_llm_response_to_cache, download_voice, start_bots_chat_action, stop_bots_chat_action,
@@ -18,12 +21,21 @@ use tracing::error;
 use tracing::log::info;
 use uuid::Uuid;
 
-pub async fn default_message_handler(
+pub async fn default_message_handler<T>(
     bot: Bot,
     msg: Message,
-    app_state: Arc<BotAppState>,
-) -> anyhow::Result<()> {
-    let app_name = &app_state.app_name;
+    app_state: Arc<T>,
+) -> anyhow::Result<()>
+where
+    T: AppNameProvider
+        + OpenAIClientInit
+        + QdrantClientInit
+        + TempCacheInit
+        + Send
+        + Sync
+        + 'static,
+{
+    let app_name = app_state.app_name();
     let chat_id = msg.chat.id;
     let chat_id_as_integer = chat_id.0;
     let chat_id_as_str = chat_id_as_integer.to_string();

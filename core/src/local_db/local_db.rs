@@ -141,7 +141,10 @@ async fn create_app_db_tables(pool: &SqlitePool, app_name: &AppName) -> Result<(
             let query = "
                 CREATE TABLE IF NOT EXISTS users (
                     user_id INTEGER PRIMARY KEY,
-                    telegram_username TEXT
+                    telegram_username TEXT,
+                    first_name TEXT,
+                    last_name TEXT,
+                    nickname TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS user_channels (

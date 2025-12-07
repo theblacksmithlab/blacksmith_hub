@@ -1,0 +1,32 @@
+use crate::ai::common::common::raw_llm_processing;
+use crate::models::common::ai::LlmModel;
+use crate::models::common::app_name::AppName;
+use crate::models::common::system_roles::TheViperRoomRoleType;
+use crate::state::llm_client_init_trait::OpenAIClientInit;
+use crate::utils::common::get_system_role_or_fallback;
+use std::sync::Arc;
+
+pub async fn generate_user_nickname<T>(
+    app_state: Arc<T>,
+    username: String,
+    first_name: String,
+    last_name: String,
+) -> Result<String, String>
+where
+    T: OpenAIClientInit + Send + Sync + 'static,
+{
+    let system_role = get_system_role_or_fallback(
+        &AppName::TheViperRoomBot,
+        TheViperRoomRoleType::SystemNicknameGeneration,
+        None,
+    );
+
+    let user_data = format!(
+        "Username: {}, user's firstname: {}, user's lastname: {}",
+        username, first_name, last_name
+    );
+
+    raw_llm_processing(&system_role, &user_data, app_state, LlmModel::Light)
+        .await
+        .map_err(|e| format!("Failed to generate nickname: {}", e))
+}

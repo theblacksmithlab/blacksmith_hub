@@ -4,7 +4,7 @@ use core::models::common::ai::LlmModel;
 use core::models::common::app_name::AppName;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::models::common::system_roles::GrootRoleType;
-use core::state::tg_bot::app_state::BotAppState;
+use core::state::tg_bot::GrootBotState;
 use core::utils::common::get_message;
 use core::utils::common::get_system_role_or_fallback;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
@@ -582,7 +582,7 @@ pub async fn ai_check(
     chat_title: &str,
     username: &str,
     user_id: u64,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
 ) -> Result<Option<()>> {
     let system_role =
         get_system_role_or_fallback(&AppName::GrootBot, GrootRoleType::MessageCheck, None);
@@ -651,19 +651,19 @@ pub async fn ai_check(
 }
 
 pub async fn is_user_active(
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
     chat_id: i64,
     user_id: u64,
     username: &str,
     chat_title: &str,
 ) -> bool {
     let message_counts_num = {
-        let counts = app_state.message_counts.as_ref().unwrap().lock().await;
+        let counts = app_state.message_counts.lock().await;
         counts.get_message_count(chat_id, user_id)
     };
 
     let chat_message_stats_num = {
-        let stats = app_state.chat_message_stats.as_ref().unwrap().lock().await;
+        let stats = app_state.chat_message_stats.lock().await;
         stats
             .fetching_message_counts
             .get(&chat_id)
@@ -692,13 +692,13 @@ pub async fn is_user_active(
 }
 
 pub async fn update_user_message_count(
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
     chat_title: &str,
     chat_id: i64,
     user_id: u64,
     username: &str,
 ) {
-    let mut counts = app_state.message_counts.as_ref().unwrap().lock().await;
+    let mut counts = app_state.message_counts.lock().await;
 
     counts.increment_message_count(chat_id, user_id);
 
@@ -712,10 +712,10 @@ pub async fn update_user_message_count(
     );
 }
 
-pub async fn save_message_counts_to_file(app_state: Arc<BotAppState>) {
-    let counts = app_state.message_counts.as_ref().unwrap().lock().await;
+pub async fn save_message_counts_to_file(app_state: Arc<GrootBotState>) {
+    let counts = app_state.message_counts.lock().await;
 
-    if let Err(e) = counts.save_message_counts(&app_state.app_name).await {
+    if let Err(e) = counts.save_message_counts(&app_state.core.app_name).await {
         error!("Error saving message_counts to file: {}", e);
     } else {
         info!("Message_counts data successfully saved to file");
@@ -724,7 +724,7 @@ pub async fn save_message_counts_to_file(app_state: Arc<BotAppState>) {
 
 pub async fn handle_groot_report(
     bot: &Bot,
-    app_state: &Arc<BotAppState>,
+    app_state: &Arc<GrootBotState>,
     original_msg: &Message,
     reported_msg: &Message,
     reporter_id: i64,
@@ -797,8 +797,8 @@ pub async fn handle_groot_report(
         false
     };
 
-    let white_listed_users = load_white_listed_users(&app_state.app_name);
-    let black_listed_users = load_black_listed_users(&app_state.app_name);
+    let white_listed_users = load_white_listed_users(&app_state.core.app_name);
+    let black_listed_users = load_black_listed_users(&app_state.core.app_name);
 
     if white_listed_users.contains(&reported_user_id) {
         info!(
@@ -871,12 +871,12 @@ pub async fn handle_groot_report(
     let chat_title = reported_msg.chat.title().unwrap_or_else(|| "Unknown Chat");
 
     let reports_count = {
-        let message_reports = app_state.message_reports.as_ref().unwrap();
+        let message_reports = &app_state.message_reports;
         let mut reports = message_reports.lock().await;
         let message_id = reported_msg.id.0;
         let count = reports.add_report(original_msg.chat.id.0, message_id);
 
-        if let Err(e) = reports.save_message_reports(&app_state.app_name).await {
+        if let Err(e) = reports.save_message_reports(&app_state.core.app_name).await {
             error!("Error saving message reports: {}", e);
         }
 
@@ -945,7 +945,7 @@ pub async fn handle_groot_report(
             reported_msg.clone(),
             &message_to_check,
             true,
-            &app_state.app_name,
+            &app_state.core.app_name,
             chat_title,
             &reported_username,
             reported_user_id as u64,

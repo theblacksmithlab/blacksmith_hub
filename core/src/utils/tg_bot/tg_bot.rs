@@ -1,7 +1,6 @@
 use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::models::common::system_messages::{AppsSystemMessages, ProbiotBotMessages};
-use crate::state::tg_bot::app_state::BotAppState;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
 use crate::utils::common::get_message;
 use anyhow::Result;
@@ -128,12 +127,15 @@ pub async fn is_bot_addressed(bot: &Bot, msg: &Message) -> Result<bool> {
     Ok(false)
 }
 
-pub async fn run_bot_dispatcher(
+pub async fn run_bot_dispatcher<T>(
     bot: Bot,
     main_handler: UpdateHandler<anyhow::Error>,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<T>,
     callback_query_handler: Option<UpdateHandler<anyhow::Error>>,
-) -> Result<()> {
+) -> Result<()>
+where
+    T: Send + Sync + 'static,
+{
     let mut handler_tree = dptree::entry().branch(main_handler);
 
     if let Some(callback_handler) = callback_query_handler {
@@ -285,14 +287,14 @@ pub async fn save_tts_payload<T: TempCacheInit + Send + Sync>(
     dialogue_cache.add_tts_payload(message_id.to_string(), tts_payload.to_string());
 }
 
-pub async fn get_and_remove_tts_payload(
-    app_state: Arc<BotAppState>,
+pub async fn get_and_remove_tts_payload<T: TempCacheInit + Send + Sync>(
+    app_state: Arc<T>,
     chat_id: ChatId,
     message_id: String,
 ) -> Option<String> {
     let chat_id_as_integer = chat_id.0;
     let user_id_as_str = chat_id_as_integer.to_string();
-    let mut cache = app_state.temp_cache.lock().await;
+    let mut cache = app_state.get_temp_cache().lock().await;
     if let Some(dialogue_cache) = cache.get_mut(&user_id_as_str) {
         dialogue_cache.get_and_remove_tts_payload(message_id)
     } else {

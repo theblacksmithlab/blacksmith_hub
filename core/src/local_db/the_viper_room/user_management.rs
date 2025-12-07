@@ -1,36 +1,69 @@
 use crate::models::the_viper_room::db_models::User;
+use crate::state::llm_client_init_trait::OpenAIClientInit;
+use crate::utils::tg_bot::the_viper_room_bot::the_viper_room_bot_utils::generate_user_nickname;
 use sqlx::{Pool, Sqlite};
-use tracing::info;
+use std::sync::Arc;
+use tracing::{info, warn};
 
-pub async fn create_or_update_user(
+pub async fn create_or_update_user<T>(
     db_pool: &Pool<Sqlite>,
     user_id: i64,
     telegram_username: Option<&str>,
-) -> anyhow::Result<()> {
+    first_name: Option<&str>,
+    last_name: Option<&str>,
+    app_state: Arc<T>,
+) -> anyhow::Result<()>
+where
+    T: OpenAIClientInit + Send + Sync + 'static,
+{
+    let username_str = telegram_username.unwrap_or("mommy's_anon");
+    let first_str = first_name.unwrap_or("Mommy's");
+    let last_str = last_name.unwrap_or("Anon");
+
+    let nickname = match generate_user_nickname(
+        app_state,
+        username_str.to_string(),
+        first_str.to_string(),
+        last_str.to_string(),
+    )
+    .await
+    {
+        Ok(nick) => nick,
+        Err(e) => {
+            warn!("Failed to generate nickname: {}. Using fallback", e);
+            format!("{}_{}", first_str, user_id % 1000)
+        }
+    };
+
     let query = "
-        INSERT INTO users (user_id, telegram_username)
-        VALUES (?, ?)
+        INSERT INTO users (user_id, telegram_username, first_name, last_name, nickname)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET
-            telegram_username = excluded.telegram_username
+            telegram_username = excluded.telegram_username,
+            first_name = excluded.first_name,
+            last_name = excluded.last_name,
+            nickname = excluded.nickname
     ";
 
     sqlx::query(query)
         .bind(user_id)
         .bind(telegram_username)
+        .bind(first_name)
+        .bind(last_name)
+        .bind(&nickname)
         .execute(db_pool)
         .await?;
 
     info!(
-        "User {} (username: @{}) created/updated",
-        user_id,
-        telegram_username.unwrap_or("no_username")
+        "User {} (username: @{}, nickname: {}) created/updated",
+        user_id, username_str, nickname
     );
 
     Ok(())
 }
 
 pub async fn get_user(db_pool: &Pool<Sqlite>, user_id: i64) -> anyhow::Result<Option<User>> {
-    let query = "SELECT user_id, telegram_username FROM users WHERE user_id = ?";
+    let query = "SELECT user_id, telegram_username, first_name, last_name, nickname FROM users WHERE user_id = ?";
 
     let user = sqlx::query_as::<_, User>(query)
         .bind(user_id)
@@ -38,6 +71,14 @@ pub async fn get_user(db_pool: &Pool<Sqlite>, user_id: i64) -> anyhow::Result<Op
         .await?;
 
     Ok(user)
+}
+
+pub async fn get_user_nickname(
+    db_pool: &Pool<Sqlite>,
+    user_id: i64,
+) -> anyhow::Result<Option<String>> {
+    let user = get_user(db_pool, user_id).await?;
+    Ok(user.and_then(|u| u.nickname))
 }
 
 pub async fn delete_user(db_pool: &Pool<Sqlite>, user_id: i64) -> anyhow::Result<()> {

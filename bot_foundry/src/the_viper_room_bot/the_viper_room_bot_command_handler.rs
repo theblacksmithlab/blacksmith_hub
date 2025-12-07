@@ -1,19 +1,20 @@
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
-    generate_podcast, schedule_podcast, send_main_menu, stop_daily_podcasts, MainMenuMessageType,
+    generate_podcast, schedule_podcast, send_generated_podcast_via_telegram_agent, send_main_menu,
+    stop_daily_podcasts,
 };
 use core::local_db::the_viper_room::user_management;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::{CommonMessages, TheViperRoomBotMessages};
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
-use core::state::tg_bot::app_state::BotAppState;
-use core::telegram_client::grammers_functionality::initialize_grammers_client;
+use core::models::the_viper_room::db_models::Recipient;
+use core::models::the_viper_room::the_viper_room_bot::MainMenuMessageType;
+use core::state::tg_bot::TheViperRoomBotState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::tg_bot::{
     check_username_from_message, get_chat_title, get_username_from_message,
 };
-use std::path::Path;
+use std::env;
 use std::sync::Arc;
-use std::{env, fs};
 use teloxide::prelude::{Message, Requester};
 use teloxide::Bot;
 use teloxide_core::payloads::SendPhotoSetters;
@@ -24,7 +25,7 @@ pub(crate) async fn the_viper_room_command_handler(
     bot: Bot,
     msg: Message,
     cmd: TheViperRoomBotCommands,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<TheViperRoomBotState>,
 ) -> anyhow::Result<()> {
     if check_username_from_message(&bot, &msg).await == false {
         return Ok(());
@@ -39,35 +40,15 @@ pub(crate) async fn the_viper_room_command_handler(
     let chat_title = get_chat_title(&msg);
     let photo_path = "common_res/the_viper_room/avatar.jpeg";
 
-    let nickname_for_public_podcast: String = env::var("PUBLIC_PODCAST_NICKNAME")
-        .expect("PUBLIC_PODCAST_NICKNAME environment variable not set")
-        .parse()
-        .expect("PUBLIC_PODCAST_NICKNAME environment variable is not a valid string");
-
     let lord_admin_id: u64 = env::var("LORD_ADMIN_ID")
         .expect("LORD_ADMIN_ID environment variable must be set")
         .parse()
         .expect("LORD_ADMIN_ID must be a valid integer");
 
-    let tg_agent_id =
-        Arc::new(env::var("TG_AGENT_ID").expect("TG_AGENT_ID must be set in environment"));
-
-    let session_path = format!(
-        "common_res/the_viper_room/grammers_system_session/{}.session",
-        tg_agent_id
-    );
-
-    if !Path::new(&session_path).exists() {
-        return Err(anyhow::anyhow!(
-            "Telegram agent session file not found: {}. Please ensure the session file exists",
-            session_path
-        ));
-    }
-
-    let session_data = fs::read(Path::new(&session_path))
-        .map_err(|e| anyhow::anyhow!("Failed to read session file {}: {}", session_path, e))?;
-
-    let g_client = initialize_grammers_client(session_data.clone()).await?;
+    let tg_agent_id: i64 = env::var("TG_AGENT_ID")
+        .expect("TG_AGENT_ID must be set in environment")
+        .parse()
+        .expect("TG_AGENT_ID must be a valid i64 number");
 
     if matches!(
         cmd,
@@ -99,12 +80,19 @@ pub(crate) async fn the_viper_room_command_handler(
             );
 
             // Register or update user in database
-            if let Some(db_pool) = &app_state.db_pool {
+            if let Some(db_pool) = &app_state.core.db_pool {
                 let user_id_i64 = user_id.0 as i64;
+
+                let first_name = Some(user.first_name.as_str());
+                let last_name = user.last_name.as_deref();
+
                 user_management::create_or_update_user(
                     db_pool.as_ref(),
                     user_id_i64,
                     Some(&username),
+                    first_name,
+                    last_name,
+                    app_state.clone(),
                 )
                 .await?;
                 info!(
@@ -152,44 +140,48 @@ pub(crate) async fn the_viper_room_command_handler(
         TheViperRoomBotCommands::Podcast if user_id.0 == lord_admin_id => {
             bot.send_message(chat_id, "Starting podcast generation by /podcast cmd...")
                 .await?;
-            generate_podcast(
-                g_client,
-                bot.clone(),
-                chat_id,
-                app_state.clone(),
-                &tg_agent_id,
-                nickname_for_public_podcast,
+
+            let podcast_path =
+                generate_podcast(app_state.clone(), tg_agent_id, Recipient::Public).await?;
+
+            bot.send_message(chat_id, "Podcast generated! Sending to channel...")
+                .await?;
+
+            send_generated_podcast_via_telegram_agent(
+                podcast_path,
+                &app_state.telegram_agent.client,
                 "the_viper_room",
             )
             .await?;
+
+            bot.send_message(chat_id, "Podcast sent successfully!")
+                .await?;
         }
 
         // Testing podcast generation
         TheViperRoomBotCommands::Test if user_id.0 == lord_admin_id => {
             bot.send_message(chat_id, "Starting test podcast generation by /test cmd...")
                 .await?;
-            generate_podcast(
-                g_client,
-                bot.clone(),
-                chat_id,
-                app_state.clone(),
-                &tg_agent_id,
-                nickname_for_public_podcast,
+
+            let podcast_path =
+                generate_podcast(app_state.clone(), tg_agent_id, Recipient::Public).await?;
+
+            bot.send_message(chat_id, "Podcast generated! Sending to test chat...")
+                .await?;
+
+            send_generated_podcast_via_telegram_agent(
+                podcast_path,
+                &app_state.telegram_agent.client,
                 "nervosettestchat",
             )
             .await?;
+
+            bot.send_message(chat_id, "Test podcast sent successfully!")
+                .await?;
         }
 
         TheViperRoomBotCommands::Schedule if user_id.0 == lord_admin_id => {
-            schedule_podcast(
-                bot.clone(),
-                chat_id,
-                app_state.clone(),
-                tg_agent_id,
-                nickname_for_public_podcast,
-                session_data,
-            )
-            .await?;
+            schedule_podcast(bot.clone(), chat_id, app_state.clone(), tg_agent_id).await?;
             bot.send_message(
                 chat_id,
                 "Daily podcast generation scheduled by /schedule cmd",

@@ -1,13 +1,16 @@
 use crate::ai::common::common::raw_llm_processing;
+use crate::local_db::the_viper_room::user_management::get_user_nickname;
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::TheViperRoomRoleType;
+use crate::models::the_viper_room::db_models::Recipient;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::get_system_role_or_fallback;
 use chrono::Duration as ChronoDuration;
 use chrono::Utc;
 use grammers_client::types::Chat::{Channel, Group, User};
 use grammers_client::{types, Client as g_Client};
+use sqlx::{Pool, Sqlite};
 use std::fs;
 use std::fs::{copy, read_dir, remove_file, OpenOptions};
 use std::io::Write;
@@ -99,6 +102,7 @@ pub(crate) async fn processing_dialogs<T: OpenAIClientInit + Send + Sync>(
                 user_tmp_dir.clone(),
             )
             .await?;
+
             // Check for FLOOD_WAIT (unnecessary for now)
             // sleep(Duration::from_secs(1)).await;
         }
@@ -209,9 +213,38 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
 pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
-    nickname: String,
+    recipient: Recipient,
+    db_pool: Option<&Pool<Sqlite>>,
 ) -> Result<String, anyhow::Error> {
     info!("Starting updates summarization...");
+
+    let addressee = match recipient {
+        Recipient::Public => "Public".to_string(),
+        Recipient::Private(user_id) => {
+            if let Some(pool) = db_pool {
+                match get_user_nickname(pool, user_id).await {
+                    Ok(Some(nickname)) => {
+                        info!("Using nickname for user {}: {}", user_id, nickname);
+                        nickname
+                    }
+                    Ok(None) => {
+                        warn!("No nickname found for user {}, using 'Друг'", user_id);
+                        "Друг".to_string()
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Error fetching nickname for user {}: {}. Using 'Друг'",
+                            user_id, e
+                        );
+                        "Друг".to_string()
+                    }
+                }
+            } else {
+                warn!("No database pool provided, using 'Друг' as default");
+                "Друг".to_string()
+            }
+        }
+    };
 
     let system_role = get_system_role_or_fallback(
         &AppName::TheViperRoom,
@@ -225,7 +258,7 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
 
     let updates_with_nickname_provided = format!(
         "Адресат: {}\nТекст подкаста подготовленный твоим помощником: {}",
-        nickname, updates
+        addressee, updates
     );
 
     let updates_summarized = raw_llm_processing(
@@ -477,16 +510,28 @@ pub async fn generate_waveform(audio_path: &Path) -> anyhow::Result<Vec<u8>> {
     Ok(waveform)
 }
 
-pub async fn save_daily_public_podcast(
+pub async fn save_daily_podcast(
     podcast_path: &PathBuf,
     caption_path: &PathBuf,
+    recipient: Recipient,
 ) -> anyhow::Result<()> {
-    let daily_podcast_dir = "common_res/the_viper_room/daily_public_podcast";
+    let daily_podcast_dir = match recipient {
+        Recipient::Public => "common_res/the_viper_room/daily_public_podcast".to_string(),
+        Recipient::Private(user_id) => {
+            format!(
+                "common_res/the_viper_room/{}/daily_private_podcast",
+                user_id
+            )
+        }
+    };
 
-    fs::create_dir_all(daily_podcast_dir)?;
+    fs::create_dir_all(&daily_podcast_dir)?;
 
-    info!("Cleaning old daily podcast files...");
-    for entry in read_dir(daily_podcast_dir)? {
+    info!(
+        "Cleaning old daily podcast files in {}...",
+        daily_podcast_dir
+    );
+    for entry in read_dir(&daily_podcast_dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_file() {
@@ -504,8 +549,8 @@ pub async fn save_daily_public_podcast(
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("Invalid caption path"))?;
 
-    let dest_podcast = PathBuf::from(daily_podcast_dir).join(podcast_filename);
-    let dest_caption = PathBuf::from(daily_podcast_dir).join(caption_filename);
+    let dest_podcast = PathBuf::from(&daily_podcast_dir).join(podcast_filename);
+    let dest_caption = PathBuf::from(&daily_podcast_dir).join(caption_filename);
 
     copy(podcast_path, &dest_podcast)?;
     copy(caption_path, &dest_caption)?;
