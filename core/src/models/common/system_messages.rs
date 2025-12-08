@@ -236,9 +236,11 @@ impl TheViperRoomBotMessages {
             TheViperRoomBotMessages::PleaseWaitForPersonalPodcastSearch => {
                 "please_wait_for_personal_podcast_search"
             }
-            TheViperRoomBotMessages::PleaseWaitForPersonalPodcastRecord => {"please_wait_for_personal_podcast_record"},
-            TheViperRoomBotMessages::GrabAFreshPersonalPodcast => {"grab_a_fresh_personal_podcast"},
-            TheViperRoomBotMessages::GrabAFreshPublicPodcast => {"grab_a_fresh_public_podcast"},
+            TheViperRoomBotMessages::PleaseWaitForPersonalPodcastRecord => {
+                "please_wait_for_personal_podcast_record"
+            }
+            TheViperRoomBotMessages::GrabAFreshPersonalPodcast => "grab_a_fresh_personal_podcast",
+            TheViperRoomBotMessages::GrabAFreshPublicPodcast => "grab_a_fresh_public_podcast",
         }
     }
 }

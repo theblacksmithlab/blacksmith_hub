@@ -140,7 +140,10 @@ pub async fn send_generated_podcast_via_bot(
     let podcast_dir = match &recipient {
         Recipient::Public => "common_res/the_viper_room/daily_public_podcast".to_string(),
         Recipient::Private(user_id) => {
-            format!("common_res/the_viper_room/{}/daily_private_podcast", user_id)
+            format!(
+                "common_res/the_viper_room/{}/daily_private_podcast",
+                user_id
+            )
         }
     };
 
@@ -169,10 +172,7 @@ pub async fn send_generated_podcast_via_bot(
     let podcast_path = match podcast_file {
         Some(path) => path,
         None => {
-            return Err(anyhow::anyhow!(
-                "Podcast file not found in {}",
-                podcast_dir
-            ));
+            return Err(anyhow::anyhow!("Podcast file not found in {}", podcast_dir));
         }
     };
 
@@ -681,7 +681,7 @@ pub async fn send_daily_podcast(
     };
 
     info!("Looking for daily podcast in: {}", podcast_dir);
-    
+
     let podcast_exists = if let Ok(entries) = read_dir(&podcast_dir) {
         entries
             .flatten()
@@ -693,7 +693,8 @@ pub async fn send_daily_podcast(
     if !podcast_exists {
         match &recipient {
             Recipient::Public => {
-                let no_podcast_msg = "К сожалению, сегодняшний подкаст ещё не готов. Попробуй зайти позже!";
+                let no_podcast_msg =
+                    "К сожалению, сегодняшний подкаст ещё не готов. Попробуй зайти позже!";
                 bot.send_message(chat_id, no_podcast_msg).await?;
                 return Ok(());
             }
@@ -704,13 +705,10 @@ pub async fn send_daily_podcast(
                 .await?;
                 bot.send_message(chat_id, bot_system_message).await?;
 
-                let generated_podcast = generate_podcast(
-                    app_state.clone(),
-                    user_id.0 as i64,
-                    recipient.clone(),
-                )
-                .await?;
-                
+                let generated_podcast =
+                    generate_podcast(app_state.clone(), user_id.0 as i64, recipient.clone())
+                        .await?;
+
                 if let Err(e) = save_daily_podcast(
                     &generated_podcast,
                     &generated_podcast.with_extension("txt"),
@@ -720,14 +718,13 @@ pub async fn send_daily_podcast(
                 {
                     error!("Failed to save daily private podcast: {}", e);
                 }
-                
-                for file in [
-                    &generated_podcast,
-                    &generated_podcast.with_extension("txt"),
-                ] {
+
+                for file in [&generated_podcast, &generated_podcast.with_extension("txt")] {
                     if file.exists() {
                         match remove_file(file) {
-                            Ok(_) => info!("Temporary file {} deleted after saving!", file.display()),
+                            Ok(_) => {
+                                info!("Temporary file {} deleted after saving!", file.display())
+                            }
                             Err(e) => info!("Could not delete temporary {}: {}", file.display(), e),
                         }
                     }
@@ -740,8 +737,8 @@ pub async fn send_daily_podcast(
                 get_message(AppsSystemMessages::TheViperRoomBot(
                     TheViperRoomBotMessages::GrabAFreshPublicPodcast,
                 ))
-                    .await?
-            },
+                .await?
+            }
             Recipient::Private(_) => {
                 get_message(AppsSystemMessages::TheViperRoomBot(
                     TheViperRoomBotMessages::GrabAFreshPersonalPodcast,
@@ -751,10 +748,13 @@ pub async fn send_daily_podcast(
         };
         bot.send_message(chat_id, message).await?;
     }
-    
+
     send_generated_podcast_via_bot(bot, chat_id, recipient, &username).await?;
 
-    info!("Daily podcast sent successfully for user: {} [{}]", username, user_id);
+    info!(
+        "Daily podcast sent successfully for user: {} [{}]",
+        username, user_id
+    );
 
     Ok(())
 }
@@ -776,7 +776,7 @@ fn extract_podcast_title(path: &PathBuf) -> String {
 
 async fn cleanup_daily_podcasts() -> Result<()> {
     info!("Starting daily podcasts cleanup...");
-    
+
     let public_podcast_dir = "common_res/the_viper_room/daily_public_podcast";
     if let Ok(entries) = read_dir(public_podcast_dir) {
         for entry in entries.flatten() {
@@ -789,7 +789,7 @@ async fn cleanup_daily_podcasts() -> Result<()> {
             }
         }
     }
-    
+
     let base_dir = "common_res/the_viper_room";
     if let Ok(entries) = read_dir(base_dir) {
         for entry in entries.flatten() {

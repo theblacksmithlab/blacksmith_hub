@@ -96,7 +96,9 @@ async fn main() -> Result<()> {
         AppName::TheViperRoomBot => {
             let state = Arc::new(TheViperRoomBotState::new(core).await?);
 
-            if let Err(e) = the_viper_room_bot::the_viper_room_bot_utils::schedule_daily_cleanup().await {
+            if let Err(e) =
+                the_viper_room_bot::the_viper_room_bot_utils::schedule_daily_cleanup().await
+            {
                 error!("Failed to schedule daily cleanup: {}", e);
             }
 
