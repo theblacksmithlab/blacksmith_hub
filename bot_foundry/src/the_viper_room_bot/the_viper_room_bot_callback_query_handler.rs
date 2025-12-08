@@ -126,13 +126,14 @@ pub(crate) async fn the_viper_room_bor_callback_query_handler(
                 states_lock.insert(user_id.0, TheViperRoomBotUserState::PodcastTimeMenuView);
             }
 
-            // TODO: Implement podcast time configuration
             let temp_msg = "⏰ Время отправки подкаста\n\nНастройка времени отправки в разработке.";
             bot.send_message(chat_id, temp_msg).await?;
 
             if let Err(e) = bot.delete_message(chat_id, callback_query_message).await {
                 warn!("Failed to delete query origin message: {}", e);
             }
+
+            send_settings_menu(&bot, user_id, chat_id, &app_state).await?;
 
             bot.answer_callback_query(q.id).await?;
         }

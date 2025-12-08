@@ -740,8 +740,8 @@ pub async fn send_daily_podcast(
     if !podcast_exists {
         match &recipient {
             Recipient::Public => {
-                let no_podcast_msg =
-                    "К сожалению, сегодняшний подкаст ещё не готов. Попробуй зайти позже!";
+                let no_podcast_msg = get_message(AppsSystemMessages::TheViperRoomBot(TheViperRoomBotMessages::PublicPodcaseIsNotReadyYet)).await?;
+
                 bot.send_message(chat_id, no_podcast_msg).await?;
                 return Ok(());
             }

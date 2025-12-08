@@ -209,6 +209,7 @@ pub enum TheViperRoomBotMessages {
     PleaseWaitForPersonalPodcastRecord,
     GrabAFreshPersonalPodcast,
     GrabAFreshPublicPodcast,
+    PublicPodcaseIsNotReadyYet
 }
 
 impl TheViperRoomBotMessages {
@@ -241,6 +242,7 @@ impl TheViperRoomBotMessages {
             }
             TheViperRoomBotMessages::GrabAFreshPersonalPodcast => "grab_a_fresh_personal_podcast",
             TheViperRoomBotMessages::GrabAFreshPublicPodcast => "grab_a_fresh_public_podcast",
+            TheViperRoomBotMessages::PublicPodcaseIsNotReadyYet => "public_podcase_is_not_ready",
         }
     }
 }
