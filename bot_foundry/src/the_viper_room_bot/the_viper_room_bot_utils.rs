@@ -24,7 +24,7 @@ use teloxide::prelude::{ChatId, Requester};
 use teloxide::types::MessageOrigin;
 use teloxide::types::{ChatKind, PublicChatKind};
 use teloxide::Bot;
-use teloxide_core::payloads::{SendAudioSetters, SendMessageSetters};
+use teloxide_core::payloads::{SendMessageSetters, SendVoiceSetters};
 use teloxide_core::types::{
     InlineKeyboardButton, InlineKeyboardMarkup, InputFile, KeyboardButton, KeyboardMarkup,
     ParseMode, UserId,
@@ -136,7 +136,6 @@ pub async fn send_generated_podcast_via_bot(
     recipient: Recipient,
     username: &str,
 ) -> Result<()> {
-    // Определяем путь к папке в зависимости от Recipient
     let podcast_dir = match &recipient {
         Recipient::Public => "common_res/the_viper_room/daily_public_podcast".to_string(),
         Recipient::Private(user_id) => {
@@ -149,7 +148,6 @@ pub async fn send_generated_podcast_via_bot(
 
     info!("Looking for podcast in: {}", podcast_dir);
 
-    // Ищем файлы
     let mut podcast_file: Option<PathBuf> = None;
     let mut caption_file: Option<PathBuf> = None;
 
@@ -168,7 +166,6 @@ pub async fn send_generated_podcast_via_bot(
         }
     }
 
-    // Проверяем наличие подкаста
     let podcast_path = match podcast_file {
         Some(path) => path,
         None => {
@@ -178,7 +175,6 @@ pub async fn send_generated_podcast_via_bot(
 
     info!("Found podcast: {:?}", podcast_path);
 
-    // Читаем caption
     let caption = if let Some(caption_path) = caption_file {
         info!("Found caption: {:?}", caption_path);
         read_to_string(&caption_path).unwrap_or_else(|e| {
@@ -195,15 +191,9 @@ pub async fn send_generated_podcast_via_bot(
         }
     };
 
-    let title = extract_podcast_title(&podcast_path);
-    let thumbnail_path = "common_res/the_viper_room/podcast_cover.jpg";
-
     info!("Sending podcast via bot to user {} [{}]", username, chat_id);
 
-    bot.send_audio(chat_id, InputFile::file(&podcast_path))
-        .title(title)
-        .performer("The Viper Room")
-        .thumbnail(InputFile::file(thumbnail_path))
+    bot.send_voice(chat_id, InputFile::file(&podcast_path))
         .caption(&caption)
         .await?;
 
@@ -757,21 +747,6 @@ pub async fn send_daily_podcast(
     );
 
     Ok(())
-}
-
-fn extract_podcast_title(path: &PathBuf) -> String {
-    if let Some(file_name) = path.file_stem() {
-        if let Some(name_str) = file_name.to_str() {
-            if let Some(date_start) = name_str.rfind('(') {
-                if let Some(date_end) = name_str.rfind(')') {
-                    let date = &name_str[date_start + 1..date_end];
-                    return format!("Daily Podcast [{}]", date);
-                }
-            }
-        }
-    }
-
-    "Daily Podcast".to_string()
 }
 
 async fn cleanup_daily_podcasts() -> Result<()> {

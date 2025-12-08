@@ -17,21 +17,36 @@ where
     T: OpenAIClientInit + Send + Sync + 'static,
 {
     let username_str = telegram_username.unwrap_or("mommy's_anon");
-    let first_str = first_name.unwrap_or("Mommy's");
-    let last_str = last_name.unwrap_or("Anon");
+    let first_str = first_name.unwrap_or("null");
+    let last_str = last_name.unwrap_or("null");
 
-    let nickname = match generate_user_nickname(
-        app_state,
-        username_str.to_string(),
-        first_str.to_string(),
-        last_str.to_string(),
-    )
-    .await
-    {
-        Ok(nick) => nick,
-        Err(e) => {
-            warn!("Failed to generate nickname: {}. Using fallback", e);
+    let existing_user = get_user(db_pool, user_id).await?;
+
+    let nickname = if let Some(user) = existing_user {
+        info!(
+            "User {} already exists with nickname '{}', keeping it",
+            user_id,
+            user.nickname.as_deref().unwrap_or("Unknown")
+        );
+        user.nickname.unwrap_or_else(|| {
+            warn!("User {} has no nickname, using fallback", user_id);
             format!("{}_{}", first_str, user_id % 1000)
+        })
+    } else {
+        info!("New user {}, generating nickname via LLM", user_id);
+        match generate_user_nickname(
+            app_state,
+            username_str.to_string(),
+            first_str.to_string(),
+            last_str.to_string(),
+        )
+        .await
+        {
+            Ok(nick) => nick,
+            Err(e) => {
+                warn!("Failed to generate nickname: {}. Using fallback", e);
+                format!("{}_{}", first_str, user_id % 1000)
+            }
         }
     };
 
