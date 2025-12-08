@@ -406,6 +406,50 @@ async fn get_duration(file_path: &str) -> anyhow::Result<f64> {
     Ok(duration)
 }
 
+pub(crate) async fn equalize_voice_for_broadcast(input_path: &str) -> anyhow::Result<String> {
+    if !Path::new(input_path).exists() {
+        return Err(anyhow::anyhow!("Input audio file not found: {}", input_path));
+    }
+
+    info!("Applying professional voice equalization...");
+
+    let input_path_buf = PathBuf::from(input_path);
+    let parent = input_path_buf.parent().unwrap_or(Path::new("."));
+    let file_stem = input_path_buf.file_stem().unwrap_or_default();
+    let equalized_path = parent.join(format!("{}_eq.mp3", file_stem.to_string_lossy()));
+    let equalized_path_str = equalized_path.to_str().unwrap();
+
+    let audio_filter = "highpass=f=80,\
+                        equalizer=f=200:width_type=o:width=2:g=-2,\
+                        equalizer=f=3000:width_type=o:width=2:g=4,\
+                        acompressor=threshold=-18dB:ratio=4:attack=5:release=50,\
+                        alimiter=limit=0.9";
+
+    let output = Command::new("ffmpeg")
+        .args([
+            "-i",
+            input_path,
+            "-filter:a",
+            audio_filter,
+            "-codec:a",
+            "libmp3lame",
+            "-q:a",
+            "0",
+            "-y",
+            equalized_path_str,
+        ])
+        .output()
+        .await?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!("ffmpeg equalization error: {}", error));
+    }
+
+    info!("Voice equalization completed: {}", equalized_path_str);
+    Ok(equalized_path_str.to_string())
+}
+
 pub(crate) async fn mix_podcast_with_music(
     podcast_path: &str,
     music_path: &str,
@@ -418,8 +462,12 @@ pub(crate) async fn mix_podcast_with_music(
         return Err(anyhow::anyhow!("Music file not found: {}", music_path));
     }
 
-    info!("Getting podcast duration...");
-    let podcast_duration = get_duration(podcast_path).await?;
+    // Применяем профессиональную эквализацию к голосу
+    info!("Step 1: Equalizing voice...");
+    let equalized_podcast_path = equalize_voice_for_broadcast(podcast_path).await?;
+
+    info!("Step 2: Getting podcast duration...");
+    let podcast_duration = get_duration(&equalized_podcast_path).await?;
     info!("Podcast duration: {} seconds", podcast_duration);
 
     let fade_start = podcast_duration - 4.0;
@@ -433,11 +481,11 @@ pub(crate) async fn mix_podcast_with_music(
         fade_start
     );
 
-    info!("Starting ffmpeg mixing process...");
+    info!("Step 3: Mixing equalized voice with music...");
     let output = Command::new("ffmpeg")
         .args([
             "-i",
-            podcast_path,
+            &equalized_podcast_path,
             "-i",
             music_path,
             "-filter_complex",
@@ -454,7 +502,19 @@ pub(crate) async fn mix_podcast_with_music(
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!("ffmpeg error: {}", error));
+        // Удаляем временный файл перед возвратом ошибки
+        let _ = remove_file(&equalized_podcast_path);
+        return Err(anyhow::anyhow!("ffmpeg mixing error: {}", error));
+    }
+
+    // Удаляем временный эквализированный файл
+    if let Err(e) = remove_file(&equalized_podcast_path) {
+        warn!(
+            "Could not delete temporary equalized file {}: {}",
+            equalized_podcast_path, e
+        );
+    } else {
+        info!("Temporary equalized file deleted: {}", equalized_podcast_path);
     }
 
     info!("Mixing completed successfully");
