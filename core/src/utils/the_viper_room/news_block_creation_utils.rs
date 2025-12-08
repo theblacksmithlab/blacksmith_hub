@@ -1,4 +1,5 @@
 use crate::ai::common::common::raw_llm_processing;
+use crate::local_db::the_viper_room::channel_management::get_user_channels;
 use crate::local_db::the_viper_room::user_management::get_user_nickname;
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
@@ -61,6 +62,76 @@ pub(crate) async fn get_dialogs(client: &g_Client) -> Result<Vec<types::Dialog>,
     Ok(channels)
 }
 
+pub(crate) async fn get_user_dialogs_from_db(
+    client: &g_Client,
+    user_id: i64,
+    db_pool: &Pool<Sqlite>,
+) -> Result<Vec<types::Chat>, anyhow::Error> {
+    info!("Getting user {} channels from database...", user_id);
+
+    let user_channels = get_user_channels(db_pool, user_id).await?;
+
+    if user_channels.is_empty() {
+        info!("User {} has no channels in database", user_id);
+        return Ok(Vec::new());
+    }
+
+    info!(
+        "Found {} channels for user {} in database",
+        user_channels.len(),
+        user_id
+    );
+
+    let mut chats = Vec::new();
+
+    for user_channel in &user_channels {
+        let username = &user_channel.channel_username;
+
+        info!(
+            "Resolving channel: {} (@{})",
+            user_channel.channel_title, username
+        );
+
+        match client.resolve_username(username).await {
+            Ok(Some(chat)) => {
+                if let Channel(_channel) = &chat {
+                    chats.push(chat);
+                    info!(
+                        "Channel {} (@{}) resolved successfully",
+                        user_channel.channel_title, username
+                    );
+                } else {
+                    warn!(
+                        "Chat @{} is not a channel ({}), skipping",
+                        username, user_channel.channel_title
+                    );
+                }
+            }
+            Ok(None) => {
+                warn!(
+                    "Channel @{} ({}) not found or not accessible",
+                    username, user_channel.channel_title
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to resolve channel @{} ({}): {}",
+                    username, user_channel.channel_title, e
+                );
+            }
+        }
+    }
+
+    info!(
+        "Successfully resolved {}/{} channels for user {}",
+        chats.len(),
+        user_channels.len(),
+        user_id
+    );
+
+    Ok(chats)
+}
+
 pub(crate) async fn processing_dialogs<T: OpenAIClientInit + Send + Sync>(
     client: &g_Client,
     channels: Vec<types::Dialog>,
@@ -96,15 +167,36 @@ pub(crate) async fn processing_dialogs<T: OpenAIClientInit + Send + Sync>(
             info!("Receiving updates from channel: {}...", channel_name);
             get_latest_messages(
                 client,
-                dialog.clone(),
+                dialog.chat(),
                 &channel_name,
                 app_state.clone(),
                 user_tmp_dir.clone(),
             )
             .await?;
+        }
+    }
 
-            // Check for FLOOD_WAIT (unnecessary for now)
-            // sleep(Duration::from_secs(1)).await;
+    Ok(())
+}
+
+pub(crate) async fn processing_chats<T: OpenAIClientInit + Send + Sync>(
+    client: &g_Client,
+    chats: Vec<types::Chat>,
+    app_state: Arc<T>,
+    user_tmp_dir: String,
+) -> Result<(), anyhow::Error> {
+    for chat in &chats {
+        if let Channel(channel) = chat {
+            let channel_name = channel.title();
+            info!("Receiving updates from channel: {}...", channel_name);
+            get_latest_messages(
+                client,
+                chat,
+                &channel_name,
+                app_state.clone(),
+                user_tmp_dir.clone(),
+            )
+            .await?;
         }
     }
 
@@ -286,12 +378,12 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
 
 pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
     client: &g_Client,
-    dialog: types::Dialog,
+    chat: &types::Chat,
     chat_name: &str,
     app_state: Arc<T>,
     user_tmp_dir: String,
 ) -> anyhow::Result<()> {
-    let mut messages = client.iter_messages(dialog.chat());
+    let mut messages = client.iter_messages(chat);
     let now = Utc::now();
     let period = now - chrono::Duration::hours(12);
 
@@ -408,7 +500,10 @@ async fn get_duration(file_path: &str) -> anyhow::Result<f64> {
 
 pub(crate) async fn equalize_voice_for_broadcast(input_path: &str) -> anyhow::Result<String> {
     if !Path::new(input_path).exists() {
-        return Err(anyhow::anyhow!("Input audio file not found: {}", input_path));
+        return Err(anyhow::anyhow!(
+            "Input audio file not found: {}",
+            input_path
+        ));
     }
 
     info!("Applying professional voice equalization...");
@@ -462,7 +557,6 @@ pub(crate) async fn mix_podcast_with_music(
         return Err(anyhow::anyhow!("Music file not found: {}", music_path));
     }
 
-    // Применяем профессиональную эквализацию к голосу
     info!("Step 1: Equalizing voice...");
     let equalized_podcast_path = equalize_voice_for_broadcast(podcast_path).await?;
 
@@ -476,7 +570,7 @@ pub(crate) async fn mix_podcast_with_music(
     // amix with duration=first will cut music to match podcast length
     let filter_complex = format!(
         "[1:a]aloop=loop=-1:size=2e+09[music_looped];\
-         [music_looped]volume=0.045,afade=t=out:st={}:d=4[music];\
+         [music_looped]volume=0.04,afade=t=out:st={}:d=4[music];\
          [0:a][music]amix=inputs=2:duration=first",
         fade_start
     );
@@ -502,19 +596,20 @@ pub(crate) async fn mix_podcast_with_music(
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
-        // Удаляем временный файл перед возвратом ошибки
         let _ = remove_file(&equalized_podcast_path);
         return Err(anyhow::anyhow!("ffmpeg mixing error: {}", error));
     }
 
-    // Удаляем временный эквализированный файл
     if let Err(e) = remove_file(&equalized_podcast_path) {
         warn!(
             "Could not delete temporary equalized file {}: {}",
             equalized_podcast_path, e
         );
     } else {
-        info!("Temporary equalized file deleted: {}", equalized_podcast_path);
+        info!(
+            "Temporary equalized file deleted: {}",
+            equalized_podcast_path
+        );
     }
 
     info!("Mixing completed successfully");

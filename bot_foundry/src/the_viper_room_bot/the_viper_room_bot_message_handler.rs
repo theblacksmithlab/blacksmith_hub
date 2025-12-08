@@ -4,6 +4,9 @@ use crate::the_viper_room_bot::the_viper_room_bot_utils::{
 };
 use anyhow::Result;
 use core::local_db::the_viper_room::channel_management;
+use core::local_db::the_viper_room::channel_management::{
+    clear_user_channels, get_channel, get_user_channels, remove_channel,
+};
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::TheViperRoomBotMessages;
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
@@ -162,7 +165,6 @@ pub(crate) async fn the_viper_room_message_handler(
                                     if let Chat::Channel(channel) = chat {
                                         let channel_id = normalize_channel_id(channel.id());
                                         let channel_title = channel.title().to_string();
-                                        let channel_username = Some(username.clone());
 
                                         {
                                             let mut pending_lock =
@@ -173,7 +175,7 @@ pub(crate) async fn the_viper_room_message_handler(
                                             user_channels.push(PendingChannel {
                                                 channel_id,
                                                 channel_title,
-                                                channel_username,
+                                                channel_username: username.clone(),
                                             });
                                         }
 
@@ -294,15 +296,14 @@ pub(crate) async fn the_viper_room_message_handler(
 
                 let user_id_i64 = user_id.0 as i64;
 
-                let channels =
-                    channel_management::get_user_channels(db_pool.as_ref(), user_id_i64).await?;
+                let channels = get_user_channels(db_pool.as_ref(), user_id_i64).await?;
                 let channels_count = channels.len();
 
                 if channels_count == 0 {
                     bot.send_message(chat_id, "ℹ️ У тебя нет каналов для удаления")
                         .await?;
                 } else {
-                    channel_management::clear_user_channels(db_pool.as_ref(), user_id_i64).await?;
+                    clear_user_channels(db_pool.as_ref(), user_id_i64).await?;
 
                     bot.send_message(
                         chat_id,
@@ -342,16 +343,9 @@ pub(crate) async fn the_viper_room_message_handler(
 
                 let user_id_i64 = user_id.0 as i64;
 
-                match channel_management::get_channel(db_pool.as_ref(), user_id_i64, channel_id)
-                    .await?
-                {
+                match get_channel(db_pool.as_ref(), user_id_i64, channel_id).await? {
                     Some(channel) => {
-                        channel_management::remove_channel(
-                            db_pool.as_ref(),
-                            user_id_i64,
-                            channel_id,
-                        )
-                        .await?;
+                        remove_channel(db_pool.as_ref(), user_id_i64, channel_id).await?;
 
                         bot.send_message(
                             chat_id,
@@ -455,8 +449,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
             let user_id_i64 = user_id.0 as i64;
 
-            let current_channels =
-                channel_management::get_user_channels(db_pool.as_ref(), user_id_i64).await?;
+            let current_channels = get_user_channels(db_pool.as_ref(), user_id_i64).await?;
             let current_count = current_channels.len();
 
             let available_slots = MAX_CHANNELS_PER_USER.saturating_sub(current_count);
@@ -476,8 +469,15 @@ pub(crate) async fn the_viper_room_message_handler(
                 return Ok(());
             }
 
-            let channels_to_save: Vec<_> = channels_to_add.iter().take(available_slots).collect();
-            let skipped_count = channels_to_add.len() - channels_to_save.len();
+            // Filter out private channels (without username) - only public channels allowed
+            let (public_channels, private_channels): (Vec<_>, Vec<_>) = channels_to_add
+                .iter()
+                .partition(|ch| !ch.channel_username.trim().is_empty());
+
+            let private_count = private_channels.len();
+
+            let channels_to_save: Vec<_> = public_channels.iter().take(available_slots).collect();
+            let skipped_count = public_channels.len() - channels_to_save.len();
 
             let mut saved_count = 0;
             let mut error_count = 0;
@@ -488,7 +488,7 @@ pub(crate) async fn the_viper_room_message_handler(
                     user_id_i64,
                     channel.channel_id,
                     &channel.channel_title,
-                    channel.channel_username.as_deref(),
+                    &channel.channel_username,
                 )
                 .await
                 {
@@ -505,15 +505,34 @@ pub(crate) async fn the_viper_room_message_handler(
                 pending_lock.remove(&user_id.0);
             }
 
-            let result_msg = if skipped_count > 0 {
-                format!(
-                    "⚠️ Достигнут лимит каналов (максимум {}).\n\n✅ Добавлено каналов: {}\n❌ Не добавлено: {}\n\nДля освобождения слотов воспользуйся пунктом \"➖ Удалить канал\" в меню управления каналами",
-                    MAX_CHANNELS_PER_USER, saved_count, skipped_count
-                )
-            } else if error_count == 0 {
-                format!("✅ Сохранено каналов: {}", saved_count)
+            let mut result_parts = Vec::new();
+
+            if saved_count > 0 {
+                result_parts.push(format!("✅ Сохранено каналов: {}", saved_count));
+            }
+
+            if private_count > 0 {
+                result_parts.push(format!(
+                    "⚠️ Приватных каналов пропущено: {}\n(Поддерживаются только публичные каналы с username)",
+                    private_count
+                ));
+            }
+
+            if skipped_count > 0 {
+                result_parts.push(format!(
+                    "⚠️ Достигнут лимит (макс. {}), не добавлено: {}",
+                    MAX_CHANNELS_PER_USER, skipped_count
+                ));
+            }
+
+            if error_count > 0 {
+                result_parts.push(format!("❌ Ошибок при сохранении: {}", error_count));
+            }
+
+            let result_msg = if result_parts.is_empty() {
+                "❌ Нет каналов для сохранения".to_string()
             } else {
-                format!("✅ Сохранено: {}\n❌ Ошибок: {}", saved_count, error_count)
+                result_parts.join("\n\n")
             };
 
             bot.send_message(chat_id, result_msg).await?;
@@ -555,6 +574,8 @@ pub(crate) async fn the_viper_room_message_handler(
             .await?;
             bot.send_message(chat_id, bot_system_message).await?;
 
+            tokio::time::sleep(Duration::from_secs(2)).await;
+
             send_daily_podcast(
                 &bot,
                 user_id,
@@ -581,6 +602,8 @@ pub(crate) async fn the_viper_room_message_handler(
             ))
             .await?;
             bot.send_message(chat_id, bot_system_message).await?;
+
+            tokio::time::sleep(Duration::from_secs(2)).await;
 
             send_daily_podcast(
                 &bot,

@@ -21,12 +21,12 @@ pub struct UserChannel {
     pub user_id: i64,
     pub channel_id: i64,
     pub channel_title: String,
-    pub channel_username: Option<String>,
+    pub channel_username: String, // NOT NULL - only public channels allowed
 }
 
 #[derive(Debug, Clone)]
 pub struct PendingChannel {
     pub channel_id: i64,
     pub channel_title: String,
-    pub channel_username: Option<String>,
+    pub channel_username: String, // NOT NULL - only public channels allowed
 }

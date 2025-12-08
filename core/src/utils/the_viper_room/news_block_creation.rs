@@ -10,8 +10,8 @@ use crate::models::the_viper_room::db_models::Recipient;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::get_system_role_or_fallback;
 use crate::utils::the_viper_room::news_block_creation_utils::{
-    get_dialogs, mix_podcast_with_music, processing_dialogs, summarize_updates,
-    updates_file_creation,
+    get_dialogs, get_user_dialogs_from_db, mix_podcast_with_music, processing_chats,
+    processing_dialogs, summarize_updates, updates_file_creation,
 };
 use grammers_client::Client as g_Client;
 use sqlx::{Pool, Sqlite};
@@ -32,8 +32,31 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
     let user_tmp_dir = format!("common_res/the_viper_room/tmp/{}", user_id);
     create_dir_all(&user_tmp_dir)?;
 
-    let channels = get_dialogs(&client).await?;
-    processing_dialogs(&client, channels, app_state.clone(), user_tmp_dir.clone()).await?;
+    match &recipient {
+        Recipient::Public => {
+            info!("Fetching channels for public podcast from agent subscriptions");
+            let channels = get_dialogs(&client).await?;
+
+            info!(
+                "Processing {} channels for podcast generation",
+                channels.len()
+            );
+            processing_dialogs(&client, channels, app_state.clone(), user_tmp_dir.clone()).await?;
+        }
+        Recipient::Private(user_id) => {
+            info!("Fetching channels for user {} from database", user_id);
+            if let Some(pool) = db_pool {
+                let chats = get_user_dialogs_from_db(&client, *user_id, pool).await?;
+
+                info!("Processing {} channels for podcast generation", chats.len());
+                processing_chats(&client, chats, app_state.clone(), user_tmp_dir.clone()).await?;
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Database pool is required for private podcast generation"
+                ));
+            }
+        }
+    };
 
     updates_file_creation(user_tmp_dir.clone(), app_state.clone()).await?;
 

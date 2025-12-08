@@ -7,7 +7,7 @@ pub async fn add_channel(
     user_id: i64,
     channel_id: i64,
     channel_title: &str,
-    channel_username: Option<&str>,
+    channel_username: &str,
 ) -> anyhow::Result<()> {
     let query = "
         INSERT INTO user_channels (user_id, channel_id, channel_title, channel_username)
@@ -26,7 +26,7 @@ pub async fn add_channel(
         .await?;
 
     info!(
-        "Channel '{}' ({}) [username: {:?}] added for user {}",
+        "Channel '{}' ({}) [@{}] added for user {}",
         channel_title, channel_id, channel_username, user_id
     );
 

@@ -10,29 +10,32 @@ use core::models::the_viper_room::the_viper_room_bot;
 use core::models::the_viper_room::the_viper_room_bot::MainMenuMessageType;
 use core::state::tg_bot::TheViperRoomBotState;
 use core::utils::common::get_message;
+use core::utils::tg_bot::tg_bot::{start_bots_chat_action, stop_bots_chat_action};
 use core::utils::the_viper_room::news_block_creation::news_block_creation;
 use core::utils::the_viper_room::news_block_creation_utils::{
     generate_waveform, save_daily_podcast,
 };
 use grammers_client::types::{attributes::Attribute, InputMessage};
 use grammers_client::Client as g_Client;
+use reqwest::multipart;
 use std::fs::{read_dir, read_to_string, remove_file};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use teloxide::prelude::{ChatId, Requester};
-use teloxide::types::MessageOrigin;
+use teloxide::types::{ChatAction, MessageOrigin};
 use teloxide::types::{ChatKind, PublicChatKind};
 use teloxide::Bot;
-use teloxide_core::payloads::{SendMessageSetters, SendVoiceSetters};
+use teloxide_core::payloads::SendMessageSetters;
 use teloxide_core::types::{
-    InlineKeyboardButton, InlineKeyboardMarkup, InputFile, KeyboardButton, KeyboardMarkup,
-    ParseMode, UserId,
+    InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Message, ParseMode,
+    UserId,
 };
+use tokio::sync::Mutex;
 use tokio::time;
 use tokio::time::Instant;
-use tracing::error;
 use tracing::log::info;
+use tracing::{error, warn};
 
 fn extract_channel_username_from_link(input: &str) -> Option<String> {
     // Try to strip common prefixes
@@ -130,8 +133,48 @@ pub async fn send_generated_podcast_via_telegram_agent(
     Ok(())
 }
 
+async fn send_voice_with_waveform(
+    bot_token: &str,
+    chat_id: ChatId,
+    audio_path: &PathBuf,
+    caption: &str,
+    waveform: Vec<u8>,
+) -> Result<()> {
+    let api_url = format!("https://api.telegram.org/bot{}/sendVoice", bot_token);
+
+    let file_bytes = tokio::fs::read(audio_path).await?;
+    let file_name = audio_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("podcast.mp3");
+
+    let form = multipart::Form::new()
+        .text("chat_id", chat_id.to_string())
+        .text("caption", caption.to_string())
+        .text("waveform", serde_json::to_string(&waveform)?)
+        .part(
+            "voice",
+            multipart::Part::bytes(file_bytes)
+                .file_name(file_name.to_string())
+                .mime_str("audio/mpeg")?,
+        );
+
+    let client = reqwest::Client::new();
+    let response = client.post(&api_url).multipart(form).send().await?;
+
+    if !response.status().is_success() {
+        let error_text = response.text().await?;
+        return Err(anyhow::anyhow!(
+            "Failed to send voice with waveform: {}",
+            error_text
+        ));
+    }
+
+    Ok(())
+}
+
 pub async fn send_generated_podcast_via_bot(
-    bot: &Bot,
+    _bot: &Bot,
     chat_id: ChatId,
     recipient: Recipient,
     username: &str,
@@ -193,9 +236,15 @@ pub async fn send_generated_podcast_via_bot(
 
     info!("Sending podcast via bot to user {} [{}]", username, chat_id);
 
-    bot.send_voice(chat_id, InputFile::file(&podcast_path))
-        .caption(&caption)
-        .await?;
+    let waveform = generate_waveform(&podcast_path).await?;
+
+    let bot_token = std::env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM_BOT")?;
+
+    send_voice_with_waveform(&bot_token, chat_id, &podcast_path, &caption, waveform).await?;
+
+    // bot.send_voice(chat_id, InputFile::file(&podcast_path))
+    //     .caption(&caption)
+    //     .await?;
 
     info!(
         "Podcast sent successfully to user {} [{}]",
@@ -460,16 +509,11 @@ pub async fn show_user_channels(
             .iter()
             .enumerate()
             .map(|(i, ch)| {
-                let username_info = ch
-                    .channel_username
-                    .as_ref()
-                    .map(|u| format!(" @{}", u))
-                    .unwrap_or_default();
                 format!(
-                    "{}. {}{} (ID: {})",
+                    "{}. {} @{} (ID: {})",
                     i + 1,
                     ch.channel_title,
-                    username_info,
+                    ch.channel_username,
                     ch.channel_id
                 )
             })
@@ -554,11 +598,11 @@ pub async fn send_delete_channel_prompt(
 }
 
 pub enum ChannelInput {
-    Forwarded(i64, String, Option<String>),
+    Forwarded(i64, String, String), // channel_id, title, username (NOT NULL)
     Usernames(Vec<String>, Vec<String>),
 }
 
-pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInput> {
+pub fn parse_channel_input(msg: &Message) -> Result<ChannelInput> {
     if let Some(origin) = msg.forward_origin() {
         match origin {
             MessageOrigin::Channel { chat, .. } => match &chat.kind {
@@ -566,10 +610,23 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
                     PublicChatKind::Channel(channel_info) => {
                         let channel_id = the_viper_room_bot::normalize_channel_id(chat.id.0);
                         let channel_title = chat.title().unwrap_or("Без названия").to_string();
-                        let channel_username = channel_info.username.clone();
+
+                        let channel_username = match channel_info.username.clone() {
+                            Some(username) => username,
+                            None => {
+                                warn!(
+                                    "Public channel '{}' (ID: {}) has no username - unexpected API behavior",
+                                    channel_title, channel_id
+                                );
+                                return Err(anyhow!(
+                                    "❌ Неожиданная ошибка Telegram API: публичный канал не имеет username.\n\
+                                    Попробуй добавить канал по @username или ссылке https://t.me/..."
+                                ));
+                            }
+                        };
 
                         info!(
-                            "Forwarded from channel: ID={}, title='{}', username={:?}",
+                            "Forwarded from channel: ID={}, title='{}', username=@{}",
                             channel_id, channel_title, channel_username
                         );
 
@@ -688,12 +745,47 @@ pub async fn send_daily_podcast(
                 bot.send_message(chat_id, no_podcast_msg).await?;
                 return Ok(());
             }
-            Recipient::Private(_) => {
+            Recipient::Private(uid) => {
+                if let Some(db_pool) = app_state.core.db_pool.as_ref() {
+                    let user_channels =
+                        channel_management::get_user_channels(db_pool, *uid).await?;
+
+                    if user_channels.len() < 5 {
+                        let msg = format!(
+                            "📋 У тебя всего {} каналов для персонального подкаста.\n\n\
+                            Для генерации подкаста нужно минимум 5 каналов, чтобы было из чего делать контент.\n\n\
+                            Добавь больше каналов через меню \"⚙️ Настройки\" → \"📝 Управление каналами\"",
+                            user_channels.len()
+                        );
+                        bot.send_message(chat_id, msg).await?;
+
+                        send_main_menu(
+                            bot,
+                            user_id,
+                            chat_id,
+                            &app_state,
+                            MainMenuMessageType::Minimal,
+                        )
+                        .await?;
+
+                        return Ok(());
+                    }
+                }
+
                 let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
                     TheViperRoomBotMessages::PleaseWaitForPersonalPodcastRecord,
                 ))
                 .await?;
                 bot.send_message(chat_id, bot_system_message).await?;
+
+                let action_flag = Arc::new(Mutex::new(true));
+                start_bots_chat_action(
+                    bot.clone(),
+                    chat_id,
+                    ChatAction::RecordVoice,
+                    Arc::clone(&action_flag),
+                )
+                .await;
 
                 let generated_podcast =
                     generate_podcast(app_state.clone(), user_id.0 as i64, recipient.clone())
@@ -719,6 +811,8 @@ pub async fn send_daily_podcast(
                         }
                     }
                 }
+
+                stop_bots_chat_action(action_flag).await;
             }
         }
     } else {
