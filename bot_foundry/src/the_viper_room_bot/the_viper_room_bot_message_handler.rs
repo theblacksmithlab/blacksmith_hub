@@ -1,6 +1,6 @@
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
-    parse_channel_input, send_actual_daily_public_podcast, send_channels_menu, send_main_menu,
-    send_private_daily_podcast, send_settings_menu, ChannelInput,
+    parse_channel_input, send_channels_menu, send_daily_podcast, send_main_menu,
+    send_settings_menu, ChannelInput,
 };
 use anyhow::Result;
 use core::local_db::the_viper_room::channel_management;
@@ -550,11 +550,21 @@ pub(crate) async fn the_viper_room_message_handler(
         }
         "🎙 Сегодняшний подкаст" => {
             let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
-                TheViperRoomBotMessages::PublicPodcastSendingIntroMessage,
+                TheViperRoomBotMessages::PleaseWaitForPublicPodcastSearch,
             ))
             .await?;
             bot.send_message(chat_id, bot_system_message).await?;
-            send_actual_daily_public_podcast(bot.clone(), chat_id).await?;
+
+            send_daily_podcast(
+                &bot,
+                user_id,
+                chat_id,
+                username,
+                app_state.clone(),
+                Recipient::Public,
+            )
+            .await?;
+
             send_main_menu(
                 &bot,
                 user_id,
@@ -572,7 +582,7 @@ pub(crate) async fn the_viper_room_message_handler(
             .await?;
             bot.send_message(chat_id, bot_system_message).await?;
 
-            send_private_daily_podcast(
+            send_daily_podcast(
                 &bot,
                 user_id,
                 chat_id,

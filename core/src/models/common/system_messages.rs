@@ -201,13 +201,14 @@ pub enum TheViperRoomBotMessages {
     UnexpectedMessage,
     SupportMessage,
     MainMenuMinimal,
-    PublicPodcastSendingIntroMessage,
+    PleaseWaitForPublicPodcastSearch,
     ChannelAddingInstruction,
     SettingsMenuUnexpectedMessage,
     GeminiTTSInstruction,
     PleaseWaitForPersonalPodcastSearch,
     PleaseWaitForPersonalPodcastRecord,
-    GrabAFreshPersonalPodcast
+    GrabAFreshPersonalPodcast,
+    GrabAFreshPublicPodcast,
 }
 
 impl TheViperRoomBotMessages {
@@ -224,8 +225,8 @@ impl TheViperRoomBotMessages {
             TheViperRoomBotMessages::UnexpectedMessage => "unexpected_message",
             TheViperRoomBotMessages::SupportMessage => "support_message",
             TheViperRoomBotMessages::MainMenuMinimal => "main_menu_text_minimal",
-            TheViperRoomBotMessages::PublicPodcastSendingIntroMessage => {
-                "public_podcast_sending_intro_message"
+            TheViperRoomBotMessages::PleaseWaitForPublicPodcastSearch => {
+                "please_wait_for_public_podcast_search"
             }
             TheViperRoomBotMessages::ChannelAddingInstruction => "channel_adding_instruction",
             TheViperRoomBotMessages::SettingsMenuUnexpectedMessage => {
@@ -236,7 +237,8 @@ impl TheViperRoomBotMessages {
                 "please_wait_for_personal_podcast_search"
             }
             TheViperRoomBotMessages::PleaseWaitForPersonalPodcastRecord => {"please_wait_for_personal_podcast_record"},
-            TheViperRoomBotMessages::GrabAFreshPersonalPodcast => {"grab_a_fresh_personal_podcast"}
+            TheViperRoomBotMessages::GrabAFreshPersonalPodcast => {"grab_a_fresh_personal_podcast"},
+            TheViperRoomBotMessages::GrabAFreshPublicPodcast => {"grab_a_fresh_public_podcast"},
         }
     }
 }

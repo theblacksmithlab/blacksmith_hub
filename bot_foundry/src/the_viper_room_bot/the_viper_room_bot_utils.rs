@@ -133,27 +133,74 @@ pub async fn send_generated_podcast_via_telegram_agent(
 pub async fn send_generated_podcast_via_bot(
     bot: &Bot,
     chat_id: ChatId,
-    podcast_file_path: PathBuf,
+    recipient: Recipient,
     username: &str,
-    user_id: i64,
 ) -> Result<()> {
-    info!("Sending podcast via bot to user {} [{}]", username, chat_id);
-
-    let podcast_caption_file = podcast_file_path.with_extension("txt");
-
-    let caption = if podcast_caption_file.exists() {
-        read_to_string(&podcast_caption_file).unwrap_or_else(|e| {
-            error!("Failed to read caption file: {}", e);
-            "Твой персональный подкаст".to_string()
-        })
-    } else {
-        "Твой персональный подкаст".to_string()
+    // Определяем путь к папке в зависимости от Recipient
+    let podcast_dir = match &recipient {
+        Recipient::Public => "common_res/the_viper_room/daily_public_podcast".to_string(),
+        Recipient::Private(user_id) => {
+            format!("common_res/the_viper_room/{}/daily_private_podcast", user_id)
+        }
     };
 
-    let title = extract_podcast_title(&podcast_file_path);
+    info!("Looking for podcast in: {}", podcast_dir);
+
+    // Ищем файлы
+    let mut podcast_file: Option<PathBuf> = None;
+    let mut caption_file: Option<PathBuf> = None;
+
+    if let Ok(entries) = read_dir(&podcast_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(extension) = path.extension() {
+                    match extension.to_str() {
+                        Some("mp3") => podcast_file = Some(path),
+                        Some("txt") => caption_file = Some(path),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    // Проверяем наличие подкаста
+    let podcast_path = match podcast_file {
+        Some(path) => path,
+        None => {
+            return Err(anyhow::anyhow!(
+                "Podcast file not found in {}",
+                podcast_dir
+            ));
+        }
+    };
+
+    info!("Found podcast: {:?}", podcast_path);
+
+    // Читаем caption
+    let caption = if let Some(caption_path) = caption_file {
+        info!("Found caption: {:?}", caption_path);
+        read_to_string(&caption_path).unwrap_or_else(|e| {
+            error!("Failed to read caption file: {}", e);
+            match recipient {
+                Recipient::Public => "Сегодняшний подкаст".to_string(),
+                Recipient::Private(_) => "Твой персональный подкаст".to_string(),
+            }
+        })
+    } else {
+        match recipient {
+            Recipient::Public => "Сегодняшний подкаст".to_string(),
+            Recipient::Private(_) => "Твой персональный подкаст".to_string(),
+        }
+    };
+
+    let title = extract_podcast_title(&podcast_path);
     let thumbnail_path = "common_res/the_viper_room/podcast_cover.jpg";
 
-    bot.send_audio(chat_id, InputFile::file(&podcast_file_path))
+    info!("Sending podcast via bot to user {} [{}]", username, chat_id);
+
+    bot.send_audio(chat_id, InputFile::file(&podcast_path))
         .title(title)
         .performer("The Viper Room")
         .thumbnail(InputFile::file(thumbnail_path))
@@ -164,28 +211,6 @@ pub async fn send_generated_podcast_via_bot(
         "Podcast sent successfully to user {} [{}]",
         username, chat_id
     );
-
-    if let Err(e) = save_daily_podcast(
-        &podcast_file_path,
-        &podcast_caption_file,
-        Recipient::Private(user_id),
-    )
-    .await
-    {
-        error!(
-            "Failed to save daily private podcast for user {}: {}",
-            user_id, e
-        );
-    }
-
-    for file in [&podcast_file_path, &podcast_caption_file] {
-        if file.exists() {
-            match remove_file(file) {
-                Ok(_) => info!("File {} deleted after sending!", file.display()),
-                Err(e) => info!("Could not delete {}: {}", file.display(), e),
-            }
-        }
-    }
 
     Ok(())
 }
@@ -640,7 +665,7 @@ pub fn parse_channel_input(msg: &teloxide::types::Message) -> Result<ChannelInpu
     ))
 }
 
-pub async fn send_private_daily_podcast(
+pub async fn send_daily_podcast(
     bot: &Bot,
     user_id: UserId,
     chat_id: ChatId,
@@ -648,165 +673,88 @@ pub async fn send_private_daily_podcast(
     app_state: Arc<TheViperRoomBotState>,
     recipient: Recipient,
 ) -> Result<()> {
-    let personal_daily_podcast_dir = format!(
-        "common_res/the_viper_room/{}/daily_personal_podcast",
-        user_id.0
-    );
-
-    info!(
-        "Looking for personal daily podcast in: {}",
-        personal_daily_podcast_dir
-    );
-
-    let mut podcast_file: Option<PathBuf> = None;
-    let mut caption_file: Option<PathBuf> = None;
-
-    if let Ok(entries) = read_dir(personal_daily_podcast_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_file() {
-                if let Some(extension) = path.extension() {
-                    match extension.to_str() {
-                        Some("mp3") => podcast_file = Some(path),
-                        Some("txt") => caption_file = Some(path),
-                        _ => {}
-                    }
-                }
-            }
+    let podcast_dir = match &recipient {
+        Recipient::Public => "common_res/the_viper_room/daily_public_podcast".to_string(),
+        Recipient::Private(uid) => {
+            format!("common_res/the_viper_room/{}/daily_private_podcast", uid)
         }
-    }
+    };
 
-    let podcast_path = match podcast_file {
-        Some(path) => {
-            let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
-                TheViperRoomBotMessages::GrabAFreshPersonalPodcast,
-            ))
+    info!("Looking for daily podcast in: {}", podcast_dir);
+    
+    let podcast_exists = if let Ok(entries) = read_dir(&podcast_dir) {
+        entries
+            .flatten()
+            .any(|entry| entry.path().extension().and_then(|e| e.to_str()) == Some("mp3"))
+    } else {
+        false
+    };
+
+    if !podcast_exists {
+        match &recipient {
+            Recipient::Public => {
+                let no_podcast_msg = "К сожалению, сегодняшний подкаст ещё не готов. Попробуй зайти позже!";
+                bot.send_message(chat_id, no_podcast_msg).await?;
+                return Ok(());
+            }
+            Recipient::Private(_) => {
+                let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
+                    TheViperRoomBotMessages::PleaseWaitForPersonalPodcastRecord,
+                ))
                 .await?;
-            bot.send_message(chat_id, bot_system_message).await?;
+                bot.send_message(chat_id, bot_system_message).await?;
 
-            path
-        },
-        None => {
-            let bot_system_message = get_message(AppsSystemMessages::TheViperRoomBot(
-                TheViperRoomBotMessages::PleaseWaitForPersonalPodcastSearch,
-            ))
-            .await?;
-            bot.send_message(chat_id, bot_system_message).await?;
-
-            let generated_personal_podcast = generate_podcast(
-                app_state.clone(),
-                user_id.0 as i64,
-                recipient
-            )
-                .await?;
-
-            if let Err(e) =
-                save_daily_podcast(
-                    &generated_personal_podcast,
-                    &generated_personal_podcast
-                        .with_extension("txt"),
-                    Recipient::Private(user_id.0 as i64)
+                let generated_podcast = generate_podcast(
+                    app_state.clone(),
+                    user_id.0 as i64,
+                    recipient.clone(),
                 )
-                    .await
-            {
-                error!("Failed to save daily public podcast: {}", e);
-            }
-
-            generated_personal_podcast
-        }
-    };
-
-    info!("Found daily personal podcast: {:?}", podcast_path);
-
-    let title = extract_podcast_title(&podcast_path);
-
-    let caption = if let Some(caption_path) = caption_file {
-        info!("Found caption: {:?}", caption_path);
-        read_to_string(&caption_path).unwrap_or_else(|e| {
-            error!("Failed to read caption file: {}", e);
-            "Твой сегодняшний подкаст".to_string()
-        })
-    } else {
-        "Твой сегодняшний подкаст".to_string()
-    };
-
-    info!("Sending personal daily podcast to user: {} [{}]...", username, user_id);
-
-    let thumbnail_path = "common_res/the_viper_room/podcast_cover.jpg";
-
-    bot.send_audio(chat_id, InputFile::file(&podcast_path))
-        .title(title)
-        .performer("The Viper Room")
-        .thumbnail(InputFile::file(thumbnail_path))
-        .caption(&caption)
-        .await?;
-
-    info!(
-        "Personal daily podcast for user: {} [{}] sent successfully!",
-        username, user_id
-    );
-
-    Ok(())
-}
-
-pub async fn send_actual_daily_public_podcast(bot: Bot, chat_id: ChatId) -> Result<()> {
-    let daily_podcast_dir = "common_res/the_viper_room/daily_public_podcast";
-
-    info!("Looking for daily public podcast in: {}", daily_podcast_dir);
-
-    let mut podcast_file: Option<PathBuf> = None;
-    let mut caption_file: Option<PathBuf> = None;
-
-    if let Ok(entries) = read_dir(daily_podcast_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_file() {
-                if let Some(extension) = path.extension() {
-                    match extension.to_str() {
-                        Some("mp3") => podcast_file = Some(path),
-                        Some("txt") => caption_file = Some(path),
-                        _ => {}
+                .await?;
+                
+                if let Err(e) = save_daily_podcast(
+                    &generated_podcast,
+                    &generated_podcast.with_extension("txt"),
+                    recipient.clone(),
+                )
+                .await
+                {
+                    error!("Failed to save daily private podcast: {}", e);
+                }
+                
+                for file in [
+                    &generated_podcast,
+                    &generated_podcast.with_extension("txt"),
+                ] {
+                    if file.exists() {
+                        match remove_file(file) {
+                            Ok(_) => info!("Temporary file {} deleted after saving!", file.display()),
+                            Err(e) => info!("Could not delete temporary {}: {}", file.display(), e),
+                        }
                     }
                 }
             }
         }
-    }
-
-    let podcast_path = match podcast_file {
-        Some(path) => path,
-        None => {
-            let no_podcast_msg = "К сожалению, сегодняшний подкаст ещё не готов. Попробуйте позже!";
-            bot.send_message(chat_id, no_podcast_msg).await?;
-            return Ok(());
-        }
-    };
-
-    info!("Found daily podcast: {:?}", podcast_path);
-
-    let title = extract_podcast_title(&podcast_path);
-
-    let caption = if let Some(caption_path) = caption_file {
-        info!("Found caption: {:?}", caption_path);
-        read_to_string(&caption_path).unwrap_or_else(|e| {
-            error!("Failed to read caption file: {}", e);
-            "Сегодняшний подкаст".to_string()
-        })
     } else {
-        "Сегодняшний подкаст".to_string()
-    };
+        let message = match &recipient {
+            Recipient::Public => {
+                get_message(AppsSystemMessages::TheViperRoomBot(
+                    TheViperRoomBotMessages::GrabAFreshPublicPodcast,
+                ))
+                    .await?
+            },
+            Recipient::Private(_) => {
+                get_message(AppsSystemMessages::TheViperRoomBot(
+                    TheViperRoomBotMessages::GrabAFreshPersonalPodcast,
+                ))
+                .await?
+            }
+        };
+        bot.send_message(chat_id, message).await?;
+    }
+    
+    send_generated_podcast_via_bot(bot, chat_id, recipient, &username).await?;
 
-    info!("Sending daily podcast to user...");
-
-    let thumbnail_path = "common_res/the_viper_room/podcast_cover.jpg";
-
-    bot.send_audio(chat_id, InputFile::file(&podcast_path))
-        .title(title)
-        .performer("The Viper Room")
-        .thumbnail(InputFile::file(thumbnail_path))
-        .caption(&caption)
-        .await?;
-
-    info!("Daily podcast sent successfully!");
+    info!("Daily podcast sent successfully for user: {} [{}]", username, user_id);
 
     Ok(())
 }
@@ -824,4 +772,98 @@ fn extract_podcast_title(path: &PathBuf) -> String {
     }
 
     "Daily Podcast".to_string()
+}
+
+async fn cleanup_daily_podcasts() -> Result<()> {
+    info!("Starting daily podcasts cleanup...");
+    
+    let public_podcast_dir = "common_res/the_viper_room/daily_public_podcast";
+    if let Ok(entries) = read_dir(public_podcast_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                match remove_file(&path) {
+                    Ok(_) => info!("Removed public podcast file: {:?}", path),
+                    Err(e) => error!("Failed to remove public podcast file {:?}: {}", path, e),
+                }
+            }
+        }
+    }
+    
+    let base_dir = "common_res/the_viper_room";
+    if let Ok(entries) = read_dir(base_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(folder_name) = path.file_name().and_then(|n| n.to_str()) {
+                    if folder_name.parse::<i64>().is_ok() {
+                        // Это папка пользователя, очищаем daily_private_podcast
+                        let private_podcast_dir = path.join("daily_private_podcast");
+                        if private_podcast_dir.exists() {
+                            if let Ok(podcast_entries) = read_dir(&private_podcast_dir) {
+                                for podcast_entry in podcast_entries.flatten() {
+                                    let podcast_path = podcast_entry.path();
+                                    if podcast_path.is_file() {
+                                        match remove_file(&podcast_path) {
+                                            Ok(_) => info!(
+                                                "Removed private podcast file for user {}: {:?}",
+                                                folder_name, podcast_path
+                                            ),
+                                            Err(e) => error!(
+                                                "Failed to remove private podcast file {:?}: {}",
+                                                podcast_path, e
+                                            ),
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    info!("Daily podcasts cleanup completed!");
+    Ok(())
+}
+
+pub async fn schedule_daily_cleanup() -> Result<()> {
+    info!("Starting daily cleanup scheduler...");
+
+    let offset = FixedOffset::east_opt(3 * 3600).unwrap();
+    let now: DateTime<FixedOffset> = Utc::now().with_timezone(&offset);
+    let midnight = offset
+        .with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
+        .unwrap();
+
+    let duration_until_midnight = if now > midnight {
+        midnight + chrono::Duration::days(1) - now
+    } else {
+        midnight - now
+    };
+
+    let start_at =
+        Instant::now() + Duration::from_secs(duration_until_midnight.num_seconds() as u64);
+    let mut interval = time::interval_at(start_at, Duration::from_secs(24 * 60 * 60));
+
+    let hours = duration_until_midnight.num_hours();
+    let minutes = duration_until_midnight.num_minutes() % 60;
+    let seconds = duration_until_midnight.num_seconds() % 60;
+
+    info!(
+        "Daily cleanup scheduled! Next run in {} hours, {} minutes, {} seconds",
+        hours, minutes, seconds
+    );
+
+    tokio::spawn(async move {
+        loop {
+            interval.tick().await;
+            if let Err(e) = cleanup_daily_podcasts().await {
+                error!("Error during daily cleanup: {:?}", e);
+            }
+        }
+    });
+
+    Ok(())
 }

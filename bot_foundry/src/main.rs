@@ -94,7 +94,13 @@ async fn main() -> Result<()> {
         AppName::ProbiotBot => BotState::Probiot(Arc::new(ProbiotBotState::new(core).await?)),
         AppName::GrootBot => BotState::Groot(Arc::new(GrootBotState::new(core).await?)),
         AppName::TheViperRoomBot => {
-            BotState::TheViperRoom(Arc::new(TheViperRoomBotState::new(core).await?))
+            let state = Arc::new(TheViperRoomBotState::new(core).await?);
+
+            if let Err(e) = the_viper_room_bot::the_viper_room_bot_utils::schedule_daily_cleanup().await {
+                error!("Failed to schedule daily cleanup: {}", e);
+            }
+
+            BotState::TheViperRoom(state)
         }
         _ => {
             return Err(anyhow::anyhow!(
