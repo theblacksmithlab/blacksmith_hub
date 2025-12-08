@@ -683,7 +683,7 @@ pub async fn send_private_daily_podcast(
             ))
                 .await?;
             bot.send_message(chat_id, bot_system_message).await?;
-            
+
             path
         },
         None => {
@@ -705,7 +705,7 @@ pub async fn send_private_daily_podcast(
                     &generated_personal_podcast,
                     &generated_personal_podcast
                         .with_extension("txt"),
-                    Recipient::Public
+                    Recipient::Private(user_id.0 as i64)
                 )
                     .await
             {

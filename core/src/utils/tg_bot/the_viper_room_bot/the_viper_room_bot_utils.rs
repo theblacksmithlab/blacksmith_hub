@@ -5,6 +5,7 @@ use crate::models::common::system_roles::TheViperRoomRoleType;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::get_system_role_or_fallback;
 use std::sync::Arc;
+use tracing::info;
 
 pub async fn generate_user_nickname<T>(
     app_state: Arc<T>,
@@ -25,6 +26,8 @@ where
         "Username: {}, user's firstname: {}, user's lastname: {}",
         username, first_name, last_name
     );
+
+    info!("Generating a nickname from user's data: {}", user_data);
 
     raw_llm_processing(&system_role, &user_data, app_state, LlmModel::Light)
         .await
