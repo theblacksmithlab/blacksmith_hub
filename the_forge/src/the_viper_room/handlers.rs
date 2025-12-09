@@ -1,8 +1,9 @@
 use crate::the_viper_room::local_utils::{generate_user_system_nickname, get_user_system_nickname};
 use axum::extract::State;
 use axum::Json;
-use core::models::the_viper_room::the_viper_room::AuthStage::MiniAppInitConfirmed;
-use core::models::the_viper_room::the_viper_room::{
+use core::models::the_viper_room::db_models::Recipient;
+use core::models::the_viper_room::the_viper_room_web_ui::AuthStage::MiniAppInitConfirmed;
+use core::models::the_viper_room::the_viper_room_web_ui::{
     ActionStep, AuthStage, TheViperRoomServerResponse, TheViperRoomUserAction,
 };
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
@@ -236,8 +237,9 @@ pub(crate) async fn handle_the_viper_room_user_request(
                             client,
                             &user_id_as_str,
                             the_viper_room_app_state.clone(),
-                            nickname,
+                            Recipient::Private(user_id),
                             false,
+                            None,
                         )
                         .await
                         {

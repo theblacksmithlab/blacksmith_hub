@@ -2,6 +2,7 @@ use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use crate::models::tg_bot::groot_bot::groot_bot::ChatObject;
 pub use crate::utils::common::{build_resource_file_path, get_message};
+use crate::utils::tg_bot::tg_bot;
 use anyhow::{Context, Result};
 use serde_json::{from_reader, Value};
 use std::collections::{HashMap, HashSet};
@@ -14,9 +15,8 @@ use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::types::ChatKind::Public;
 use teloxide::types::PublicChatKind::Supergroup;
-use teloxide::types::{ChatPublic, MessageId, ThreadId};
+use teloxide::types::{ChatPublic, ThreadId};
 use teloxide::Bot;
-use tokio::time::sleep;
 use tracing::{error, info, warn};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -137,11 +137,11 @@ pub async fn paid_chat_spam_warning(
                 .message_thread_id(thread_id)
                 .await?;
 
-            auto_delete_message(
+            tg_bot::auto_delete_message(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(120),
+                Some(Duration::from_secs(120)),
             )
             .await;
         } else {
@@ -154,11 +154,11 @@ pub async fn paid_chat_spam_warning(
                 .send_message(msg.chat.id, bot_system_message_text)
                 .await?;
 
-            auto_delete_message(
+            tg_bot::auto_delete_message(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(120),
+                Some(Duration::from_secs(120)),
             )
             .await;
         }
@@ -171,11 +171,11 @@ pub async fn paid_chat_spam_warning(
             .send_message(msg.chat.id, bot_system_message_text)
             .await?;
 
-        auto_delete_message(
+        tg_bot::auto_delete_message(
             bot.clone(),
             sent_message.chat.id,
             sent_message.id,
-            Duration::from_secs(120),
+            Some(Duration::from_secs(120)),
         )
         .await;
     }
@@ -206,11 +206,11 @@ pub async fn unpaid_chat_spam_warning(
                 .message_thread_id(thread_id)
                 .await?;
 
-            auto_delete_message(
+            tg_bot::auto_delete_message(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(30),
+                Some(Duration::from_secs(30)),
             )
             .await;
         } else {
@@ -219,11 +219,11 @@ pub async fn unpaid_chat_spam_warning(
                 .send_message(msg.chat.id, demo_bot_system_message)
                 .await?;
 
-            auto_delete_message(
+            tg_bot::auto_delete_message(
                 bot.clone(),
                 bot_system_message.chat.id,
                 bot_system_message.id,
-                Duration::from_secs(30),
+                Some(Duration::from_secs(30)),
             )
             .await;
         }
@@ -232,11 +232,11 @@ pub async fn unpaid_chat_spam_warning(
             .send_message(msg.chat.id, demo_bot_system_message)
             .await?;
 
-        auto_delete_message(
+        tg_bot::auto_delete_message(
             bot.clone(),
             bot_system_message.chat.id,
             bot_system_message.id,
-            Duration::from_secs(30),
+            Some(Duration::from_secs(30)),
         )
         .await;
     }
@@ -501,18 +501,6 @@ pub fn add_chat_to_file(app_name: &AppName, chat_object: ChatObject) -> Result<(
     );
 
     Ok(())
-}
-
-pub async fn auto_delete_message(
-    bot: Bot,
-    chat_id: ChatId,
-    message_id: MessageId,
-    delay: Duration,
-) {
-    tokio::spawn(async move {
-        sleep(delay).await;
-        bot.delete_message(chat_id, message_id).await.ok();
-    });
 }
 
 pub fn get_chat_username(msg: &Message) -> String {

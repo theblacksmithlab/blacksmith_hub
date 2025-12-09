@@ -215,7 +215,7 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
     };
 
     let llm_response =
-        raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::ComplexMini).await?;
+        raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::ComplexFast).await?;
 
     Ok((llm_response, extra_data))
 }

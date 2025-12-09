@@ -1,2 +1,6 @@
 pub mod app_state;
-pub mod groot_bot_extended_app_state;
+
+// Re-exports для удобного импорта
+pub use app_state::{
+    AppNameProvider, CoreBotState, GrootBotState, ProbiotBotState, TheViperRoomBotState,
+};

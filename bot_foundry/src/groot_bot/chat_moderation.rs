@@ -7,7 +7,7 @@ use crate::groot_bot::chat_moderation_utils::{
 use crate::groot_bot::resources_cmd_handler::resources_cmd_handler;
 use anyhow::Result;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
-use core::state::tg_bot::app_state::BotAppState;
+use core::state::tg_bot::GrootBotState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
     is_message_from_linked_channel, load_black_listed_users, load_white_listed_users,
@@ -22,7 +22,7 @@ use tracing::{error, info};
 pub async fn chat_moderation(
     bot: Bot,
     msg: Message,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
     is_paid_chat: bool,
 ) -> Result<()> {
     let user_id = msg.clone().from.unwrap().id.0;
@@ -31,8 +31,8 @@ pub async fn chat_moderation(
     // let chat_username = get_chat_username(&msg);
     let chat_id = msg.chat.id;
 
-    if let Some(dialog_states_mutex) = &app_state.dialog_states {
-        let mut dialog_states = dialog_states_mutex.lock().await;
+    {
+        let mut dialog_states = app_state.dialog_states.lock().await;
 
         if let Some(state) = dialog_states.get_mut(&user_id) {
             if state.awaiting_option_choice
@@ -108,7 +108,7 @@ pub async fn chat_moderation(
         info!("Message from chat itself - skipping moderation");
     }
 
-    let app_name = &app_state.app_name;
+    let app_name = &app_state.core.app_name;
     // let _paid_chats = load_paid_chats(app_name);
     // paid_chats.contains(&chat_id.0);
     let white_listed_users = load_white_listed_users(app_name);

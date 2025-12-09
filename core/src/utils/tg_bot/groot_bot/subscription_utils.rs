@@ -1,5 +1,5 @@
-use crate::local_db::tg_bot::groot_bot::subscription_management::has_active_subscription_for_other_chats;
-use crate::state::tg_bot::app_state::BotAppState;
+use crate::local_db::telegram::groot_bot::subscription_management::has_active_subscription_for_other_chats;
+use crate::state::tg_bot::GrootBotState;
 use crate::utils::uniframe_studio::heleket_client::InvoiceResult;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -82,9 +82,9 @@ pub async fn show_plan_selection(
     target_chat_title: &str,
     user_id: i64,
     target_chat_id: i64,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
 ) -> Result<()> {
-    let has_discount_for_other_chats = if let Some(db_pool) = &app_state.db_pool {
+    let has_discount_for_other_chats = if let Some(db_pool) = &app_state.core.db_pool {
         has_active_subscription_for_other_chats(db_pool, user_id, target_chat_id)
             .await
             .unwrap_or(false)

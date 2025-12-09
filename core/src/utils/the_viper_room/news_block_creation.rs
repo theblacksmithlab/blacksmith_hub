@@ -1,19 +1,20 @@
 use crate::ai::common::common::raw_llm_processing;
-use crate::ai::common::voice_processing::{podcast_tts_via_elevenlabs, podcast_tts_via_openai};
+use crate::ai::common::voice_processing::{
+    podcast_tts_via_elevenlabs, podcast_tts_via_google, podcast_tts_via_openai,
+};
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
-use crate::models::common::system_messages::AppsSystemMessages;
-use crate::models::common::system_messages::TheViperRoomBotMessages;
 use crate::models::common::system_roles::TheViperRoomRoleType;
 use crate::models::the_viper_room::common::TTSProvider;
+use crate::models::the_viper_room::db_models::Recipient;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
-use crate::utils::common::get_message;
 use crate::utils::common::get_system_role_or_fallback;
 use crate::utils::the_viper_room::news_block_creation_utils::{
-    get_dialogs, mix_podcast_with_music, processing_dialogs, summarize_updates,
-    updates_file_creation,
+    get_dialogs, get_user_dialogs_from_db, mix_podcast_with_music, processing_chats,
+    processing_dialogs, summarize_updates, updates_file_creation,
 };
 use grammers_client::Client as g_Client;
+use sqlx::{Pool, Sqlite};
 use std::fs;
 use std::fs::{create_dir_all, read_dir, remove_file, rename};
 use std::path::PathBuf;
@@ -24,20 +25,45 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
     client: &g_Client,
     user_id: &str,
     app_state: Arc<T>,
-    nickname: String,
+    recipient: Recipient,
     need_caption: bool,
+    db_pool: Option<&Pool<Sqlite>>,
 ) -> anyhow::Result<PathBuf> {
     let user_tmp_dir = format!("common_res/the_viper_room/tmp/{}", user_id);
     create_dir_all(&user_tmp_dir)?;
 
-    let channels = get_dialogs(&client).await?;
-    processing_dialogs(&client, channels, app_state.clone(), user_tmp_dir.clone()).await?;
+    match &recipient {
+        Recipient::Public => {
+            info!("Fetching channels for public podcast from agent subscriptions");
+            let channels = get_dialogs(&client).await?;
+
+            info!(
+                "Processing {} channels for podcast generation",
+                channels.len()
+            );
+            processing_dialogs(&client, channels, app_state.clone(), user_tmp_dir.clone()).await?;
+        }
+        Recipient::Private(user_id) => {
+            info!("Fetching channels for user {} from database", user_id);
+            if let Some(pool) = db_pool {
+                let chats = get_user_dialogs_from_db(&client, *user_id, pool).await?;
+
+                info!("Processing {} channels for podcast generation", chats.len());
+                processing_chats(&client, chats, app_state.clone(), user_tmp_dir.clone()).await?;
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Database pool is required for private podcast generation"
+                ));
+            }
+        }
+    };
 
     updates_file_creation(user_tmp_dir.clone(), app_state.clone()).await?;
 
-    let podcast_text = summarize_updates(user_tmp_dir.clone(), app_state.clone(), nickname).await?;
+    let podcast_text =
+        summarize_updates(user_tmp_dir.clone(), app_state.clone(), recipient, db_pool).await?;
 
-    let tts_provider = TTSProvider::OpenAI;
+    let tts_provider = TTSProvider::Google;
 
     let audio_path = match tts_provider {
         TTSProvider::OpenAI => {
@@ -52,6 +78,11 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
         TTSProvider::ElevenLabs => {
             let audio_path =
                 podcast_tts_via_elevenlabs(podcast_text.clone(), user_tmp_dir.clone()).await?;
+            audio_path
+        }
+        TTSProvider::Google => {
+            let audio_path =
+                podcast_tts_via_google(podcast_text.clone(), user_tmp_dir.clone()).await?;
             audio_path
         }
     };
@@ -108,19 +139,20 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
             None,
         );
 
-        let mut caption = raw_llm_processing(
+        let caption = raw_llm_processing(
             &system_role,
             &podcast_text,
             app_state.clone(),
             LlmModel::Light,
         )
         .await?;
-        caption.push_str(
-            &get_message(AppsSystemMessages::TheViperRoomBot(
-                TheViperRoomBotMessages::DonationFooter,
-            ))
-            .await?,
-        );
+
+        // caption.push_str(
+        //     &get_message(AppsSystemMessages::TheViperRoomBot(
+        //         TheViperRoomBotMessages::DonationFooter,
+        //     ))
+        //     .await?
+        // );
 
         let caption_path = audio_path.with_extension("txt");
         fs::write(caption_path, caption)?;

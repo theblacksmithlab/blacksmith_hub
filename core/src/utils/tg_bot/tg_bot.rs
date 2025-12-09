@@ -1,7 +1,6 @@
 use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::models::common::system_messages::{AppsSystemMessages, ProbiotBotMessages};
-use crate::state::tg_bot::app_state::BotAppState;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
 use crate::utils::common::get_message;
 use anyhow::Result;
@@ -15,13 +14,14 @@ use teloxide::net::Download;
 use teloxide::prelude::{ChatId, Message, Requester};
 use teloxide::sugar::request::RequestReplyExt;
 use teloxide::types::{
-    ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntityKind, User,
+    ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, MessageEntityKind, MessageId, User,
 };
 use teloxide::{dptree, Bot};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
+use tracing::warn;
 
 pub async fn check_username_from_message(bot: &Bot, msg: &Message) -> bool {
     if msg.chat.username().is_some() {
@@ -43,31 +43,11 @@ pub async fn check_username_from_user(bot: &Bot, user: &User, chat_id: ChatId) -
     } else {
         let error_message = "Извините, но для использования приложения необходимо установить username в Telegram.\n\
                             Пожалуйста, установите username в настройках что бы получить доступ к приложению";
+
         let _ = bot.send_message(chat_id, error_message).await;
         false
     }
 }
-
-// pub fn get_username_from_message(msg: &Message) -> String {
-//     msg.from
-//         .as_ref()
-//         .map(|user| {
-//             if let Some(username) = &user.username {
-//                 return username.to_string();
-//             }
-//
-//             let first_name = user.first_name.trim();
-//             let last_name = user.last_name.as_deref().unwrap_or("").trim();
-//
-//             match (first_name.is_empty(), last_name.is_empty()) {
-//                 (false, false) => format!("{} {}", first_name, last_name),
-//                 (false, true) => first_name.to_string(),
-//                 (true, false) => last_name.to_string(),
-//                 (true, true) => "mommy's_anon".to_string(),
-//             }
-//         })
-//         .unwrap_or_else(|| "mommy's_anon".to_string())
-// }
 
 pub fn get_username_from_message(msg: &Message) -> String {
     msg.from
@@ -147,12 +127,15 @@ pub async fn is_bot_addressed(bot: &Bot, msg: &Message) -> Result<bool> {
     Ok(false)
 }
 
-pub async fn run_bot_dispatcher(
+pub async fn run_bot_dispatcher<T>(
     bot: Bot,
     main_handler: UpdateHandler<anyhow::Error>,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<T>,
     callback_query_handler: Option<UpdateHandler<anyhow::Error>>,
-) -> Result<()> {
+) -> Result<()>
+where
+    T: Send + Sync + 'static,
+{
     let mut handler_tree = dptree::entry().branch(main_handler);
 
     if let Some(callback_handler) = callback_query_handler {
@@ -304,14 +287,14 @@ pub async fn save_tts_payload<T: TempCacheInit + Send + Sync>(
     dialogue_cache.add_tts_payload(message_id.to_string(), tts_payload.to_string());
 }
 
-pub async fn get_and_remove_tts_payload(
-    app_state: Arc<BotAppState>,
+pub async fn get_and_remove_tts_payload<T: TempCacheInit + Send + Sync>(
+    app_state: Arc<T>,
     chat_id: ChatId,
     message_id: String,
 ) -> Option<String> {
     let chat_id_as_integer = chat_id.0;
     let user_id_as_str = chat_id_as_integer.to_string();
-    let mut cache = app_state.temp_cache.lock().await;
+    let mut cache = app_state.get_temp_cache().lock().await;
     if let Some(dialogue_cache) = cache.get_mut(&user_id_as_str) {
         dialogue_cache.get_and_remove_tts_payload(message_id)
     } else {
@@ -336,5 +319,46 @@ pub fn create_app_tmp_dir(app_name: &AppName) -> std::io::Result<()> {
 }
 
 pub fn is_localdb_implemented(app_name: &AppName) -> bool {
-    matches!(app_name, AppName::GrootBot)
+    matches!(app_name, AppName::GrootBot | AppName::TheViperRoomBot)
+}
+
+pub async fn auto_delete_message(
+    bot: Bot,
+    chat_id: ChatId,
+    message_id: MessageId,
+    delay: Option<Duration>,
+) {
+    tokio::spawn(async move {
+        if let Some(d) = delay {
+            sleep(d).await;
+        }
+
+        if let Err(e) = bot.delete_message(chat_id, message_id).await {
+            warn!(
+                "Failed to delete message {:?} in chat {:?}: {}",
+                message_id, chat_id, e
+            );
+        }
+    });
+}
+
+pub async fn auto_delete_messages_batch(
+    bot: Bot,
+    messages: Vec<(ChatId, MessageId)>,
+    delay: Option<Duration>,
+) {
+    let bot_clone = bot.clone();
+    tokio::spawn(async move {
+        if let Some(d) = delay {
+            sleep(d).await;
+        }
+        for (chat_id, message_id) in messages {
+            if let Err(e) = bot_clone.delete_message(chat_id, message_id).await {
+                warn!(
+                    "Failed to delete message {:?} in chat {:?}: {}",
+                    message_id, chat_id, e
+                );
+            }
+        }
+    });
 }

@@ -1,6 +1,6 @@
 use core::models::tg_bot::groot_bot::groot_bot::ResourcesDialogState;
 use core::models::tg_bot::groot_bot::groot_bot::{EditType, ShowType};
-use core::state::tg_bot::app_state::BotAppState;
+use core::state::tg_bot::GrootBotState;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::build_resource_file_path;
 use core::utils::tg_bot::groot_bot::groot_bot_utils::{
     load_black_listed_users, load_restricted_words, load_white_listed_users,
@@ -19,7 +19,7 @@ pub async fn resources_cmd_handler(
     bot: Bot,
     msg: Message,
     state: &mut ResourcesDialogState,
-    app_state: Arc<BotAppState>,
+    app_state: Arc<GrootBotState>,
     username: &str,
     user_id: u64,
 ) -> anyhow::Result<()> {
@@ -66,7 +66,7 @@ pub async fn resources_cmd_handler(
             "'Белый список' пользователей" => {
                 state.awaiting_show_type = false;
                 state.show_type = ShowType::UsersFromWhiteList;
-                let white_listed_users_ids = load_white_listed_users(&app_state.app_name);
+                let white_listed_users_ids = load_white_listed_users(&app_state.core.app_name);
 
                 let data = if white_listed_users_ids.is_empty() {
                     "No data available".to_string()
@@ -97,7 +97,7 @@ pub async fn resources_cmd_handler(
                 state.awaiting_show_type = false;
                 state.show_type = ShowType::UsersFromBlackList;
 
-                let black_listed_users_ids = load_black_listed_users(&app_state.app_name);
+                let black_listed_users_ids = load_black_listed_users(&app_state.core.app_name);
 
                 let data = if black_listed_users_ids.is_empty() {
                     "No data available".to_string()
@@ -128,7 +128,7 @@ pub async fn resources_cmd_handler(
                 state.awaiting_show_type = false;
                 state.show_type = ShowType::Words;
 
-                let restricted_words = load_restricted_words(&app_state.app_name);
+                let restricted_words = load_restricted_words(&app_state.core.app_name);
 
                 let data = if restricted_words.is_empty() {
                     "No data available".to_string()
@@ -233,14 +233,16 @@ pub async fn resources_cmd_handler(
             _ => {
                 state.awaiting_data_entry = false;
                 let file_path = match state.edit_type {
-                    EditType::UsersToWhiteList => {
-                        build_resource_file_path(&app_state.app_name, "white_listed_users.json")
-                    }
-                    EditType::UsersToBlackList => {
-                        build_resource_file_path(&app_state.app_name, "black_listed_users.json")
-                    }
+                    EditType::UsersToWhiteList => build_resource_file_path(
+                        &app_state.core.app_name,
+                        "white_listed_users.json",
+                    ),
+                    EditType::UsersToBlackList => build_resource_file_path(
+                        &app_state.core.app_name,
+                        "black_listed_users.json",
+                    ),
                     EditType::Words => {
-                        build_resource_file_path(&app_state.app_name, "restricted_words.json")
+                        build_resource_file_path(&app_state.core.app_name, "restricted_words.json")
                     }
                     _ => return Ok(()),
                 };

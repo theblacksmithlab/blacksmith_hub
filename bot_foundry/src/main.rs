@@ -3,10 +3,9 @@ use crate::groot_bot::groot_bot_handlers::{groot_bot_command_handler, groot_bot_
 use crate::probiot_bot::probiot_bot_handlers::{
     probiot_callback_query_handler, probiot_command_handler,
 };
-use crate::the_viper_room_bot::the_viper_room_bot_handlers::{
-    the_viper_room_bor_callback_query_handler, the_viper_room_command_handler,
-    the_viper_room_message_handler,
-};
+use crate::the_viper_room_bot::the_viper_room_bot_callback_query_handler::the_viper_room_bor_callback_query_handler;
+use crate::the_viper_room_bot::the_viper_room_bot_command_handler::the_viper_room_command_handler;
+use crate::the_viper_room_bot::the_viper_room_bot_message_handler::the_viper_room_message_handler;
 use anyhow::{anyhow, Result};
 use async_openai::Client as LLM_Client;
 use core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;
@@ -14,7 +13,7 @@ use core::models::common::app_name::AppName;
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
-use core::state::tg_bot::app_state::BotAppState;
+use core::state::tg_bot::{CoreBotState, GrootBotState, ProbiotBotState, TheViperRoomBotState};
 use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
 use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use dotenv::dotenv;
@@ -32,6 +31,22 @@ pub mod groot_bot;
 pub mod probiot_bot;
 pub mod the_viper_room_bot;
 
+enum BotState {
+    Probiot(Arc<ProbiotBotState>),
+    Groot(Arc<GrootBotState>),
+    TheViperRoom(Arc<TheViperRoomBotState>),
+}
+
+impl BotState {
+    fn app_name(&self) -> &AppName {
+        match self {
+            BotState::Probiot(state) => &state.core.app_name,
+            BotState::Groot(state) => &state.core.app_name,
+            BotState::TheViperRoom(state) => &state.core.app_name,
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     if let Err(e) = CryptoProvider::install_default(aws_lc_rs::default_provider()) {
@@ -46,7 +61,9 @@ async fn main() -> Result<()> {
 
     info!("Determining AppName of the Telegram bot being launched...");
 
-    let app_name_str = env::var("APP_NAME").unwrap_or_else(|_| "tester_bot".to_string());
+    let app_name_str = env::var("APP_NAME")
+        .map_err(|_| anyhow::anyhow!("APP_NAME environment variable is required"))?;
+
     let app_name = match app_name_str.as_str() {
         "probiot_bot" => AppName::ProbiotBot,
         "the_viper_room_bot" => AppName::TheViperRoomBot,
@@ -70,13 +87,28 @@ async fn main() -> Result<()> {
 
     let llm_client = LLM_Client::new();
 
-    let app_state = if app_name == AppName::GrootBot {
-        Arc::new(
-            BotAppState::with_groot_bot_options(llm_client, qdrant_client, app_name.clone())
-                .await?,
-        )
-    } else {
-        Arc::new(BotAppState::new(llm_client, qdrant_client, app_name.clone()).await?)
+    let core = Arc::new(CoreBotState::new(llm_client, qdrant_client, app_name.clone()).await?);
+
+    let bot_state = match app_name {
+        AppName::ProbiotBot => BotState::Probiot(Arc::new(ProbiotBotState::new(core).await?)),
+        AppName::GrootBot => BotState::Groot(Arc::new(GrootBotState::new(core).await?)),
+        AppName::TheViperRoomBot => {
+            let state = Arc::new(TheViperRoomBotState::new(core).await?);
+
+            if let Err(e) =
+                the_viper_room_bot::the_viper_room_bot_utils::schedule_daily_cleanup().await
+            {
+                error!("Failed to schedule daily cleanup: {}", e);
+            }
+
+            BotState::TheViperRoom(state)
+        }
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Unsupported bot app_name: {}",
+                app_name.as_str()
+            ))
+        }
     };
 
     let handlers = match get_handlers(&app_name) {
@@ -87,7 +119,7 @@ async fn main() -> Result<()> {
         }
     };
 
-    if let Err(err) = start_bot_with_handlers(app_state, handlers).await {
+    if let Err(err) = start_bot_with_handlers(bot_state, handlers).await {
         error!(
             "Failed to start bot with app_name '{}': {}",
             app_name.as_str(),
@@ -99,7 +131,7 @@ async fn main() -> Result<()> {
 }
 
 async fn start_bot_with_handlers(
-    app_state: Arc<BotAppState>,
+    bot_state: BotState,
     handlers: (
         UpdateHandler<anyhow::Error>,
         UpdateHandler<anyhow::Error>,
@@ -108,21 +140,21 @@ async fn start_bot_with_handlers(
     ),
 ) -> Result<()> {
     let (command_handler, message_handler, callback_query_handler, edited_handler) = handlers;
-    let bot = match app_state.app_name {
+    let bot = match bot_state.app_name() {
         AppName::ProbiotBot => Bot::new(env::var("TELOXIDE_TOKEN_PROBIOT")?),
-        AppName::TheViperRoomBot => Bot::new(env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM")?),
+        AppName::TheViperRoomBot => Bot::new(env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM_BOT")?),
         AppName::GrootBot => Bot::new(env::var("TELOXIDE_TOKEN_GROOT")?),
         _ => {
             return Err(anyhow::anyhow!(
                 "Unsupported app type of the app: {}",
-                app_state.app_name
+                bot_state.app_name()
             ))
         }
     };
 
     info!(
         "Starting | {} | Telegram bot...",
-        app_state.app_name.as_str()
+        bot_state.app_name().as_str()
     );
 
     let mut main_handler = dptree::entry()
@@ -133,7 +165,17 @@ async fn start_bot_with_handlers(
         main_handler = main_handler.branch(edited);
     }
 
-    run_bot_dispatcher(bot, main_handler, app_state.clone(), callback_query_handler).await?;
+    match bot_state {
+        BotState::Probiot(state) => {
+            run_bot_dispatcher(bot, main_handler, state, callback_query_handler).await?
+        }
+        BotState::Groot(state) => {
+            run_bot_dispatcher(bot, main_handler, state, callback_query_handler).await?
+        }
+        BotState::TheViperRoom(state) => {
+            run_bot_dispatcher(bot, main_handler, state, callback_query_handler).await?
+        }
+    }
 
     Ok(())
 }
@@ -151,7 +193,7 @@ fn get_handlers(
             Update::filter_message()
                 .filter_command::<ProbiotBotCommands>()
                 .endpoint(probiot_command_handler),
-            Update::filter_message().endpoint(default_message_handler),
+            Update::filter_message().endpoint(default_message_handler::<ProbiotBotState>),
             Some(Update::filter_callback_query().endpoint(probiot_callback_query_handler)),
             None,
         )),

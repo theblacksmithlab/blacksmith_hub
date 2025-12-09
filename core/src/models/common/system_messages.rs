@@ -106,6 +106,7 @@ pub enum CommonMessages {
     GlobalErrorProcessingVoiceMessage,
     InvalidRequestContent,
     PrivateCmdUsedInPublicChat,
+    NoUsernameWarning,
 }
 
 impl CommonMessages {
@@ -124,6 +125,7 @@ impl CommonMessages {
             }
             CommonMessages::InvalidRequestContent => "invalid_request_content",
             CommonMessages::PrivateCmdUsedInPublicChat => "private_cmd_used_in_public_chat",
+            CommonMessages::NoUsernameWarning => "no_username_warning",
         }
     }
 }
@@ -197,6 +199,17 @@ pub enum TheViperRoomBotMessages {
     FAQ,
     MainMenu,
     UnexpectedMessage,
+    SupportMessage,
+    MainMenuMinimal,
+    PleaseWaitForPublicPodcastSearch,
+    ChannelAddingInstruction,
+    SettingsMenuUnexpectedMessage,
+    GeminiTTSInstruction,
+    PleaseWaitForPersonalPodcastSearch,
+    PleaseWaitForPersonalPodcastRecord,
+    GrabAFreshPersonalPodcast,
+    GrabAFreshPublicPodcast,
+    PublicPodcaseIsNotReadyYet,
 }
 
 impl TheViperRoomBotMessages {
@@ -209,8 +222,27 @@ impl TheViperRoomBotMessages {
             }
             TheViperRoomBotMessages::StartMessage => "start_message",
             TheViperRoomBotMessages::FAQ => "faq",
-            TheViperRoomBotMessages::MainMenu => "main_menu_text",
+            TheViperRoomBotMessages::MainMenu => "main_menu_text_full",
             TheViperRoomBotMessages::UnexpectedMessage => "unexpected_message",
+            TheViperRoomBotMessages::SupportMessage => "support_message",
+            TheViperRoomBotMessages::MainMenuMinimal => "main_menu_text_minimal",
+            TheViperRoomBotMessages::PleaseWaitForPublicPodcastSearch => {
+                "please_wait_for_public_podcast_search"
+            }
+            TheViperRoomBotMessages::ChannelAddingInstruction => "channel_adding_instruction",
+            TheViperRoomBotMessages::SettingsMenuUnexpectedMessage => {
+                "settings_menu_unexpected_message"
+            }
+            TheViperRoomBotMessages::GeminiTTSInstruction => "gemini_tts_instruction",
+            TheViperRoomBotMessages::PleaseWaitForPersonalPodcastSearch => {
+                "please_wait_for_personal_podcast_search"
+            }
+            TheViperRoomBotMessages::PleaseWaitForPersonalPodcastRecord => {
+                "please_wait_for_personal_podcast_record"
+            }
+            TheViperRoomBotMessages::GrabAFreshPersonalPodcast => "grab_a_fresh_personal_podcast",
+            TheViperRoomBotMessages::GrabAFreshPublicPodcast => "grab_a_fresh_public_podcast",
+            TheViperRoomBotMessages::PublicPodcaseIsNotReadyYet => "public_podcase_is_not_ready",
         }
     }
 }

@@ -1,2 +1,3 @@
 pub mod local_db;
-pub mod tg_bot;
+pub mod telegram;
+pub mod the_viper_room;

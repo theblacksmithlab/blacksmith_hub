@@ -1,6 +1,6 @@
 use crate::models::common::app_name::AppName;
-use crate::models::the_viper_room::the_viper_room::AuthStage::AuthError;
-use crate::models::the_viper_room::the_viper_room::{AuthStage, TheViperRoomServerResponse};
+use crate::models::the_viper_room::the_viper_room_web_ui::AuthStage::AuthError;
+use crate::models::the_viper_room::the_viper_room_web_ui::{AuthStage, TheViperRoomServerResponse};
 use crate::state::the_viper_room::app_state::TheViperRoomAppState;
 use crate::state::the_viper_room::app_state_operation::reset_user_state_with_message;
 use crate::utils::common::update_the_viper_room_user_state;

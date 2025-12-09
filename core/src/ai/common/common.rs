@@ -29,16 +29,17 @@ pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
         builder.temperature(0.2);
     }
 
-    builder.messages([
-        ChatCompletionRequestSystemMessageArgs::default()
-            .content(system_role)
-            .build()?
-            .into(),
-        ChatCompletionRequestUserMessageArgs::default()
-            .content(request)
-            .build()?
-            .into()
-    ])
+    builder
+        .messages([
+            ChatCompletionRequestSystemMessageArgs::default()
+                .content(system_role)
+                .build()?
+                .into(),
+            ChatCompletionRequestUserMessageArgs::default()
+                .content(request)
+                .build()?
+                .into(),
+        ])
         .response_format(JsonObject);
 
     let llm_request = builder.build()?;

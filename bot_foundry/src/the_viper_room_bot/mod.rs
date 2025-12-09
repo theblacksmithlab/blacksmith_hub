@@ -1,2 +1,4 @@
-pub mod the_viper_room_bot_handlers;
+pub mod the_viper_room_bot_callback_query_handler;
+pub mod the_viper_room_bot_command_handler;
+pub mod the_viper_room_bot_message_handler;
 pub mod the_viper_room_bot_utils;

@@ -26,7 +26,9 @@ async fn main() -> Result<()> {
 
     info!("Determining AppName of the Telegram agent being launched...");
 
-    let app_name_str = env::var("APP_NAME").unwrap_or_else(|_| "tester_bot".to_string());
+    let app_name_str = env::var("APP_NAME")
+        .map_err(|_| anyhow::anyhow!("APP_NAME environment variable is required"))?;
+
     let app_name = match app_name_str.as_str() {
         "agent_davon" => AppName::AgentDavon,
         "the_viper_room" | "w3a_web" | "blacksmith_web" | "probiot_bot" | "the_viper_room_bot"

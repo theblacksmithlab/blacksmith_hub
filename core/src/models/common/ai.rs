@@ -3,10 +3,9 @@ use strum_macros::Display;
 
 #[derive(Debug, Display)]
 pub enum LlmModel {
-    Tiny,
-    Light,
-    ComplexMini,
-    Complex,
+    Tiny,                // gpt-4o-mini
+    Light,               // gpt-4o
+    Complex,             // gpt-5.1
     TextEmbedding3Large, // OpenAI embedding generative model
     ComplexFast,         // gpt-5.1 (low reasoning)
     TTS,
@@ -17,7 +16,6 @@ impl LlmModel {
         match self {
             LlmModel::Tiny => "got-4o-mini",
             LlmModel::Light => "gpt-4o",
-            LlmModel::ComplexMini => "gpt-5-mini",
             LlmModel::Complex | LlmModel::ComplexFast => "gpt-5.1",
             LlmModel::TextEmbedding3Large => "text-embedding-3-large",
             LlmModel::TTS => "gpt-4o-mini-tts",
@@ -25,10 +23,7 @@ impl LlmModel {
     }
 
     pub fn is_gpt5_model(&self) -> bool {
-        matches!(
-            self,
-            LlmModel::ComplexMini | LlmModel::Complex | LlmModel::ComplexFast
-        )
+        matches!(self, LlmModel::Complex | LlmModel::ComplexFast)
     }
 
     pub fn reasoning_effort(&self) -> Option<ReasoningEffort> {
