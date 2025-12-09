@@ -1,8 +1,8 @@
-use core::local_db::the_viper_room::user_management;
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     generate_podcast, schedule_podcast, send_generated_podcast_via_telegram_agent, send_main_menu,
     stop_daily_podcasts,
 };
+use core::local_db::the_viper_room::user_management;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::{CommonMessages, TheViperRoomBotMessages};
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
@@ -78,7 +78,7 @@ pub(crate) async fn the_viper_room_command_handler(
                 "User: {} [{}] executed {:?} cmd in private chat",
                 username, user_id, cmd
             );
-            
+
             if let Some(db_pool) = &app_state.core.db_pool {
                 let first_name = Some(user.first_name.as_str());
                 let last_name = user.last_name.as_deref();

@@ -498,7 +498,7 @@ pub async fn show_user_channels(
             return Ok(());
         }
     };
-    
+
     let channels = channel_management::get_user_channels(db_pool.as_ref(), user_id).await?;
 
     let message = if channels.is_empty() {
@@ -739,7 +739,10 @@ pub async fn send_daily_podcast(
     if !podcast_exists {
         match &recipient {
             Recipient::Public => {
-                let no_podcast_msg = get_message(AppsSystemMessages::TheViperRoomBot(TheViperRoomBotMessages::PublicPodcaseIsNotReadyYet)).await?;
+                let no_podcast_msg = get_message(AppsSystemMessages::TheViperRoomBot(
+                    TheViperRoomBotMessages::PublicPodcaseIsNotReadyYet,
+                ))
+                .await?;
 
                 bot.send_message(chat_id, no_podcast_msg).await?;
                 return Ok(());
@@ -787,8 +790,7 @@ pub async fn send_daily_podcast(
                 .await;
 
                 let generated_podcast =
-                    generate_podcast(app_state.clone(), user_id, recipient.clone())
-                        .await?;
+                    generate_podcast(app_state.clone(), user_id, recipient.clone()).await?;
 
                 if let Err(e) = save_daily_podcast(
                     &generated_podcast,

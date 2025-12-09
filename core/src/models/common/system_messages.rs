@@ -209,7 +209,7 @@ pub enum TheViperRoomBotMessages {
     PleaseWaitForPersonalPodcastRecord,
     GrabAFreshPersonalPodcast,
     GrabAFreshPublicPodcast,
-    PublicPodcaseIsNotReadyYet
+    PublicPodcaseIsNotReadyYet,
 }
 
 impl TheViperRoomBotMessages {

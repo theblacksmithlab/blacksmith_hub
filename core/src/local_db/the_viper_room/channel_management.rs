@@ -91,7 +91,10 @@ pub async fn get_channel(
 pub async fn clear_user_channels(db_pool: &Pool<Sqlite>, user_id: u64) -> anyhow::Result<()> {
     let query = "DELETE FROM user_channels WHERE user_id = ?";
 
-    let result = sqlx::query(query).bind(user_id as i64).execute(db_pool).await?;
+    let result = sqlx::query(query)
+        .bind(user_id as i64)
+        .execute(db_pool)
+        .await?;
 
     info!(
         "Cleared {} channels for user {}",

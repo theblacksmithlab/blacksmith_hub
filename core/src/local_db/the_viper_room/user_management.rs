@@ -1,10 +1,10 @@
 use crate::models::the_viper_room::db_models::User;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::tg_bot::the_viper_room_bot::the_viper_room_bot_utils::generate_user_nickname;
+use anyhow::Result;
 use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
 use tracing::{info, warn};
-use anyhow::Result;
 
 pub async fn create_or_update_user<T>(
     db_pool: &Pool<Sqlite>,
@@ -89,10 +89,7 @@ pub async fn get_user(db_pool: &Pool<Sqlite>, user_id: u64) -> Result<Option<Use
     Ok(user)
 }
 
-pub async fn get_user_nickname(
-    db_pool: &Pool<Sqlite>,
-    user_id: u64,
-) -> Result<Option<String>> {
+pub async fn get_user_nickname(db_pool: &Pool<Sqlite>, user_id: u64) -> Result<Option<String>> {
     let user = get_user(db_pool, user_id).await?;
     Ok(user.and_then(|u| u.nickname))
 }
