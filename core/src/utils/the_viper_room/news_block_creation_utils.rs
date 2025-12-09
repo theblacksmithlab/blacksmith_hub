@@ -305,38 +305,9 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
 pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
-    recipient: Recipient,
-    db_pool: Option<&Pool<Sqlite>>,
+    addressee: &str,
 ) -> Result<String, anyhow::Error> {
     info!("Starting updates summarization...");
-
-    let addressee = match recipient {
-        Recipient::Public => "Public".to_string(),
-        Recipient::Private(user_id) => {
-            if let Some(pool) = db_pool {
-                match get_user_nickname(pool, user_id).await {
-                    Ok(Some(nickname)) => {
-                        info!("Using nickname for user {}: {}", user_id, nickname);
-                        nickname
-                    }
-                    Ok(None) => {
-                        warn!("No nickname found for user {}, using 'Друг'", user_id);
-                        "Друг".to_string()
-                    }
-                    Err(e) => {
-                        warn!(
-                            "Error fetching nickname for user {}: {}. Using 'Друг'",
-                            user_id, e
-                        );
-                        "Друг".to_string()
-                    }
-                }
-            } else {
-                warn!("No database pool provided, using 'Друг' as default");
-                "Друг".to_string()
-            }
-        }
-    };
 
     let system_role = get_system_role_or_fallback(
         &AppName::TheViperRoom,

@@ -761,15 +761,6 @@ pub async fn send_daily_podcast(
                         );
                         bot.send_message(chat_id, msg).await?;
 
-                        send_main_menu(
-                            bot,
-                            user_id,
-                            chat_id,
-                            &app_state,
-                            MainMenuMessageType::Minimal,
-                        )
-                        .await?;
-
                         return Ok(());
                     }
                 }

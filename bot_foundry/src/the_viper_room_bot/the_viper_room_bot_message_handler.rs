@@ -121,7 +121,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
                         bot.send_message(
                             chat_id,
-                            format!("✅ Канал \"{}\" принят\nДобавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню", channel_title),
+                            format!("✅ Канал \"{}\" принят, НО ПОКА НЕ СОХРАНЁН!\nДобавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню", channel_title),
                         )
                         .await?;
 
@@ -138,7 +138,8 @@ pub(crate) async fn the_viper_room_message_handler(
                         );
 
                         if !Path::new(&session_path).exists() {
-                            bot.send_message(chat_id, "❌ Ошибка: сессия Telegram не найдена")
+                            bot.send_message(chat_id, "❌ Ошибка: Наш Telegram-агент в данный момент спит и не готов обработать данные\n\
+                            Попробуй повторить попытку позднее и спасибо за понимание 🙏")
                                 .await?;
 
                             send_main_menu(
@@ -146,7 +147,7 @@ pub(crate) async fn the_viper_room_message_handler(
                                 user_id,
                                 chat_id,
                                 &app_state,
-                                MainMenuMessageType::Minimal,
+                                MainMenuMessageType::Full,
                             )
                             .await?;
 
@@ -156,7 +157,7 @@ pub(crate) async fn the_viper_room_message_handler(
                         let session_data = fs::read(Path::new(&session_path))?;
                         let g_client = initialize_grammers_client(session_data).await?;
 
-                        let mut added_count = 0;
+                        let mut accepted_channels = Vec::new();
                         let mut errors: Vec<String> = Vec::new();
 
                         for username in usernames {
@@ -174,12 +175,12 @@ pub(crate) async fn the_viper_room_message_handler(
                                                 .or_insert_with(Vec::new);
                                             user_channels.push(PendingChannel {
                                                 channel_id,
-                                                channel_title,
+                                                channel_title: channel_title.clone(),
                                                 channel_username: username.clone(),
                                             });
                                         }
 
-                                        added_count += 1;
+                                        accepted_channels.push((channel_title, username.clone()));
                                     } else if let Chat::Group(_) = chat {
                                         warn!("Username '@{}' is a group, not a channel", username);
                                         errors.push(format!(
@@ -207,8 +208,19 @@ pub(crate) async fn the_viper_room_message_handler(
 
                         let mut result_parts = Vec::new();
 
-                        if added_count > 0 {
-                            result_parts.push(format!("✅ Принято каналов: {}", added_count));
+                        if !accepted_channels.is_empty() {
+                            let channels_list = accepted_channels
+                                .iter()
+                                .map(|(title, username)| {
+                                    format!("  • \"{}\" (@{})", title, username)
+                                })
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            result_parts.push(format!(
+                                "✅ Принято каналов ({}):\n{}",
+                                accepted_channels.len(),
+                                channels_list
+                            ));
                         }
 
                         if !errors.is_empty() {
@@ -225,10 +237,10 @@ pub(crate) async fn the_viper_room_message_handler(
                         }
 
                         let result_msg = if result_parts.is_empty() {
-                            "❌ Не удалось обработать каналы".to_string()
+                            "❌ Не удалось обработать каналы\nПопробуй повторить попытку, следуя инструкции по загрузке каналов, которые я предоставил тебе ранее".to_string()
                         } else {
                             let result_footer =
-                                "Добавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню"
+                                "Нажми кнопку \"Сохранить\" в нижнем меню чтобы добавить принятые каналы в твою базу данных"
                                     .to_string();
                             result_parts.push(result_footer);
                             result_parts.join("\n\n")
@@ -257,7 +269,7 @@ pub(crate) async fn the_viper_room_message_handler(
                         });
                     }
 
-                    bot.send_message(chat_id, format!("✅ Канал \"{}\" принят\nДобавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню", channel_title))
+                    bot.send_message(chat_id, format!("✅ Канал \"{}\" принят, НО ПОКА НЕ СОХРАНЁН!\nДобавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню", channel_title))
                         .await?;
 
                     return Ok(());
@@ -285,7 +297,8 @@ pub(crate) async fn the_viper_room_message_handler(
                     None => {
                         bot.send_message(
                             chat_id,
-                            "❌ Ошибка: база данных недоступна в данный момент.",
+                            "❌ Ошибка: База данных недоступна в данный момент\
+                            Попробуй повторить попытку позднее и спасибо за понимание 🙏",
                         )
                         .await?;
 
@@ -309,7 +322,6 @@ pub(crate) async fn the_viper_room_message_handler(
                     )
                     .await?;
                 }
-
                 send_channels_menu(&bot, user_id, chat_id, &app_state).await?;
                 return Ok(());
             } else {
@@ -330,7 +342,8 @@ pub(crate) async fn the_viper_room_message_handler(
                     None => {
                         bot.send_message(
                             chat_id,
-                            "❌ Ошибка: база данных недоступна в данный момент",
+                            "❌ Ошибка: База данных недоступна в данный момент\
+                            Попробуй повторить попытку позднее и спасибо за понимание 🙏",
                         )
                         .await?;
 
@@ -404,7 +417,8 @@ pub(crate) async fn the_viper_room_message_handler(
             };
 
             if channels_to_add.is_empty() {
-                bot.send_message(chat_id, "❌ Нет каналов для сохранения")
+                bot.send_message(chat_id, "❌ Похоже ты не предоставил ни одного валидного канала для сохранения\n\
+                Попробуй повторить попытку, следуя инструкции по загрузке каналов, которые я предоставил тебе ранее")
                     .await?;
 
                 let keyboard = KeyboardMarkup::new(vec![
@@ -427,15 +441,19 @@ pub(crate) async fn the_viper_room_message_handler(
             let db_pool = match &app_state.core.db_pool {
                 Some(pool) => pool,
                 None => {
-                    bot.send_message(chat_id, "Ошибка: база данных недоступна в данный момент.\nПопробуй повторить попытку позже")
-                        .await?;
+                    bot.send_message(
+                        chat_id,
+                        "Ошибка: база данных недоступна в данный момент\
+                    Попробуй повторить попытку позднее и спасибо за понимание 🙏",
+                    )
+                    .await?;
 
                     send_main_menu(
                         &bot,
                         user_id,
                         chat_id,
                         &app_state,
-                        MainMenuMessageType::Minimal,
+                        MainMenuMessageType::Full,
                     )
                     .await?;
 
@@ -473,8 +491,8 @@ pub(crate) async fn the_viper_room_message_handler(
             let channels_to_save: Vec<_> = public_channels.iter().take(available_slots).collect();
             let skipped_count = public_channels.len() - channels_to_save.len();
 
-            let mut saved_count = 0;
-            let mut error_count = 0;
+            let mut saved_channels = Vec::new();
+            let mut failed_channels = Vec::new();
 
             for channel in channels_to_save {
                 match channel_management::add_channel(
@@ -486,10 +504,18 @@ pub(crate) async fn the_viper_room_message_handler(
                 )
                 .await
                 {
-                    Ok(_) => saved_count += 1,
+                    Ok(_) => {
+                        saved_channels.push((
+                            channel.channel_title.clone(),
+                            channel.channel_username.clone(),
+                        ));
+                    }
                     Err(e) => {
                         warn!("Failed to add channel {}: {}", channel.channel_id, e);
-                        error_count += 1;
+                        failed_channels.push((
+                            channel.channel_title.clone(),
+                            channel.channel_username.clone(),
+                        ));
                     }
                 }
             }
@@ -501,8 +527,17 @@ pub(crate) async fn the_viper_room_message_handler(
 
             let mut result_parts = Vec::new();
 
-            if saved_count > 0 {
-                result_parts.push(format!("✅ Сохранено каналов: {}", saved_count));
+            if !saved_channels.is_empty() {
+                let channels_list = saved_channels
+                    .iter()
+                    .map(|(title, username)| format!("  • \"{}\" (@{})", title, username))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                result_parts.push(format!(
+                    "✅ Успешно сохранены каналы ({}):\n{}",
+                    saved_channels.len(),
+                    channels_list
+                ));
             }
 
             if private_count > 0 {
@@ -519,12 +554,21 @@ pub(crate) async fn the_viper_room_message_handler(
                 ));
             }
 
-            if error_count > 0 {
-                result_parts.push(format!("❌ Ошибок при сохранении: {}", error_count));
+            if !failed_channels.is_empty() {
+                let failed_list = failed_channels
+                    .iter()
+                    .map(|(title, username)| format!("  • \"{}\" (@{})", title, username))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                result_parts.push(format!(
+                    "❌ Ошибки при сохранении ({}):\n{}",
+                    failed_channels.len(),
+                    failed_list
+                ));
             }
 
             let result_msg = if result_parts.is_empty() {
-                "❌ Нет каналов для сохранения".to_string()
+                "❌ Похоже ты не предоставил ни одного валидного канала для сохранения".to_string()
             } else {
                 result_parts.join("\n\n")
             };

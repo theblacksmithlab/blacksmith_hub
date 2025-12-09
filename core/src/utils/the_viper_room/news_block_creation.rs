@@ -2,6 +2,7 @@ use crate::ai::common::common::raw_llm_processing;
 use crate::ai::common::voice_processing::{
     podcast_tts_via_elevenlabs, podcast_tts_via_google, podcast_tts_via_openai,
 };
+use crate::local_db::the_viper_room::user_management::get_user_nickname;
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::TheViperRoomRoleType;
@@ -19,6 +20,7 @@ use std::fs;
 use std::fs::{create_dir_all, read_dir, remove_file, rename};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tracing::log::warn;
 use tracing::{error, info};
 
 pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
@@ -58,10 +60,38 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
         }
     };
 
+    let addressee = match recipient {
+        Recipient::Public => "Public".to_string(),
+        Recipient::Private(user_id) => {
+            if let Some(pool) = db_pool {
+                match get_user_nickname(pool, user_id).await {
+                    Ok(Some(nickname)) => {
+                        info!("Using nickname for user {}: {}", user_id, nickname);
+                        nickname
+                    }
+                    Ok(None) => {
+                        warn!("No nickname found for user {}, using 'Друг'", user_id);
+                        "Друг".to_string()
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Error fetching nickname for user {}: {}. Using 'Друг'",
+                            user_id, e
+                        );
+                        "Друг".to_string()
+                    }
+                }
+            } else {
+                warn!("No database pool provided, using 'Друг' as default");
+                "Друг".to_string()
+            }
+        }
+    };
+
     updates_file_creation(user_tmp_dir.clone(), app_state.clone()).await?;
 
     let podcast_text =
-        summarize_updates(user_tmp_dir.clone(), app_state.clone(), recipient, db_pool).await?;
+        summarize_updates(user_tmp_dir.clone(), app_state.clone(), &addressee).await?;
 
     let tts_provider = TTSProvider::Google;
 
@@ -139,9 +169,14 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
             None,
         );
 
+        let data_for_caption = format!(
+            "Адресат: {}\nТекст эпизода подкаста: {}",
+            addressee, podcast_text
+        );
+
         let caption = raw_llm_processing(
             &system_role,
-            &podcast_text,
+            &data_for_caption,
             app_state.clone(),
             LlmModel::Light,
         )
