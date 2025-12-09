@@ -34,7 +34,7 @@ pub(crate) async fn the_viper_room_bor_callback_query_handler(
         return Ok(());
     }
     let username = get_username_from_user(user);
-    let user_id = UserId(user.id.0);
+    let user_id = user.id.0;
     let callback_query_message = q.message.as_ref().unwrap().id();
 
     if let Some(data) = q.data.clone() {
@@ -123,7 +123,7 @@ pub(crate) async fn the_viper_room_bor_callback_query_handler(
         Some("settings_podcast_time") => {
             {
                 let mut states_lock = app_state.user_states.lock().await;
-                states_lock.insert(user_id.0, TheViperRoomBotUserState::PodcastTimeMenuView);
+                states_lock.insert(user_id, TheViperRoomBotUserState::PodcastTimeMenuView);
             }
 
             let temp_msg = "⏰ Время отправки подкаста\n\nНастройка времени отправки в разработке.";

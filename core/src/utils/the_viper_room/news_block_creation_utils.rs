@@ -64,7 +64,7 @@ pub(crate) async fn get_dialogs(client: &g_Client) -> Result<Vec<types::Dialog>,
 
 pub(crate) async fn get_user_dialogs_from_db(
     client: &g_Client,
-    user_id: i64,
+    user_id: u64,
     db_pool: &Pool<Sqlite>,
 ) -> Result<Vec<types::Chat>, anyhow::Error> {
     info!("Getting user {} channels from database...", user_id);

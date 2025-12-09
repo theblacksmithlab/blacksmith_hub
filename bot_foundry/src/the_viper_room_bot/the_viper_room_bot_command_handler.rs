@@ -1,8 +1,8 @@
+use core::local_db::the_viper_room::user_management;
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     generate_podcast, schedule_podcast, send_generated_podcast_via_telegram_agent, send_main_menu,
     stop_daily_podcasts,
 };
-use core::local_db::the_viper_room::user_management;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::{CommonMessages, TheViperRoomBotMessages};
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
@@ -36,7 +36,7 @@ pub(crate) async fn the_viper_room_command_handler(
         .from
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("No user in message"))?;
-    let user_id = UserId(user.id.0);
+    let user_id = user.id.0;
     let chat_title = get_chat_title(&msg);
     let photo_path = "common_res/the_viper_room/avatar.jpeg";
 
@@ -45,7 +45,7 @@ pub(crate) async fn the_viper_room_command_handler(
         .parse()
         .expect("LORD_ADMIN_ID must be a valid integer");
 
-    let tg_agent_id: i64 = env::var("TG_AGENT_ID")
+    let tg_agent_id: u64 = env::var("TG_AGENT_ID")
         .expect("TG_AGENT_ID must be set in environment")
         .parse()
         .expect("TG_AGENT_ID must be a valid i64 number");
@@ -78,17 +78,14 @@ pub(crate) async fn the_viper_room_command_handler(
                 "User: {} [{}] executed {:?} cmd in private chat",
                 username, user_id, cmd
             );
-
-            // Register or update user in database
+            
             if let Some(db_pool) = &app_state.core.db_pool {
-                let user_id_i64 = user_id.0 as i64;
-
                 let first_name = Some(user.first_name.as_str());
                 let last_name = user.last_name.as_deref();
 
                 user_management::create_or_update_user(
                     db_pool.as_ref(),
-                    user_id_i64,
+                    user_id,
                     Some(&username),
                     first_name,
                     last_name,
@@ -137,7 +134,7 @@ pub(crate) async fn the_viper_room_command_handler(
             .await?;
         }
 
-        TheViperRoomBotCommands::Podcast if user_id.0 == lord_admin_id => {
+        TheViperRoomBotCommands::Podcast if user_id == lord_admin_id => {
             bot.send_message(chat_id, "Starting podcast generation by /podcast cmd...")
                 .await?;
 
@@ -159,7 +156,7 @@ pub(crate) async fn the_viper_room_command_handler(
         }
 
         // Testing podcast generation
-        TheViperRoomBotCommands::Test if user_id.0 == lord_admin_id => {
+        TheViperRoomBotCommands::Test if user_id == lord_admin_id => {
             bot.send_message(chat_id, "Starting test podcast generation by /test cmd...")
                 .await?;
 
@@ -180,7 +177,7 @@ pub(crate) async fn the_viper_room_command_handler(
                 .await?;
         }
 
-        TheViperRoomBotCommands::Schedule if user_id.0 == lord_admin_id => {
+        TheViperRoomBotCommands::Schedule if user_id == lord_admin_id => {
             schedule_podcast(bot.clone(), chat_id, app_state.clone(), tg_agent_id).await?;
             bot.send_message(
                 chat_id,
@@ -189,7 +186,7 @@ pub(crate) async fn the_viper_room_command_handler(
             .await?;
         }
 
-        TheViperRoomBotCommands::Stop if user_id.0 == lord_admin_id => {
+        TheViperRoomBotCommands::Stop if user_id == lord_admin_id => {
             stop_daily_podcasts(app_state.clone()).await?;
             bot.send_message(chat_id, "Daily podcast generation stopped by /stop cmd")
                 .await?;

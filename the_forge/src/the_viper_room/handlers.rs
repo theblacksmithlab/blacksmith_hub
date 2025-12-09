@@ -237,7 +237,7 @@ pub(crate) async fn handle_the_viper_room_user_request(
                             client,
                             &user_id_as_str,
                             the_viper_room_app_state.clone(),
-                            Recipient::Private(user_id as i64),
+                            Recipient::Private(user_id),
                             false,
                             None,
                         )

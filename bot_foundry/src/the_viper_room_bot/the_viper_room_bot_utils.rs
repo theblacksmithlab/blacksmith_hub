@@ -56,7 +56,7 @@ fn extract_channel_username_from_link(input: &str) -> Option<String> {
 
 pub async fn generate_podcast(
     app_state: Arc<TheViperRoomBotState>,
-    user_id: i64, // make u64
+    user_id: u64,
     recipient: Recipient,
 ) -> Result<PathBuf> {
     info!("Starting podcast generation for recipient: {:?}", recipient);
@@ -258,7 +258,7 @@ pub async fn schedule_podcast(
     _bot: Bot,
     _user_id: ChatId,
     app_state: Arc<TheViperRoomBotState>,
-    app_tg_account_id: i64,
+    app_tg_account_id: u64,
 ) -> Result<()> {
     info!("Starting podcast scheduling task by /schedule cmd...");
     {
@@ -364,14 +364,14 @@ pub async fn stop_daily_podcasts(app_state: Arc<TheViperRoomBotState>) -> Result
 
 pub async fn send_main_menu(
     bot: &Bot,
-    user_id: UserId,
+    user_id: u64,
     chat_id: ChatId,
     app_state: &Arc<TheViperRoomBotState>,
     message_type: MainMenuMessageType,
 ) -> Result<()> {
     {
         let mut states_lock = app_state.user_states.lock().await;
-        states_lock.insert(user_id.0, TheViperRoomBotUserState::Idle);
+        states_lock.insert(user_id, TheViperRoomBotUserState::Idle);
     }
 
     let main_menu_text = match message_type {
@@ -412,13 +412,13 @@ pub async fn send_main_menu(
 
 pub async fn send_settings_menu(
     bot: &Bot,
-    user_id: UserId,
+    user_id: u64,
     chat_id: ChatId,
     app_state: &Arc<TheViperRoomBotState>,
 ) -> Result<()> {
     {
         let mut states_lock = app_state.user_states.lock().await;
-        states_lock.insert(user_id.0, TheViperRoomBotUserState::InSettingsMenu);
+        states_lock.insert(user_id, TheViperRoomBotUserState::InSettingsMenu);
     }
 
     let settings_text = "⚙️ Настройки:";
@@ -447,13 +447,13 @@ pub async fn send_settings_menu(
 
 pub async fn send_channels_menu(
     bot: &Bot,
-    user_id: UserId,
+    user_id: u64,
     chat_id: ChatId,
     app_state: &Arc<TheViperRoomBotState>,
 ) -> Result<()> {
     {
         let mut states_lock = app_state.user_states.lock().await;
-        states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsMenuView);
+        states_lock.insert(user_id, TheViperRoomBotUserState::ChannelsMenuView);
     }
 
     let channels_text = "📋 Управление каналами:";
@@ -486,7 +486,7 @@ pub async fn send_channels_menu(
 
 pub async fn show_user_channels(
     bot: &Bot,
-    user_id: UserId,
+    user_id: u64,
     chat_id: ChatId,
     app_state: &Arc<TheViperRoomBotState>,
 ) -> Result<()> {
@@ -498,9 +498,8 @@ pub async fn show_user_channels(
             return Ok(());
         }
     };
-
-    let user_id_i64 = user_id.0 as i64;
-    let channels = channel_management::get_user_channels(db_pool.as_ref(), user_id_i64).await?;
+    
+    let channels = channel_management::get_user_channels(db_pool.as_ref(), user_id).await?;
 
     let message = if channels.is_empty() {
         "📋 Твой список каналов пуст\n\nСначала добавь каналы для персонального подкаста"
@@ -537,18 +536,18 @@ pub async fn show_user_channels(
 
 pub async fn send_add_channel_prompt(
     bot: &Bot,
-    user_id: UserId,
+    user_id: u64,
     chat_id: ChatId,
     app_state: &Arc<TheViperRoomBotState>,
 ) -> Result<()> {
     {
         let mut states_lock = app_state.user_states.lock().await;
-        states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsAdding);
+        states_lock.insert(user_id, TheViperRoomBotUserState::ChannelsAdding);
     }
 
     {
         let mut pending_lock = app_state.pending_channels.lock().await;
-        pending_lock.insert(user_id.0, Vec::new());
+        pending_lock.insert(user_id, Vec::new());
     }
 
     let instruction_text = get_message(AppsSystemMessages::TheViperRoomBot(
@@ -572,13 +571,13 @@ pub async fn send_add_channel_prompt(
 
 pub async fn send_delete_channel_prompt(
     bot: &Bot,
-    user_id: UserId,
+    user_id: u64,
     chat_id: ChatId,
     app_state: &Arc<TheViperRoomBotState>,
 ) -> Result<()> {
     {
         let mut states_lock = app_state.user_states.lock().await;
-        states_lock.insert(user_id.0, TheViperRoomBotUserState::ChannelsDeleting);
+        states_lock.insert(user_id, TheViperRoomBotUserState::ChannelsDeleting);
     }
 
     let instruction_text = "📋 Удаление канала\n\nОтправь ID канала, который хочешь удалить.\n\nID можно найти в списке твоих каналов (пункт \"👁 Показать мои каналы\")";
@@ -714,7 +713,7 @@ pub fn parse_channel_input(msg: &Message) -> Result<ChannelInput> {
 
 pub async fn send_daily_podcast(
     bot: &Bot,
-    user_id: UserId,
+    user_id: u64,
     chat_id: ChatId,
     username: String,
     app_state: Arc<TheViperRoomBotState>,
@@ -788,7 +787,7 @@ pub async fn send_daily_podcast(
                 .await;
 
                 let generated_podcast =
-                    generate_podcast(app_state.clone(), user_id.0 as i64, recipient.clone())
+                    generate_podcast(app_state.clone(), user_id, recipient.clone())
                         .await?;
 
                 if let Err(e) = save_daily_podcast(

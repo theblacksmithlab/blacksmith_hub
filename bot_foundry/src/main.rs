@@ -31,7 +31,6 @@ pub mod groot_bot;
 pub mod probiot_bot;
 pub mod the_viper_room_bot;
 
-/// Enum для хранения разных типов состояний ботов
 enum BotState {
     Probiot(Arc<ProbiotBotState>),
     Groot(Arc<GrootBotState>),

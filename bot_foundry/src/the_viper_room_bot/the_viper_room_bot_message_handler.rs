@@ -1,8 +1,8 @@
+use anyhow::Result;
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     parse_channel_input, send_channels_menu, send_daily_podcast, send_main_menu,
     send_settings_menu, ChannelInput,
 };
-use anyhow::Result;
 use core::local_db::the_viper_room::channel_management;
 use core::local_db::the_viper_room::channel_management::{
     clear_user_channels, get_channel, get_user_channels, remove_channel,
@@ -51,7 +51,7 @@ pub(crate) async fn the_viper_room_message_handler(
         .from
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("No user in message"))?;
-    let user_id = UserId(user.id.0);
+    let user_id = user.id.0;
     let chat_title = get_chat_title(&msg);
 
     if !msg.chat.is_private() {
@@ -77,7 +77,7 @@ pub(crate) async fn the_viper_room_message_handler(
     let current_state = {
         let states_lock = app_state.user_states.lock().await;
         states_lock
-            .get(&user_id.0)
+            .get(&user_id)
             .cloned()
             .unwrap_or(TheViperRoomBotUserState::Idle)
     };
@@ -111,7 +111,7 @@ pub(crate) async fn the_viper_room_message_handler(
                         {
                             let mut pending_lock = app_state.pending_channels.lock().await;
                             let user_channels =
-                                pending_lock.entry(user_id.0).or_insert_with(Vec::new);
+                                pending_lock.entry(user_id).or_insert_with(Vec::new);
                             user_channels.push(PendingChannel {
                                 channel_id,
                                 channel_title: channel_title.clone(),
@@ -170,7 +170,7 @@ pub(crate) async fn the_viper_room_message_handler(
                                             let mut pending_lock =
                                                 app_state.pending_channels.lock().await;
                                             let user_channels = pending_lock
-                                                .entry(user_id.0)
+                                                .entry(user_id)
                                                 .or_insert_with(Vec::new);
                                             user_channels.push(PendingChannel {
                                                 channel_id,
@@ -249,7 +249,7 @@ pub(crate) async fn the_viper_room_message_handler(
                 Ok(ChannelInput::Forwarded(channel_id, channel_title, channel_username)) => {
                     {
                         let mut pending_lock = app_state.pending_channels.lock().await;
-                        let user_channels = pending_lock.entry(user_id.0).or_insert_with(Vec::new);
+                        let user_channels = pending_lock.entry(user_id).or_insert_with(Vec::new);
                         user_channels.push(PendingChannel {
                             channel_id,
                             channel_title: channel_title.clone(),
@@ -294,16 +294,14 @@ pub(crate) async fn the_viper_room_message_handler(
                     }
                 };
 
-                let user_id_i64 = user_id.0 as i64;
-
-                let channels = get_user_channels(db_pool.as_ref(), user_id_i64).await?;
+                let channels = get_user_channels(db_pool.as_ref(), user_id).await?;
                 let channels_count = channels.len();
 
                 if channels_count == 0 {
                     bot.send_message(chat_id, "ℹ️ У тебя нет каналов для удаления")
                         .await?;
                 } else {
-                    clear_user_channels(db_pool.as_ref(), user_id_i64).await?;
+                    clear_user_channels(db_pool.as_ref(), user_id).await?;
 
                     bot.send_message(
                         chat_id,
@@ -341,11 +339,9 @@ pub(crate) async fn the_viper_room_message_handler(
                     }
                 };
 
-                let user_id_i64 = user_id.0 as i64;
-
-                match get_channel(db_pool.as_ref(), user_id_i64, channel_id).await? {
+                match get_channel(db_pool.as_ref(), user_id, channel_id).await? {
                     Some(channel) => {
-                        remove_channel(db_pool.as_ref(), user_id_i64, channel_id).await?;
+                        remove_channel(db_pool.as_ref(), user_id, channel_id).await?;
 
                         bot.send_message(
                             chat_id,
@@ -387,7 +383,7 @@ pub(crate) async fn the_viper_room_message_handler(
             if matches!(current_state, TheViperRoomBotUserState::ChannelsAdding) {
                 {
                     let mut pending_lock = app_state.pending_channels.lock().await;
-                    pending_lock.remove(&user_id.0);
+                    pending_lock.remove(&user_id);
                 }
             }
             send_main_menu(
@@ -404,7 +400,7 @@ pub(crate) async fn the_viper_room_message_handler(
         {
             let channels_to_add = {
                 let pending_lock = app_state.pending_channels.lock().await;
-                pending_lock.get(&user_id.0).cloned().unwrap_or_default()
+                pending_lock.get(&user_id).cloned().unwrap_or_default()
             };
 
             if channels_to_add.is_empty() {
@@ -447,9 +443,7 @@ pub(crate) async fn the_viper_room_message_handler(
                 }
             };
 
-            let user_id_i64 = user_id.0 as i64;
-
-            let current_channels = get_user_channels(db_pool.as_ref(), user_id_i64).await?;
+            let current_channels = get_user_channels(db_pool.as_ref(), user_id).await?;
             let current_count = current_channels.len();
 
             let available_slots = MAX_CHANNELS_PER_USER.saturating_sub(current_count);
@@ -462,7 +456,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
                 {
                     let mut pending_lock = app_state.pending_channels.lock().await;
-                    pending_lock.remove(&user_id.0);
+                    pending_lock.remove(&user_id);
                 }
 
                 send_channels_menu(&bot, user_id, chat_id, &app_state).await?;
@@ -485,7 +479,7 @@ pub(crate) async fn the_viper_room_message_handler(
             for channel in channels_to_save {
                 match channel_management::add_channel(
                     db_pool.as_ref(),
-                    user_id_i64,
+                    user_id,
                     channel.channel_id,
                     &channel.channel_title,
                     &channel.channel_username,
@@ -502,7 +496,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
             {
                 let mut pending_lock = app_state.pending_channels.lock().await;
-                pending_lock.remove(&user_id.0);
+                pending_lock.remove(&user_id);
             }
 
             let mut result_parts = Vec::new();
@@ -611,7 +605,7 @@ pub(crate) async fn the_viper_room_message_handler(
                 chat_id,
                 username,
                 app_state.clone(),
-                Recipient::Private(user_id.0 as i64),
+                Recipient::Private(user_id),
             )
             .await?;
 

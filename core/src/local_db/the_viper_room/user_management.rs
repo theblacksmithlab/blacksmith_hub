@@ -4,15 +4,16 @@ use crate::utils::tg_bot::the_viper_room_bot::the_viper_room_bot_utils::generate
 use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
 use tracing::{info, warn};
+use anyhow::Result;
 
 pub async fn create_or_update_user<T>(
     db_pool: &Pool<Sqlite>,
-    user_id: i64,
+    user_id: u64,
     telegram_username: Option<&str>,
     first_name: Option<&str>,
     last_name: Option<&str>,
     app_state: Arc<T>,
-) -> anyhow::Result<()>
+) -> Result<()>
 where
     T: OpenAIClientInit + Send + Sync + 'static,
 {
@@ -61,7 +62,7 @@ where
     ";
 
     sqlx::query(query)
-        .bind(user_id)
+        .bind(user_id as i64)
         .bind(telegram_username)
         .bind(first_name)
         .bind(last_name)
@@ -77,11 +78,11 @@ where
     Ok(())
 }
 
-pub async fn get_user(db_pool: &Pool<Sqlite>, user_id: i64) -> anyhow::Result<Option<User>> {
+pub async fn get_user(db_pool: &Pool<Sqlite>, user_id: u64) -> Result<Option<User>> {
     let query = "SELECT user_id, telegram_username, first_name, last_name, nickname FROM users WHERE user_id = ?";
 
     let user = sqlx::query_as::<_, User>(query)
-        .bind(user_id)
+        .bind(user_id as i64)
         .fetch_optional(db_pool)
         .await?;
 
@@ -90,8 +91,8 @@ pub async fn get_user(db_pool: &Pool<Sqlite>, user_id: i64) -> anyhow::Result<Op
 
 pub async fn get_user_nickname(
     db_pool: &Pool<Sqlite>,
-    user_id: i64,
-) -> anyhow::Result<Option<String>> {
+    user_id: u64,
+) -> Result<Option<String>> {
     let user = get_user(db_pool, user_id).await?;
     Ok(user.and_then(|u| u.nickname))
 }
