@@ -18,7 +18,7 @@ use std::sync::Arc;
 use teloxide::prelude::{Message, Requester};
 use teloxide::Bot;
 use teloxide_core::payloads::SendPhotoSetters;
-use teloxide_core::types::{InputFile, KeyboardButton, KeyboardMarkup, ParseMode, UserId};
+use teloxide_core::types::{InputFile, KeyboardButton, KeyboardMarkup, ParseMode};
 use tracing::info;
 
 pub(crate) async fn the_viper_room_command_handler(

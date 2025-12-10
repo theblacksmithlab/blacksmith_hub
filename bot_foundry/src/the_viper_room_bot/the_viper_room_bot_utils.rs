@@ -29,7 +29,6 @@ use teloxide::Bot;
 use teloxide_core::payloads::SendMessageSetters;
 use teloxide_core::types::{
     InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, Message, ParseMode,
-    UserId,
 };
 use tokio::sync::Mutex;
 use tokio::time;
@@ -472,7 +471,7 @@ pub async fn send_channels_menu(
             "back_to_settings",
         )],
         vec![InlineKeyboardButton::callback(
-            "« Выйти в главное меню",
+            "« Выйти в Главное меню",
             "back_to_main_menu",
         )],
     ]);
@@ -493,7 +492,11 @@ pub async fn show_user_channels(
     let db_pool = match &app_state.core.db_pool {
         Some(pool) => pool,
         None => {
-            bot.send_message(chat_id, "Ошибка: база данных недоступна")
+            let local_db_unavailable_message = get_message(AppsSystemMessages::TheViperRoomBot(
+                TheViperRoomBotMessages::LocalDBUnavailable,
+            ))
+            .await?;
+            bot.send_message(chat_id, local_db_unavailable_message)
                 .await?;
             return Ok(());
         }
@@ -502,7 +505,7 @@ pub async fn show_user_channels(
     let channels = channel_management::get_user_channels(db_pool.as_ref(), user_id).await?;
 
     let message = if channels.is_empty() {
-        "📋 Твой список каналов пуст\n\nСначала добавь каналы для персонального подкаста"
+        "📋 Твой список каналов пуст\n\nДобавь каналы для персонального подкаста через меню \"Управление каналами\""
     } else {
         let channels_list = channels
             .iter()
@@ -522,10 +525,16 @@ pub async fn show_user_channels(
         &format!("📋 Твои каналы:\n\n{}", channels_list)
     };
 
-    let inline_keyboard = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
-        "« Назад к меню управления каналами",
-        "back_to_channels_menu",
-    )]]);
+    let inline_keyboard = InlineKeyboardMarkup::new(vec![
+        vec![InlineKeyboardButton::callback(
+            "« Назад к меню управления каналами",
+            "back_to_channels_menu",
+        )],
+        vec![InlineKeyboardButton::callback(
+            "« Выйти в Главное меню",
+            "back_to_main_menu",
+        )],
+    ]);
 
     bot.send_message(chat_id, message)
         .reply_markup(inline_keyboard)
@@ -557,6 +566,7 @@ pub async fn send_add_channel_prompt(
 
     let keyboard = KeyboardMarkup::new(vec![
         vec![KeyboardButton::new("💾 Сохранить")],
+        vec![KeyboardButton::new("⚙️ Настройки")],
         vec![KeyboardButton::new("🏠 Главное меню")],
     ])
     .resize_keyboard()
@@ -584,6 +594,7 @@ pub async fn send_delete_channel_prompt(
 
     let keyboard = KeyboardMarkup::new(vec![
         vec![KeyboardButton::new("🗑 Удалить все каналы")],
+        vec![KeyboardButton::new("⚙️ Настройки")],
         vec![KeyboardButton::new("🏠 Главное меню")],
     ])
     .resize_keyboard()
@@ -597,7 +608,7 @@ pub async fn send_delete_channel_prompt(
 }
 
 pub enum ChannelInput {
-    Forwarded(i64, String, String), // channel_id, title, username (NOT NULL)
+    Forwarded(i64, String, String),
     Usernames(Vec<String>, Vec<String>),
 }
 
