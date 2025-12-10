@@ -185,7 +185,7 @@ impl TheViperRoomBotState {
 
         let client_for_updates = g_client.clone();
         tokio::spawn(async move {
-            info!("Telegram updates consumer task started (prevents update queue overflow)");
+            info!("Telegram updates consumer task started");
 
             loop {
                 match client_for_updates.next_update().await {

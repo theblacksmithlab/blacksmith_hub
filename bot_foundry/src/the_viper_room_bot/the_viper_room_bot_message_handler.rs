@@ -103,7 +103,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
     if matches!(current_state, TheViperRoomBotUserState::ChannelsAdding) {
         if let Some(text) = msg.text() {
-            if text == "💾 Сохранить" || text == "🏠 Главное меню" {
+            if text == "💾 Сохранить" || text == "🏠 Главное меню" || text == "⚙️ Настройки" {
                 // Let it fall through to the main match statement below
             } else {
                 match parse_channel_input(&msg) {
@@ -298,7 +298,7 @@ pub(crate) async fn the_viper_room_message_handler(
 
     if matches!(current_state, TheViperRoomBotUserState::ChannelsDeleting) {
         if let Some(text) = msg.text() {
-            if text == "🏠 Главное меню" {
+            if text == "🏠 Главное меню" || text == "⚙️ Настройки" {
                 // Let it fall through to the main match statement below
             } else if text == "🗑 Удалить все каналы" {
                 let db_pool = match &app_state.core.db_pool {

@@ -574,6 +574,7 @@ pub async fn send_add_channel_prompt(
 
     bot.send_message(chat_id, instruction_text)
         .reply_markup(keyboard)
+        .parse_mode(ParseMode::Html)
         .await?;
 
     Ok(())

@@ -1,6 +1,5 @@
 use crate::ai::common::common::raw_llm_processing;
 use crate::local_db::the_viper_room::channel_management::get_user_channels;
-use crate::local_db::the_viper_room::user_management::get_user_nickname;
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::TheViperRoomRoleType;
