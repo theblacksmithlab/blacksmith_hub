@@ -424,7 +424,7 @@ pub async fn send_settings_menu(
 
     let inline_keyboard = InlineKeyboardMarkup::new(vec![
         vec![InlineKeyboardButton::callback(
-            "📋 Мои каналы",
+            "📋 Управление каналами",
             "settings_my_channels",
         )],
         vec![InlineKeyboardButton::callback(
