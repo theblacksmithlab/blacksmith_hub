@@ -58,7 +58,7 @@ pub async fn generate_podcast(
     user_id: u64,
     recipient: Recipient,
 ) -> Result<PathBuf> {
-    info!("Starting podcast generation for recipient: {:?}", recipient);
+    info!("Starting podcast generation for recipient: {:?}", recipient.clone());
 
     let telegram_client = &app_state.telegram_agent.client;
 
@@ -76,7 +76,7 @@ pub async fn generate_podcast(
     )
     .await?;
 
-    info!("Podcast generated successfully: {:?}", podcast_path);
+    info!("Podcast for recipient: {:?} generated successfully: {:?}", recipient, podcast_path);
 
     Ok(podcast_path)
 }
@@ -792,8 +792,32 @@ pub async fn send_daily_podcast(
                 )
                 .await;
 
-                let generated_podcast =
-                    generate_podcast(app_state.clone(), user_id, recipient.clone()).await?;
+                let generated_podcast = match generate_podcast(app_state.clone(), user_id, recipient.clone()).await {
+                    Ok(path) => path,
+                    Err(e) => {
+                        error!("Failed to generate personal podcast for user {}: {:?}", user_id, e);
+
+                        stop_bots_chat_action(action_flag).await;
+
+                        let error_message = get_message(AppsSystemMessages::TheViperRoomBot(
+                            TheViperRoomBotMessages::PodcastGenerationError,
+                        ))
+                        .await?;
+
+                        bot.send_message(chat_id, error_message).await?;
+
+                        send_main_menu(
+                            &bot,
+                            user_id,
+                            chat_id,
+                            &app_state,
+                            MainMenuMessageType::Full,
+                        )
+                            .await?;
+
+                        return Ok(());
+                    }
+                };
 
                 if let Err(e) = save_daily_podcast(
                     &generated_podcast,

@@ -1,6 +1,6 @@
 use sqlx::FromRow;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Recipient {
     Public,
     Private(u64),

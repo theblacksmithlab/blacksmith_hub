@@ -178,7 +178,7 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
             &system_role,
             &data_for_caption,
             app_state.clone(),
-            LlmModel::Light,
+            LlmModel::Tiny,
         )
         .await?;
 
