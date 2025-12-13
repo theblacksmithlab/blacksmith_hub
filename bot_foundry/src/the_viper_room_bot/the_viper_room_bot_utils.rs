@@ -630,7 +630,7 @@ pub fn parse_channel_input(msg: &Message) -> Result<ChannelInput> {
                                     channel_title, channel_id
                                 );
                                 return Err(anyhow!(
-                                    "❌ Неожиданная ошибка Telegram API: публичный канал не имеет username.\n\
+                                    "Неожиданное поведение Telegram API: публичный канал не имеет username.\n\
                                     Попробуй добавить канал по @username или ссылке https://t.me/..."
                                 ));
                             }

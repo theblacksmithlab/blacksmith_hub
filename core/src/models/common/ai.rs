@@ -14,7 +14,7 @@ pub enum LlmModel {
 impl LlmModel {
     pub fn as_str(&self) -> &'static str {
         match self {
-            LlmModel::Tiny => "got-4o-mini",
+            LlmModel::Tiny => "gpt-4o-mini",
             LlmModel::Light => "gpt-4o",
             LlmModel::Complex | LlmModel::ComplexFast => "gpt-5.1",
             LlmModel::TextEmbedding3Large => "text-embedding-3-large",
