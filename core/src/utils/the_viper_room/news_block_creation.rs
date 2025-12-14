@@ -1,6 +1,7 @@
 use crate::ai::common::common::raw_llm_processing;
 use crate::ai::common::voice_processing::{
-    podcast_tts_via_elevenlabs, podcast_tts_via_google, podcast_tts_via_openai,
+    generate_single_part_elevenlabs, generate_single_part_google, generate_single_part_openai,
+    merge_audio_parts,
 };
 use crate::local_db::the_viper_room::user_management::get_user_nickname;
 use crate::models::common::ai::LlmModel;
@@ -90,32 +91,54 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
 
     updates_file_creation(user_tmp_dir.clone(), app_state.clone()).await?;
 
-    let podcast_text =
+    let podcast_structure =
         summarize_updates(user_tmp_dir.clone(), app_state.clone(), &addressee).await?;
+
+    let mut parts_to_voice: Vec<String> = Vec::new();
+    parts_to_voice.push(podcast_structure.intro.clone());
+    parts_to_voice.extend(podcast_structure.body.clone());
+    parts_to_voice.push(podcast_structure.outro.clone());
+
+    info!(
+        "Podcast structure: 1 intro + {} body parts + 1 outro = {} total parts to voice",
+        podcast_structure.body.len(),
+        parts_to_voice.len()
+    );
 
     let tts_provider = TTSProvider::Google;
 
-    let audio_path = match tts_provider {
-        TTSProvider::OpenAI => {
-            let audio_path = podcast_tts_via_openai(
-                podcast_text.clone(),
-                user_tmp_dir.clone(),
-                app_state.clone(),
-            )
-            .await?;
-            audio_path
+    let mut audio_parts: Vec<PathBuf> = Vec::new();
+    for (i, part) in parts_to_voice.iter().enumerate() {
+        info!(
+            "Voicing part {}/{}: {} chars",
+            i + 1,
+            parts_to_voice.len(),
+            part.chars().count()
+        );
+
+        let part_audio = match tts_provider {
+            TTSProvider::OpenAI => {
+                generate_single_part_openai(part, &user_tmp_dir, i, app_state.clone()).await?
+            }
+            TTSProvider::ElevenLabs => {
+                generate_single_part_elevenlabs(part, &user_tmp_dir, i).await?
+            }
+            TTSProvider::Google => generate_single_part_google(part, &user_tmp_dir, i).await?,
+        };
+
+        audio_parts.push(part_audio);
+
+        if i < parts_to_voice.len() - 1 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
         }
-        TTSProvider::ElevenLabs => {
-            let audio_path =
-                podcast_tts_via_elevenlabs(podcast_text.clone(), user_tmp_dir.clone()).await?;
-            audio_path
-        }
-        TTSProvider::Google => {
-            let audio_path =
-                podcast_tts_via_google(podcast_text.clone(), user_tmp_dir.clone()).await?;
-            audio_path
-        }
-    };
+    }
+
+    let now = chrono::Utc::now();
+    let utc_plus_3 = now + chrono::Duration::hours(3);
+    let date_only = utc_plus_3.date_naive();
+    let final_filename = format!("The_Viper_Podcast_({})", date_only);
+
+    let audio_path = merge_audio_parts(audio_parts, &user_tmp_dir, &final_filename).await?;
 
     info!("Starting to add background music to the podcast...");
     let background_music_path = "common_res/the_viper_room/background_music.mp3";
@@ -169,9 +192,16 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
             None,
         );
 
+        let full_podcast_text = format!(
+            "{}\n\n{}\n\n{}",
+            podcast_structure.intro,
+            podcast_structure.body.join("\n\n"),
+            podcast_structure.outro
+        );
+
         let data_for_caption = format!(
             "Адресат: {}\nТекст эпизода подкаста: {}",
-            addressee, podcast_text
+            addressee, full_podcast_text
         );
 
         let caption = raw_llm_processing(

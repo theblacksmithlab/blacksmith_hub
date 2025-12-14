@@ -1,8 +1,9 @@
-use crate::ai::common::common::raw_llm_processing;
+use crate::ai::common::common::{raw_llm_processing, raw_llm_processing_json};
 use crate::local_db::the_viper_room::channel_management::get_user_channels;
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::TheViperRoomRoleType;
+use crate::models::the_viper_room::common::PodcastStructure;
 use crate::models::the_viper_room::db_models::Recipient;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::get_system_role_or_fallback;
@@ -305,7 +306,7 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
     addressee: &str,
-) -> Result<String, anyhow::Error> {
+) -> Result<PodcastStructure, anyhow::Error> {
     info!("Starting updates summarization...");
 
     let system_role = get_system_role_or_fallback(
@@ -323,7 +324,7 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
         addressee, updates
     );
 
-    let updates_summarized = raw_llm_processing(
+    let updates_summarized_json = raw_llm_processing_json(
         &system_role,
         &updates_with_nickname_provided,
         app_state.clone(),
@@ -331,19 +332,28 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
     )
     .await?;
 
-    let updates_summarized_file_path = format!("{}/updates_summarized.txt", user_tmp_dir);
+    info!("Received JSON response from LLM, parsing...");
 
+    let podcast_structure: PodcastStructure = serde_json::from_str(&updates_summarized_json)
+        .map_err(|e| anyhow::anyhow!("Failed to parse podcast structure from JSON: {}", e))?;
+
+    // Save for debugging
+    let updates_summarized_file_path = format!("{}/updates_summarized.json", user_tmp_dir);
     let mut updates_summarized_file = OpenOptions::new()
         .create(true)
         .write(true)
-        .append(true)
+        .truncate(true)
         .open(updates_summarized_file_path.clone())?;
+    writeln!(updates_summarized_file, "{}", updates_summarized_json)?;
 
-    writeln!(updates_summarized_file, "{}", updates_summarized)?;
+    info!(
+        "Podcast structure parsed successfully: {} intro, {} body parts, {} outro",
+        podcast_structure.intro.len(),
+        podcast_structure.body.len(),
+        podcast_structure.outro.len()
+    );
 
-    info!("Podcast text file created successfully!");
-
-    Ok(updates_summarized)
+    Ok(podcast_structure)
 }
 
 pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(

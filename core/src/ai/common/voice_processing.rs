@@ -594,3 +594,137 @@ fn convert_pcm_to_mp3(input_path: &str, output_path: &str) -> anyhow::Result<()>
 
     Ok(())
 }
+
+/// Generate a single audio part for OpenAI TTS
+pub async fn generate_single_part_openai<T: OpenAIClientInit + Send + Sync>(
+    text: &str,
+    user_tmp_dir: &str,
+    part_index: usize,
+    app_state: Arc<T>,
+) -> anyhow::Result<PathBuf> {
+    info!(
+        "Generating OpenAI TTS for part {}: {} chars",
+        part_index,
+        text.chars().count()
+    );
+
+    let llm_client = app_state.get_llm_client().clone();
+
+    let request = CreateSpeechRequestArgs::default()
+        .input(text)
+        .voice(Voice::Onyx)
+        .model(SpeechModel::Tts1Hd)
+        .speed(1.3)
+        .build()?;
+
+    let response = llm_client.audio().speech(request).await?;
+    let part_path = format!("{}/part_{}.mp3", user_tmp_dir, part_index);
+    response.save(&part_path).await?;
+
+    info!("Part {} saved to {}", part_index, part_path);
+    Ok(PathBuf::from(part_path))
+}
+
+/// Generate a single audio part for ElevenLabs TTS
+pub async fn generate_single_part_elevenlabs(
+    text: &str,
+    user_tmp_dir: &str,
+    part_index: usize,
+) -> anyhow::Result<PathBuf> {
+    info!(
+        "Generating ElevenLabs TTS for part {}: {} chars",
+        part_index,
+        text.chars().count()
+    );
+
+    let api_key = std::env::var("ELEVEN_LABS_API_KEY")
+        .map_err(|_| anyhow::anyhow!("ELEVEN_LABS_API_KEY not found"))?;
+
+    let audio_data = generate_elevenlabs_speech(text, &api_key).await?;
+    let part_path = format!("{}/part_{}.mp3", user_tmp_dir, part_index);
+    fs::write(&part_path, audio_data)?;
+
+    info!("Part {} saved to {}", part_index, part_path);
+    Ok(PathBuf::from(part_path))
+}
+
+/// Generate a single audio part for Google Gemini TTS
+pub async fn generate_single_part_google(
+    text: &str,
+    user_tmp_dir: &str,
+    part_index: usize,
+) -> anyhow::Result<PathBuf> {
+    info!(
+        "Generating Google Gemini TTS for part {}: {} chars",
+        part_index,
+        text.chars().count()
+    );
+
+    let api_key =
+        std::env::var("GOOGLE_API_KEY").map_err(|_| anyhow::anyhow!("GOOGLE_API_KEY not found"))?;
+
+    let tts_instruction = get_message(AppsSystemMessages::TheViperRoomBot(
+        TheViperRoomBotMessages::GeminiTTSInstruction,
+    ))
+    .await?;
+
+    let audio_data = generate_gemini_speech(text, &api_key, &tts_instruction).await?;
+    let pcm_path = format!("{}/part_{}_pcm.wav", user_tmp_dir, part_index);
+    let mp3_path = format!("{}/part_{}.mp3", user_tmp_dir, part_index);
+
+    fs::write(&pcm_path, audio_data)?;
+    convert_pcm_to_mp3(&pcm_path, &mp3_path)?;
+
+    if let Err(e) = fs::remove_file(&pcm_path) {
+        warn!("Could not delete temporary PCM file {}: {}", pcm_path, e);
+    }
+
+    info!("Part {} saved to {}", part_index, mp3_path);
+    Ok(PathBuf::from(mp3_path))
+}
+
+pub async fn merge_audio_parts(
+    audio_parts: Vec<PathBuf>,
+    user_tmp_dir: &str,
+    final_filename: &str,
+) -> anyhow::Result<PathBuf> {
+    info!("Merging {} audio parts into final podcast", audio_parts.len());
+
+    if audio_parts.is_empty() {
+        return Err(anyhow::anyhow!("No audio parts to merge"));
+    }
+
+    if audio_parts.len() == 1 {
+        info!("Only one part, no merging needed");
+        return Ok(audio_parts[0].clone());
+    }
+
+    let final_path = format!("{}/{}.mp3", user_tmp_dir, final_filename);
+
+    let parts_str: Vec<String> = audio_parts
+        .iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect();
+
+    let mut command = Command::new("ffmpeg");
+    command
+        .arg("-i")
+        .arg(format!("concat:{}", parts_str.join("|")))
+        .arg("-acodec")
+        .arg("copy")
+        .arg(&final_path);
+
+    let status = command.status()?;
+    if !status.success() {
+        return Err(anyhow::anyhow!("Failed to merge audio files"));
+    }
+    
+    for part in audio_parts {
+        if let Err(e) = fs::remove_file(&part) {
+            warn!("Could not delete temporary file {:?}: {}", part, e);
+        }
+    }
+
+    info!("Audio parts merged successfully into {}", final_path);
+    Ok(PathBuf::from(final_path))
+}
