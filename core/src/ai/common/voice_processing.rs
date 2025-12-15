@@ -496,13 +496,13 @@ async fn generate_gemini_speech(
         api_key
     );
 
-    // let full_text = format!("{}\n{}", tts_instruction, text);
+    let full_text = format!("{}\n{}", tts_instruction, text);
 
     let payload = json!({
         "contents": [{
             "role": "user",
             "parts": [{
-                "text": text
+                "text": full_text
             }]
         }],
         "generationConfig": {
@@ -511,7 +511,7 @@ async fn generate_gemini_speech(
             "speechConfig": {
                 "voiceConfig": {
                     "prebuiltVoiceConfig": {
-                        "voiceName": "Kore"
+                        "voiceName": "Puck"
                     }
                 }
             }
