@@ -833,17 +833,67 @@ pub async fn merge_audio_parts(
 
     let final_path = format!("{}/{}.mp3", user_tmp_dir, final_filename);
 
-    let parts_str: Vec<String> = audio_parts
-        .iter()
-        .map(|p| p.to_string_lossy().to_string())
-        .collect();
+    const PAUSE_DURATION_SEC: f32 = 1.0;
+
+    let mut filter_parts = Vec::new();
+    let mut input_args = Vec::new();
+
+    for (idx, part) in audio_parts.iter().enumerate() {
+        input_args.push("-i".to_string());
+        input_args.push(part.to_string_lossy().to_string());
+        filter_parts.push(format!("[{}:a]", idx));
+    }
+
+    let silence_filter = format!(
+        "anullsrc=channel_layout=stereo:sample_rate=44100:duration={}",
+        PAUSE_DURATION_SEC
+    );
+
+    let mut concat_inputs = Vec::new();
+    for (idx, _) in audio_parts.iter().enumerate() {
+        concat_inputs.push(format!("[{}:a]", idx));
+        if idx < audio_parts.len() - 1 {
+            concat_inputs.push(format!("[silence{}]", idx));
+        }
+    }
+
+    let mut silence_streams = Vec::new();
+    for idx in 0..audio_parts.len() - 1 {
+        silence_streams.push(format!("{}[silence{}]", silence_filter, idx));
+    }
+
+    let filter_complex = if silence_streams.is_empty() {
+        format!(
+            "{}[s0];{}concat=n=3:v=0:a=1[out]",
+            silence_filter,
+            concat_inputs.join("")
+        )
+    } else {
+        format!(
+            "{};{}concat=n={}:v=0:a=1[out]",
+            silence_streams.join(";"),
+            concat_inputs.join(""),
+            audio_parts.len() * 2 - 1
+        )
+    };
+
+    info!("Merging {} parts with {} sec pauses between them", audio_parts.len(), PAUSE_DURATION_SEC);
 
     let mut command = Command::new("ffmpeg");
+    for arg in input_args {
+        command.arg(arg);
+    }
+
     command
-        .arg("-i")
-        .arg(format!("concat:{}", parts_str.join("|")))
-        .arg("-acodec")
-        .arg("copy")
+        .arg("-filter_complex")
+        .arg(&filter_complex)
+        .arg("-map")
+        .arg("[out]")
+        .arg("-codec:a")
+        .arg("libmp3lame")
+        .arg("-q:a")
+        .arg("2")
+        .arg("-y")
         .arg(&final_path);
 
     let status = command.status()?;
