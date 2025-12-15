@@ -550,7 +550,7 @@ pub(crate) async fn mix_podcast_with_music(
     // amix with duration=first will cut music to match podcast length
     let filter_complex = format!(
         "[1:a]aloop=loop=-1:size=2e+09[music_looped];\
-         [music_looped]volume=0.04,afade=t=out:st={}:d=4[music];\
+         [music_looped]volume=0.043,afade=t=out:st={}:d=4[music];\
          [0:a][music]amix=inputs=2:duration=first",
         fade_start
     );

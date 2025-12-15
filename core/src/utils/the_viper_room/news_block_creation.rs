@@ -95,7 +95,7 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
         summarize_updates(user_tmp_dir.clone(), app_state.clone(), &addressee).await?;
 
     // Group body parts to reduce voice inconsistencies between TTS requests
-    const BODY_GROUP_SIZE: usize = 5; // Group 5 news items per TTS request
+    const BODY_GROUP_SIZE: usize = 3; // Group 3 news items per TTS request
 
     let mut parts_to_voice: Vec<String> = Vec::new();
 
