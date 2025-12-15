@@ -501,12 +501,18 @@ async fn generate_gemini_speech(
         }],
         "generationConfig": {
             "responseModalities": ["AUDIO"],
+            "seed": 42,
             "speechConfig": {
                 "voiceConfig": {
                     "prebuiltVoiceConfig": {
                         "voiceName": "Charon"
                     }
                 }
+            },
+            "audioConfig": {
+                "audioEncoding": "LINEAR16",
+                "sampleRateHertz": 24000,
+                "speakingRate": 1.0, "pitch": 0.0, "volumeGainDb": 0.0
             }
         }
     });
@@ -699,7 +705,7 @@ pub async fn generate_parts_batched_google(
     );
 
     let mut all_audio_parts = Vec::new();
-    
+
     for (batch_idx, batch) in parts.chunks(BATCH_SIZE).enumerate() {
         let batch_start_idx = batch_idx * BATCH_SIZE;
         info!(
@@ -709,7 +715,7 @@ pub async fn generate_parts_batched_google(
             batch_start_idx,
             batch_start_idx + batch.len() - 1
         );
-        
+
         let mut tasks = Vec::new();
         for (i, part) in batch.iter().enumerate() {
             let part_index = batch_start_idx + i;
@@ -718,7 +724,7 @@ pub async fn generate_parts_batched_google(
 
             let task = tokio::spawn(async move {
                 let mut last_error = None;
-                
+
                 for attempt in 1..=MAX_RETRIES {
                     match generate_single_part_google(&part_text, &tmp_dir, part_index).await {
                         Ok(path) => {
@@ -761,9 +767,9 @@ pub async fn generate_parts_batched_google(
 
             tasks.push(task);
         }
-        
+
         let results = futures::future::join_all(tasks).await;
-        
+
         let mut batch_results: Vec<(usize, PathBuf)> = Vec::new();
         for result in results {
             match result {
@@ -780,15 +786,15 @@ pub async fn generate_parts_batched_google(
                 }
             }
         }
-        
+
         batch_results.sort_by_key(|(idx, _)| *idx);
-        
+
         for (_, path) in batch_results {
             all_audio_parts.push(path);
         }
 
         info!("Batch {} completed successfully", batch_idx + 1);
-        
+
         if batch_idx < (parts.len() + BATCH_SIZE - 1) / BATCH_SIZE - 1 {
             info!(
                 "Waiting {} seconds before next batch to respect rate limits...",
