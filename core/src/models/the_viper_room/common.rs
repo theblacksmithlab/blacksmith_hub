@@ -1,5 +1,6 @@
 use serde::Deserialize;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TTSProvider {
     OpenAI,
     ElevenLabs,

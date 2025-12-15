@@ -54,6 +54,7 @@ anyhow = "1.0.86"
 dotenv = "0.15"
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1.85"
+futures = "0.3"
 uuid = "1.12.1"
 pulldown-cmark = "0.13.0"
 strum_macros = "0.27.1"

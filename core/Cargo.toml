@@ -14,6 +14,7 @@ grammers-client.workspace = true
 tracing.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
+futures.workspace = true
 serde_json.workspace = true
 grammers-session.workspace = true
 axum.workspace = true

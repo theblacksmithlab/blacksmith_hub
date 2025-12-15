@@ -1,6 +1,6 @@
 use crate::ai::common::common::raw_llm_processing;
 use crate::ai::common::voice_processing::{
-    generate_single_part_elevenlabs, generate_single_part_google, generate_single_part_openai,
+    generate_parts_batched_google, generate_single_part_elevenlabs, generate_single_part_openai,
     merge_audio_parts,
 };
 use crate::local_db::the_viper_room::user_management::get_user_nickname;
@@ -107,31 +107,40 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
 
     let tts_provider = TTSProvider::Google;
 
-    let mut audio_parts: Vec<PathBuf> = Vec::new();
-    for (i, part) in parts_to_voice.iter().enumerate() {
-        info!(
-            "Voicing part {}/{}: {} chars",
-            i + 1,
-            parts_to_voice.len(),
-            part.chars().count()
+    let audio_parts = if tts_provider == TTSProvider::Google {
+        info!("Using batched TTS generation for Google (9 parallel requests per batch)");
+        generate_parts_batched_google(&parts_to_voice, &user_tmp_dir).await?
+    } else {
+        info!("Using sequential TTS generation for {}",
+            if tts_provider == TTSProvider::OpenAI { "OpenAI" } else { "ElevenLabs" }
         );
+        let mut audio_parts: Vec<PathBuf> = Vec::new();
+        for (i, part) in parts_to_voice.iter().enumerate() {
+            info!(
+                "Voicing part {}/{}: {} chars",
+                i + 1,
+                parts_to_voice.len(),
+                part.chars().count()
+            );
 
-        let part_audio = match tts_provider {
-            TTSProvider::OpenAI => {
-                generate_single_part_openai(part, &user_tmp_dir, i, app_state.clone()).await?
+            let part_audio = match tts_provider {
+                TTSProvider::OpenAI => {
+                    generate_single_part_openai(part, &user_tmp_dir, i, app_state.clone()).await?
+                }
+                TTSProvider::ElevenLabs => {
+                    generate_single_part_elevenlabs(part, &user_tmp_dir, i).await?
+                }
+                TTSProvider::Google => unreachable!(),
+            };
+
+            audio_parts.push(part_audio);
+
+            if i < parts_to_voice.len() - 1 {
+                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
             }
-            TTSProvider::ElevenLabs => {
-                generate_single_part_elevenlabs(part, &user_tmp_dir, i).await?
-            }
-            TTSProvider::Google => generate_single_part_google(part, &user_tmp_dir, i).await?,
-        };
-
-        audio_parts.push(part_audio);
-
-        if i < parts_to_voice.len() - 1 {
-            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
         }
-    }
+        audio_parts
+    };
 
     let now = chrono::Utc::now();
     let utc_plus_3 = now + chrono::Duration::hours(3);

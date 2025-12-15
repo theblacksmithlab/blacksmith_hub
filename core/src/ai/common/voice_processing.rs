@@ -683,6 +683,128 @@ pub async fn generate_single_part_google(
     Ok(PathBuf::from(mp3_path))
 }
 
+pub async fn generate_parts_batched_google(
+    parts: &[String],
+    user_tmp_dir: &str,
+) -> anyhow::Result<Vec<PathBuf>> {
+    const BATCH_SIZE: usize = 9;
+    const MAX_RETRIES: usize = 3;
+    const BATCH_DELAY_SECS: u64 = 60;
+
+    info!(
+        "Starting batched Google TTS generation for {} parts (batch size: {}, max retries: {})",
+        parts.len(),
+        BATCH_SIZE,
+        MAX_RETRIES
+    );
+
+    let mut all_audio_parts = Vec::new();
+    
+    for (batch_idx, batch) in parts.chunks(BATCH_SIZE).enumerate() {
+        let batch_start_idx = batch_idx * BATCH_SIZE;
+        info!(
+            "Processing batch {}/{}: parts {}-{}",
+            batch_idx + 1,
+            (parts.len() + BATCH_SIZE - 1) / BATCH_SIZE,
+            batch_start_idx,
+            batch_start_idx + batch.len() - 1
+        );
+        
+        let mut tasks = Vec::new();
+        for (i, part) in batch.iter().enumerate() {
+            let part_index = batch_start_idx + i;
+            let part_text = part.clone();
+            let tmp_dir = user_tmp_dir.to_string();
+
+            let task = tokio::spawn(async move {
+                let mut last_error = None;
+                
+                for attempt in 1..=MAX_RETRIES {
+                    match generate_single_part_google(&part_text, &tmp_dir, part_index).await {
+                        Ok(path) => {
+                            if attempt > 1 {
+                                info!(
+                                    "Part {} succeeded on attempt {}/{}",
+                                    part_index, attempt, MAX_RETRIES
+                                );
+                            }
+                            return Ok((part_index, path));
+                        }
+                        Err(e) => {
+                            last_error = Some(e);
+                            if attempt < MAX_RETRIES {
+                                warn!(
+                                    "Part {} failed on attempt {}/{}: {}. Retrying...",
+                                    part_index, attempt, MAX_RETRIES, last_error.as_ref().unwrap()
+                                );
+                                tokio::time::sleep(tokio::time::Duration::from_secs(
+                                    2u64.pow(attempt as u32),
+                                ))
+                                .await;
+                            } else {
+                                error!(
+                                    "Part {} failed after {} attempts",
+                                    part_index, MAX_RETRIES
+                                );
+                            }
+                        }
+                    }
+                }
+
+                Err(anyhow::anyhow!(
+                    "Part {} failed after {} retries: {}",
+                    part_index,
+                    MAX_RETRIES,
+                    last_error.unwrap()
+                ))
+            });
+
+            tasks.push(task);
+        }
+        
+        let results = futures::future::join_all(tasks).await;
+        
+        let mut batch_results: Vec<(usize, PathBuf)> = Vec::new();
+        for result in results {
+            match result {
+                Ok(Ok(part_result)) => {
+                    batch_results.push(part_result);
+                }
+                Ok(Err(e)) => {
+                    error!("Task returned error: {}", e);
+                    return Err(e);
+                }
+                Err(e) => {
+                    error!("Task panicked: {}", e);
+                    return Err(anyhow::anyhow!("Task panicked: {}", e));
+                }
+            }
+        }
+        
+        batch_results.sort_by_key(|(idx, _)| *idx);
+        
+        for (_, path) in batch_results {
+            all_audio_parts.push(path);
+        }
+
+        info!("Batch {} completed successfully", batch_idx + 1);
+        
+        if batch_idx < (parts.len() + BATCH_SIZE - 1) / BATCH_SIZE - 1 {
+            info!(
+                "Waiting {} seconds before next batch to respect rate limits...",
+                BATCH_DELAY_SECS
+            );
+            tokio::time::sleep(tokio::time::Duration::from_secs(BATCH_DELAY_SECS)).await;
+        }
+    }
+
+    info!(
+        "All {} parts generated successfully with batched approach",
+        parts.len()
+    );
+    Ok(all_audio_parts)
+}
+
 pub async fn merge_audio_parts(
     audio_parts: Vec<PathBuf>,
     user_tmp_dir: &str,
