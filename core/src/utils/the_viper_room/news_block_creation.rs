@@ -94,14 +94,29 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
     let podcast_structure =
         summarize_updates(user_tmp_dir.clone(), app_state.clone(), &addressee).await?;
 
+    // Group body parts to reduce voice inconsistencies between TTS requests
+    const BODY_GROUP_SIZE: usize = 5; // Group 5 news items per TTS request
+
     let mut parts_to_voice: Vec<String> = Vec::new();
+
+    // Intro separately
     parts_to_voice.push(podcast_structure.intro.clone());
-    parts_to_voice.extend(podcast_structure.body.clone());
+
+    // Group body parts (5 news per group, joined with double newline for natural pauses)
+    for chunk in podcast_structure.body.chunks(BODY_GROUP_SIZE) {
+        let grouped_text = chunk.join("\n\n");
+        parts_to_voice.push(grouped_text);
+    }
+
+    // Outro separately
     parts_to_voice.push(podcast_structure.outro.clone());
 
+    let body_groups = (podcast_structure.body.len() + BODY_GROUP_SIZE - 1) / BODY_GROUP_SIZE;
     info!(
-        "Podcast structure: 1 intro + {} body parts + 1 outro = {} total parts to voice",
+        "Podcast structure: 1 intro + {} body groups (from {} news, {} per group) + 1 outro = {} total parts to voice",
+        body_groups,
         podcast_structure.body.len(),
+        BODY_GROUP_SIZE,
         parts_to_voice.len()
     );
 
