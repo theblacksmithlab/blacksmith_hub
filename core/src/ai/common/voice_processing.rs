@@ -403,8 +403,10 @@ pub async fn podcast_tts_via_google(text: String, user_tmp_dir: String) -> anyho
             char_count
         );
 
-        // let audio_data = generate_gemini_speech(&text, &api_key, &tts_instruction).await?;
-        let audio_data = generate_google_cloud_speech(&text, &api_key).await?;
+        // Gemini TTS API
+        let audio_data = generate_gemini_speech(&text, &api_key, &tts_instruction).await?;
+        // Google Cloud TTS API
+        // let audio_data = generate_google_cloud_speech(&text, &api_key).await?;
         let pcm_path = format!("{}/{}_pcm.wav", user_tmp_dir, file_name);
         let mp3_path = format!("{}/{}.mp3", user_tmp_dir, file_name);
 
@@ -433,8 +435,10 @@ pub async fn podcast_tts_via_google(text: String, user_tmp_dir: String) -> anyho
             chunk.chars().count()
         );
 
-        // let audio_data = generate_gemini_speech(chunk, &api_key, &tts_instruction).await?;
-        let audio_data = generate_google_cloud_speech(chunk, &api_key).await?;
+        // Gemini TTS API
+        let audio_data = generate_gemini_speech(chunk, &api_key, &tts_instruction).await?;
+        // Google Cloud TTS API
+        // let audio_data = generate_google_cloud_speech(chunk, &api_key).await?;
         let pcm_part_path = format!("{}/part_{}_pcm.wav", user_tmp_dir, i);
         let mp3_part_path = format!("{}/part_{}.mp3", user_tmp_dir, i);
 
@@ -492,13 +496,13 @@ async fn generate_gemini_speech(
         api_key
     );
 
-    let full_text = format!("{}\n{}", tts_instruction, text);
+    // let full_text = format!("{}\n{}", tts_instruction, text);
 
     let payload = json!({
         "contents": [{
             "role": "user",
             "parts": [{
-                "text": full_text
+                "text": text
             }]
         }],
         "generationConfig": {
@@ -507,7 +511,7 @@ async fn generate_gemini_speech(
             "speechConfig": {
                 "voiceConfig": {
                     "prebuiltVoiceConfig": {
-                        "voiceName": "Charon"
+                        "voiceName": "Kore"
                     }
                 }
             }
@@ -726,8 +730,10 @@ pub async fn generate_single_part_google(
     ))
     .await?;
 
-    // let audio_data = generate_gemini_speech(text, &api_key, &tts_instruction).await?;
-    let audio_data = generate_google_cloud_speech(text, &api_key).await?;
+    // Gemini TTS API
+    let audio_data = generate_gemini_speech(text, &api_key, &tts_instruction).await?;
+    // Google Cloud TTS API
+    // let audio_data = generate_google_cloud_speech(text, &api_key).await?;
     let pcm_path = format!("{}/part_{}_pcm.wav", user_tmp_dir, part_index);
     let mp3_path = format!("{}/part_{}.mp3", user_tmp_dir, part_index);
 
