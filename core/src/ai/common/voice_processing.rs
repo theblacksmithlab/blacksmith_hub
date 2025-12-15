@@ -508,11 +508,6 @@ async fn generate_gemini_speech(
                         "voiceName": "Charon"
                     }
                 }
-            },
-            "audioConfig": {
-                "audioEncoding": "LINEAR16",
-                "sampleRateHertz": 24000,
-                "speakingRate": 1.0, "pitch": 0.0, "volumeGainDb": 0.0
             }
         }
     });
