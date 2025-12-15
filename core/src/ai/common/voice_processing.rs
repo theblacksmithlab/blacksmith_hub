@@ -511,7 +511,7 @@ async fn generate_gemini_speech(
             "speechConfig": {
                 "voiceConfig": {
                     "prebuiltVoiceConfig": {
-                        "voiceName": "Puck"
+                        "voiceName": "Charon"
                     }
                 }
             }
@@ -546,61 +546,6 @@ async fn generate_gemini_speech(
     let audio_bytes = general_purpose::STANDARD
         .decode(audio_base64)
         .map_err(|e| anyhow::anyhow!("Failed to decode base64 audio: {}", e))?;
-
-    let wav_data = pcm_to_wav(&audio_bytes, 24000, 1, 16)?;
-
-    Ok(wav_data)
-}
-
-async fn generate_google_cloud_speech(
-    text: &str,
-    api_key: &str,
-) -> anyhow::Result<Vec<u8>> {
-    let client = reqwest::Client::new();
-
-    let url = format!(
-        "https://texttospeech.googleapis.com/v1/text:synthesize?key={}",
-        api_key
-    );
-
-    let payload = json!({
-        "input": {
-            "text": text
-        },
-        "voice": {
-            "languageCode": "ru-RU",
-            "name": "ru-RU-Wavenet-D",
-            "ssmlGender": "NEUTRAL"
-        },
-        "audioConfig": {
-            "audioEncoding": "LINEAR16",
-            "sampleRateHertz": 24000,
-            "speakingRate": 1.0,
-            "pitch": 0.0,
-            "volumeGainDb": 0.0
-        }
-    });
-
-    let response = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .json(&payload)
-        .send()
-        .await?;
-
-    if !response.status().is_success() {
-        let error_text = response.text().await?;
-        return Err(anyhow::anyhow!("Google Cloud TTS error: {}", error_text));
-    }
-
-    let response_json: serde_json::Value = response.json().await?;
-
-    let audio_base64 = response_json
-        .get("audioContent")
-        .and_then(|d| d.as_str())
-        .ok_or_else(|| anyhow::anyhow!("Failed to extract audio"))?;
-
-    let audio_bytes = general_purpose::STANDARD.decode(audio_base64)?;
 
     let wav_data = pcm_to_wav(&audio_bytes, 24000, 1, 16)?;
 
