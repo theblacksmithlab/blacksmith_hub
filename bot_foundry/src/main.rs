@@ -57,8 +57,7 @@ async fn main() -> Result<()> {
 
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::new("info")
-                .add_directive("grammers_session::message_box=warn".parse()?)
+            EnvFilter::new("info").add_directive("grammers_session::message_box=warn".parse()?),
         )
         .init();
 

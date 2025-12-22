@@ -200,7 +200,7 @@ pub async fn podcast_tts_via_openai<T: OpenAIClientInit + Send + Sync>(
 //     Ok(PathBuf::from(final_path))
 // }
 
-pub async fn simple_tts<T: OpenAIClientInit + Send + Sync>(
+pub async fn simple_openai_tts<T: OpenAIClientInit + Send + Sync>(
     text: &str,
     app_state: Arc<T>,
 ) -> anyhow::Result<CreateSpeechResponse> {
@@ -382,7 +382,6 @@ pub async fn podcast_tts_via_google(text: String, user_tmp_dir: String) -> anyho
     let api_key =
         std::env::var("GOOGLE_API_KEY").map_err(|_| anyhow::anyhow!("GOOGLE_API_KEY not found"))?;
 
-    // Get TTS instruction from messages
     let tts_instruction = get_message(AppsSystemMessages::TheViperRoomBot(
         TheViperRoomBotMessages::GeminiTTSInstruction,
     ))
@@ -745,17 +744,17 @@ pub async fn generate_parts_batched_google(
                             if attempt < MAX_RETRIES {
                                 warn!(
                                     "Part {} failed on attempt {}/{}: {}. Retrying...",
-                                    part_index, attempt, MAX_RETRIES, last_error.as_ref().unwrap()
+                                    part_index,
+                                    attempt,
+                                    MAX_RETRIES,
+                                    last_error.as_ref().unwrap()
                                 );
                                 tokio::time::sleep(tokio::time::Duration::from_secs(
                                     2u64.pow(attempt as u32),
                                 ))
                                 .await;
                             } else {
-                                error!(
-                                    "Part {} failed after {} attempts",
-                                    part_index, MAX_RETRIES
-                                );
+                                error!("Part {} failed after {} attempts", part_index, MAX_RETRIES);
                             }
                         }
                     }
@@ -820,7 +819,10 @@ pub async fn merge_audio_parts(
     user_tmp_dir: &str,
     final_filename: &str,
 ) -> anyhow::Result<PathBuf> {
-    info!("Merging {} audio parts into final podcast", audio_parts.len());
+    info!(
+        "Merging {} audio parts into final podcast",
+        audio_parts.len()
+    );
 
     if audio_parts.is_empty() {
         return Err(anyhow::anyhow!("No audio parts to merge"));
@@ -877,7 +879,11 @@ pub async fn merge_audio_parts(
         )
     };
 
-    info!("Merging {} parts with {} sec pauses between them", audio_parts.len(), PAUSE_DURATION_SEC);
+    info!(
+        "Merging {} parts with {} sec pauses between them",
+        audio_parts.len(),
+        PAUSE_DURATION_SEC
+    );
 
     let mut command = Command::new("ffmpeg");
     for arg in input_args {
@@ -900,7 +906,7 @@ pub async fn merge_audio_parts(
     if !status.success() {
         return Err(anyhow::anyhow!("Failed to merge audio files"));
     }
-    
+
     for part in audio_parts {
         if let Err(e) = fs::remove_file(&part) {
             warn!("Could not delete temporary file {:?}: {}", part, e);

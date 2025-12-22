@@ -126,8 +126,13 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
         info!("Using batched TTS generation for Google (9 parallel requests per batch)");
         generate_parts_batched_google(&parts_to_voice, &user_tmp_dir).await?
     } else {
-        info!("Using sequential TTS generation for {}",
-            if tts_provider == TTSProvider::OpenAI { "OpenAI" } else { "ElevenLabs" }
+        info!(
+            "Using sequential TTS generation for {}",
+            if tts_provider == TTSProvider::OpenAI {
+                "OpenAI"
+            } else {
+                "ElevenLabs"
+            }
         );
         let mut audio_parts: Vec<PathBuf> = Vec::new();
         for (i, part) in parts_to_voice.iter().enumerate() {

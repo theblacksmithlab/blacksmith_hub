@@ -103,7 +103,8 @@ pub(crate) async fn the_viper_room_message_handler(
 
     if matches!(current_state, TheViperRoomBotUserState::ChannelsAdding) {
         if let Some(text) = msg.text() {
-            if text == "💾 Сохранить" || text == "🏠 Главное меню" || text == "⚙️ Настройки" {
+            if text == "💾 Сохранить" || text == "🏠 Главное меню" || text == "⚙️ Настройки"
+            {
                 // Let it fall through to the main match statement below
             } else {
                 match parse_channel_input(&msg) {
@@ -121,10 +122,13 @@ pub(crate) async fn the_viper_room_message_handler(
 
                         bot.send_message(
                             chat_id,
-                            format!("✅ Принят канал: \"{}\"
+                            format!(
+                                "✅ Принят канал: \"{}\"
                             \nНО ПОКА НЕ СОХРАНЁН!\
                             \n\nНажми кнопку \"Сохранить\" в нижнем меню\
-                            \nили добавь ещё интересующие каналы", channel_title),
+                            \nили добавь ещё интересующие каналы",
+                                channel_title
+                            ),
                         )
                         .await?;
 
@@ -200,11 +204,17 @@ pub(crate) async fn the_viper_room_message_handler(
                                 }
                                 Ok(None) => {
                                     warn!("Username '@{}' not found", username);
-                                    errors.push(format!("❌ Канал не найден по юзернейму: @{}", username));
+                                    errors.push(format!(
+                                        "❌ Канал не найден по юзернейму: @{}",
+                                        username
+                                    ));
                                 }
                                 Err(e) => {
                                     warn!("Failed to resolve username '@{}': {}", username, e);
-                                    errors.push(format!("❌ Ошибка при проверке юзернейма: @{}", username));
+                                    errors.push(format!(
+                                        "❌ Ошибка при проверке юзернейма: @{}",
+                                        username
+                                    ));
                                 }
                             }
                         }
@@ -274,12 +284,15 @@ pub(crate) async fn the_viper_room_message_handler(
 
                     bot.send_message(
                         chat_id,
-                        format!("✅ Принят канал: \"{}\"
+                        format!(
+                            "✅ Принят канал: \"{}\"
                             \nНО ПОКА НЕ СОХРАНЁН!\
                             \n\nНажми кнопку \"Сохранить\" в нижнем меню\
-                            \nили добавь ещё интересующие каналы", channel_title),
+                            \nили добавь ещё интересующие каналы",
+                            channel_title
+                        ),
                     )
-                        .await?;
+                    .await?;
 
                     return Ok(());
                 }
@@ -304,9 +317,10 @@ pub(crate) async fn the_viper_room_message_handler(
                 let db_pool = match &app_state.core.db_pool {
                     Some(pool) => pool,
                     None => {
-                        let local_db_unavailable_message = get_message(AppsSystemMessages::TheViperRoomBot(
-                            TheViperRoomBotMessages::LocalDBUnavailable,
-                        ))
+                        let local_db_unavailable_message =
+                            get_message(AppsSystemMessages::TheViperRoomBot(
+                                TheViperRoomBotMessages::LocalDBUnavailable,
+                            ))
                             .await?;
 
                         bot.send_message(chat_id, local_db_unavailable_message)
@@ -351,9 +365,10 @@ pub(crate) async fn the_viper_room_message_handler(
                 let db_pool = match &app_state.core.db_pool {
                     Some(pool) => pool,
                     None => {
-                        let local_db_unavailable_message = get_message(AppsSystemMessages::TheViperRoomBot(
-                            TheViperRoomBotMessages::LocalDBUnavailable,
-                        ))
+                        let local_db_unavailable_message =
+                            get_message(AppsSystemMessages::TheViperRoomBot(
+                                TheViperRoomBotMessages::LocalDBUnavailable,
+                            ))
                             .await?;
 
                         bot.send_message(chat_id, local_db_unavailable_message)
@@ -454,9 +469,10 @@ pub(crate) async fn the_viper_room_message_handler(
             let db_pool = match &app_state.core.db_pool {
                 Some(pool) => pool,
                 None => {
-                    let local_db_unavailable_message = get_message(AppsSystemMessages::TheViperRoomBot(
-                        TheViperRoomBotMessages::LocalDBUnavailable,
-                    ))
+                    let local_db_unavailable_message =
+                        get_message(AppsSystemMessages::TheViperRoomBot(
+                            TheViperRoomBotMessages::LocalDBUnavailable,
+                        ))
                         .await?;
 
                     bot.send_message(chat_id, local_db_unavailable_message)
