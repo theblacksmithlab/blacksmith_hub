@@ -183,6 +183,24 @@ impl TheViperRoomBotState {
             }
         });
 
+        let client_for_updates = g_client.clone();
+        tokio::spawn(async move {
+            info!("Telegram updates consumer task started");
+
+            loop {
+                match client_for_updates.next_update().await {
+                    Ok(_update) => {
+                        // Consume the update silently - we don't need to process it
+                        // This prevents the update queue from overflowing
+                    }
+                    Err(e) => {
+                        warn!("Error consuming Telegram update: {}", e);
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                    }
+                }
+            }
+        });
+
         let telegram_agent = Arc::new(TelegramAgent { client: g_client });
 
         Ok(Self {

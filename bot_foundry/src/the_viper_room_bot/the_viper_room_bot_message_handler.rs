@@ -30,7 +30,7 @@ use teloxide::sugar::request::RequestReplyExt;
 use teloxide::Bot;
 use teloxide_core::payloads::SendMessageSetters;
 use teloxide_core::types::{
-    InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, ParseMode, UserId,
+    InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, KeyboardMarkup, ParseMode,
 };
 use tracing::info;
 use tracing::log::warn;
@@ -103,7 +103,8 @@ pub(crate) async fn the_viper_room_message_handler(
 
     if matches!(current_state, TheViperRoomBotUserState::ChannelsAdding) {
         if let Some(text) = msg.text() {
-            if text == "💾 Сохранить" || text == "🏠 Главное меню" {
+            if text == "💾 Сохранить" || text == "🏠 Главное меню" || text == "⚙️ Настройки"
+            {
                 // Let it fall through to the main match statement below
             } else {
                 match parse_channel_input(&msg) {
@@ -121,7 +122,13 @@ pub(crate) async fn the_viper_room_message_handler(
 
                         bot.send_message(
                             chat_id,
-                            format!("✅ Канал \"{}\" принят, НО ПОКА НЕ СОХРАНЁН!\nДобавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню", channel_title),
+                            format!(
+                                "✅ Принят канал: \"{}\"
+                            \nНО ПОКА НЕ СОХРАНЁН!\
+                            \n\nНажми кнопку \"Сохранить\" в нижнем меню\
+                            \nили добавь ещё интересующие каналы",
+                                channel_title
+                            ),
                         )
                         .await?;
 
@@ -138,7 +145,7 @@ pub(crate) async fn the_viper_room_message_handler(
                         );
 
                         if !Path::new(&session_path).exists() {
-                            bot.send_message(chat_id, "❌ Ошибка: Наш Telegram-агент в данный момент спит и не готов обработать данные\n\
+                            bot.send_message(chat_id, "❌ Ошибка: Наш Telegram-агент в данный момент спит и не готов обрабатывать данные\n\n\
                             Попробуй повторить попытку позднее и спасибо за понимание 🙏")
                                 .await?;
 
@@ -184,24 +191,30 @@ pub(crate) async fn the_viper_room_message_handler(
                                     } else if let Chat::Group(_) = chat {
                                         warn!("Username '@{}' is a group, not a channel", username);
                                         errors.push(format!(
-                                            "@{} - это группа, а не канал",
+                                            "⛔️ Извини, но кажется @{} - это группа, а не канал",
                                             username
                                         ));
                                     } else {
                                         warn!("Username '@{}' is not a channel (some person's username provided)", username);
                                         errors.push(format!(
-                                            "@{} не является каналом, похоже, что это пользователь",
+                                            "⛔️ Извини, но @{} не является каналом, похоже, что это пользователь",
                                             username
                                         ));
                                     }
                                 }
                                 Ok(None) => {
                                     warn!("Username '@{}' not found", username);
-                                    errors.push(format!("@{} не найден", username));
+                                    errors.push(format!(
+                                        "❌ Канал не найден по юзернейму: @{}",
+                                        username
+                                    ));
                                 }
                                 Err(e) => {
                                     warn!("Failed to resolve username '@{}': {}", username, e);
-                                    errors.push(format!("Ошибка при проверке '@{}'", username));
+                                    errors.push(format!(
+                                        "❌ Ошибка при проверке юзернейма: @{}",
+                                        username
+                                    ));
                                 }
                             }
                         }
@@ -237,7 +250,7 @@ pub(crate) async fn the_viper_room_message_handler(
                         }
 
                         let result_msg = if result_parts.is_empty() {
-                            "❌ Не удалось обработать каналы\nПопробуй повторить попытку, следуя инструкции по загрузке каналов, которые я предоставил тебе ранее".to_string()
+                            "❌ Не удалось обработать каналы\n\nПопробуй повторить попытку, следуя инструкции по загрузке каналов, которые я предоставил ранее".to_string()
                         } else {
                             let result_footer =
                                 "Нажми кнопку \"Сохранить\" в нижнем меню чтобы добавить принятые каналы в твою базу данных"
@@ -269,8 +282,17 @@ pub(crate) async fn the_viper_room_message_handler(
                         });
                     }
 
-                    bot.send_message(chat_id, format!("✅ Канал \"{}\" принят, НО ПОКА НЕ СОХРАНЁН!\nДобавь ещё каналы или нажми кнопку \"Сохранить\" в нижнем меню", channel_title))
-                        .await?;
+                    bot.send_message(
+                        chat_id,
+                        format!(
+                            "✅ Принят канал: \"{}\"
+                            \nНО ПОКА НЕ СОХРАНЁН!\
+                            \n\nНажми кнопку \"Сохранить\" в нижнем меню\
+                            \nили добавь ещё интересующие каналы",
+                            channel_title
+                        ),
+                    )
+                    .await?;
 
                     return Ok(());
                 }
@@ -289,20 +311,23 @@ pub(crate) async fn the_viper_room_message_handler(
 
     if matches!(current_state, TheViperRoomBotUserState::ChannelsDeleting) {
         if let Some(text) = msg.text() {
-            if text == "🏠 Главное меню" {
+            if text == "🏠 Главное меню" || text == "⚙️ Настройки" {
                 // Let it fall through to the main match statement below
             } else if text == "🗑 Удалить все каналы" {
                 let db_pool = match &app_state.core.db_pool {
                     Some(pool) => pool,
                     None => {
-                        bot.send_message(
-                            chat_id,
-                            "❌ Ошибка: База данных недоступна в данный момент\
-                            Попробуй повторить попытку позднее и спасибо за понимание 🙏",
-                        )
-                        .await?;
+                        let local_db_unavailable_message =
+                            get_message(AppsSystemMessages::TheViperRoomBot(
+                                TheViperRoomBotMessages::LocalDBUnavailable,
+                            ))
+                            .await?;
+
+                        bot.send_message(chat_id, local_db_unavailable_message)
+                            .await?;
 
                         send_channels_menu(&bot, user_id, chat_id, &app_state).await?;
+
                         return Ok(());
                     }
                 };
@@ -311,7 +336,7 @@ pub(crate) async fn the_viper_room_message_handler(
                 let channels_count = channels.len();
 
                 if channels_count == 0 {
-                    bot.send_message(chat_id, "ℹ️ У тебя нет каналов для удаления")
+                    bot.send_message(chat_id, "Твой список каналов пуст, нечего удалять 🤷‍♂️")
                         .await?;
                 } else {
                     clear_user_channels(db_pool.as_ref(), user_id).await?;
@@ -340,12 +365,14 @@ pub(crate) async fn the_viper_room_message_handler(
                 let db_pool = match &app_state.core.db_pool {
                     Some(pool) => pool,
                     None => {
-                        bot.send_message(
-                            chat_id,
-                            "❌ Ошибка: База данных недоступна в данный момент\
-                            Попробуй повторить попытку позднее и спасибо за понимание 🙏",
-                        )
-                        .await?;
+                        let local_db_unavailable_message =
+                            get_message(AppsSystemMessages::TheViperRoomBot(
+                                TheViperRoomBotMessages::LocalDBUnavailable,
+                            ))
+                            .await?;
+
+                        bot.send_message(chat_id, local_db_unavailable_message)
+                            .await?;
 
                         send_channels_menu(&bot, user_id, chat_id, &app_state).await?;
                         return Ok(());
@@ -359,7 +386,7 @@ pub(crate) async fn the_viper_room_message_handler(
                         bot.send_message(
                             chat_id,
                             format!(
-                                "✅ Канал \"{}\" (ID: {}) успешно удалён",
+                                "🗑️ Канал \"{}\" (ID: {}) успешно удалён",
                                 channel.channel_title, channel_id
                             ),
                         )
@@ -372,7 +399,7 @@ pub(crate) async fn the_viper_room_message_handler(
                         bot.send_message(
                             chat_id,
                             format!(
-                                "❌ Канал с ID {} не найден в твоём списке.\n\nПроверь ID и попробуй снова",
+                                "❌ Канал с ID {} не найден в твоём списке\n\nПроверь ID и попробуй снова",
                                 channel_id
                             ),
                         )
@@ -418,11 +445,12 @@ pub(crate) async fn the_viper_room_message_handler(
 
             if channels_to_add.is_empty() {
                 bot.send_message(chat_id, "❌ Похоже ты не предоставил ни одного валидного канала для сохранения\n\
-                Попробуй повторить попытку, следуя инструкции по загрузке каналов, которые я предоставил тебе ранее")
+                Попробуй повторить попытку, следуя инструкции по загрузке каналов, которые я предоставил ранее")
                     .await?;
 
                 let keyboard = KeyboardMarkup::new(vec![
                     vec![KeyboardButton::new("💾 Сохранить")],
+                    vec![KeyboardButton::new("⚙️ Настройки")],
                     vec![KeyboardButton::new("🏠 Главное меню")],
                 ])
                 .resize_keyboard()
@@ -441,12 +469,14 @@ pub(crate) async fn the_viper_room_message_handler(
             let db_pool = match &app_state.core.db_pool {
                 Some(pool) => pool,
                 None => {
-                    bot.send_message(
-                        chat_id,
-                        "Ошибка: база данных недоступна в данный момент\
-                    Попробуй повторить попытку позднее и спасибо за понимание 🙏",
-                    )
-                    .await?;
+                    let local_db_unavailable_message =
+                        get_message(AppsSystemMessages::TheViperRoomBot(
+                            TheViperRoomBotMessages::LocalDBUnavailable,
+                        ))
+                        .await?;
+
+                    bot.send_message(chat_id, local_db_unavailable_message)
+                        .await?;
 
                     send_main_menu(
                         &bot,
@@ -534,7 +564,7 @@ pub(crate) async fn the_viper_room_message_handler(
                     .collect::<Vec<_>>()
                     .join("\n");
                 result_parts.push(format!(
-                    "✅ Успешно сохранены каналы ({}):\n{}",
+                    "✅ Успешно сохранены каналы ({}):\n\n{}",
                     saved_channels.len(),
                     channels_list
                 ));
@@ -589,7 +619,7 @@ pub(crate) async fn the_viper_room_message_handler(
                 )],
                 vec![InlineKeyboardButton::callback("📖 FAQ", "FAQ")],
                 vec![InlineKeyboardButton::callback(
-                    "« Назад в Главное меню",
+                    "« Выйти в Главное меню",
                     "back_to_main_menu",
                 )],
             ]);

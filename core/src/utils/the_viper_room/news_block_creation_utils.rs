@@ -1,9 +1,9 @@
-use crate::ai::common::common::raw_llm_processing;
+use crate::ai::common::common::{raw_llm_processing, raw_llm_processing_json};
 use crate::local_db::the_viper_room::channel_management::get_user_channels;
-use crate::local_db::the_viper_room::user_management::get_user_nickname;
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::TheViperRoomRoleType;
+use crate::models::the_viper_room::common::PodcastStructure;
 use crate::models::the_viper_room::db_models::Recipient;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::get_system_role_or_fallback;
@@ -306,7 +306,7 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
     user_tmp_dir: String,
     app_state: Arc<T>,
     addressee: &str,
-) -> Result<String, anyhow::Error> {
+) -> Result<PodcastStructure, anyhow::Error> {
     info!("Starting updates summarization...");
 
     let system_role = get_system_role_or_fallback(
@@ -324,7 +324,7 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
         addressee, updates
     );
 
-    let updates_summarized = raw_llm_processing(
+    let updates_summarized_json = raw_llm_processing_json(
         &system_role,
         &updates_with_nickname_provided,
         app_state.clone(),
@@ -332,19 +332,28 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
     )
     .await?;
 
-    let updates_summarized_file_path = format!("{}/updates_summarized.txt", user_tmp_dir);
+    info!("Received JSON response from LLM, parsing...");
 
+    let podcast_structure: PodcastStructure = serde_json::from_str(&updates_summarized_json)
+        .map_err(|e| anyhow::anyhow!("Failed to parse podcast structure from JSON: {}", e))?;
+
+    // Save for debugging
+    let updates_summarized_file_path = format!("{}/updates_summarized.json", user_tmp_dir);
     let mut updates_summarized_file = OpenOptions::new()
         .create(true)
         .write(true)
-        .append(true)
+        .truncate(true)
         .open(updates_summarized_file_path.clone())?;
+    writeln!(updates_summarized_file, "{}", updates_summarized_json)?;
 
-    writeln!(updates_summarized_file, "{}", updates_summarized)?;
+    info!(
+        "Podcast structure parsed successfully: {} intro, {} body parts, {} outro",
+        podcast_structure.intro.len(),
+        podcast_structure.body.len(),
+        podcast_structure.outro.len()
+    );
 
-    info!("Podcast text file created successfully!");
-
-    Ok(updates_summarized)
+    Ok(podcast_structure)
 }
 
 pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
@@ -537,12 +546,14 @@ pub(crate) async fn mix_podcast_with_music(
 
     let fade_start = podcast_duration - 4.0;
 
-    // Loop music indefinitely, then apply volume and fade-out
-    // amix with duration=first will cut music to match podcast length
+    // Side-chain compression: Music ducks when voice is present
+    // 1. Loop music and apply fade-out
+    // 2. Apply side-chain compression (music compressed by voice level)
+    // 3. Mix voice and compressed music
     let filter_complex = format!(
-        "[1:a]aloop=loop=-1:size=2e+09[music_looped];\
-         [music_looped]volume=0.04,afade=t=out:st={}:d=4[music];\
-         [0:a][music]amix=inputs=2:duration=first",
+        "[1:a]aloop=loop=-1:size=2e+09,volume=0.08,afade=t=out:st={}:d=4[music_looped];\
+         [music_looped][0:a]sidechaincompress=threshold=0.02:ratio=4:attack=10:release=200:makeup=2[music_ducked];\
+         [0:a][music_ducked]amix=inputs=2:duration=first:weights=1.0 0.7",
         fade_start
     );
 

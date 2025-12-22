@@ -13,7 +13,7 @@ use std::sync::Arc;
 use teloxide::prelude::Requester;
 use teloxide::Bot;
 use teloxide_core::payloads::SendMessageSetters;
-use teloxide_core::types::{CallbackQuery, ParseMode, UserId};
+use teloxide_core::types::{CallbackQuery, ParseMode};
 use tracing::info;
 use tracing::log::warn;
 

@@ -94,7 +94,7 @@ pub async fn get_user_nickname(db_pool: &Pool<Sqlite>, user_id: u64) -> Result<O
     Ok(user.and_then(|u| u.nickname))
 }
 
-pub async fn delete_user(db_pool: &Pool<Sqlite>, user_id: i64) -> anyhow::Result<()> {
+pub async fn delete_user(db_pool: &Pool<Sqlite>, user_id: i64) -> Result<()> {
     let query = "DELETE FROM users WHERE user_id = ?";
 
     sqlx::query(query).bind(user_id).execute(db_pool).await?;

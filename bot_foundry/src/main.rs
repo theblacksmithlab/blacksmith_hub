@@ -56,7 +56,9 @@ async fn main() -> Result<()> {
     dotenv().ok();
 
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::new("info"))
+        .with_env_filter(
+            EnvFilter::new("info").add_directive("grammers_session::message_box=warn".parse()?),
+        )
         .init();
 
     info!("Determining AppName of the Telegram bot being launched...");
@@ -80,8 +82,8 @@ async fn main() -> Result<()> {
     }
 
     let qdrant_client = Arc::new(
-        Qdrant::from_url(&env::var("QDRANT_URL")?)
-            .api_key(env::var("QDRANT_API_KEY")?)
+        Qdrant::from_url(&env::var("QDRANT_URL")?) // point at local var in .env QDRANT_URL=http://localhost:6333
+            .api_key(env::var("QDRANT_API_KEY")?) // delete to use local qdrant
             .build()?,
     );
 
