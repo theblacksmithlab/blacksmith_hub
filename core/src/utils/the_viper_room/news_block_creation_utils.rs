@@ -552,7 +552,7 @@ pub(crate) async fn mix_podcast_with_music(
     // 3. Mix voice and compressed music
     let filter_complex = format!(
         "[1:a]aloop=loop=-1:size=2e+09,volume=0.08,afade=t=out:st={}:d=4[music_looped];\
-         [music_looped][0:a]sidechaincompress=threshold=0.02:ratio=4:attack=10:release=200:makeup=2[music_ducked];\
+         [music_looped][0:a]sidechaincompress=threshold=0.02:ratio=4:attack=10:release=500:makeup=2[music_ducked];\
          [0:a][music_ducked]amix=inputs=2:duration=first:weights=1.0 0.7",
         fade_start
     );
