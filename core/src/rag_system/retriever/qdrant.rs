@@ -454,6 +454,8 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
                             .map(String::from)
                             .unwrap_or_else(|| String::new());
 
+                        info!("found chunk text: {}", &chunk_text);
+
                         let document_title = point
                             .payload
                             .get("document_title")
@@ -556,6 +558,8 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
                             .and_then(|v| v.as_str())
                             .map(String::from)
                             .unwrap_or_else(|| String::new());
+
+                        info!("found description text: {}", &description_text);
 
                         let document_title = point
                             .payload
