@@ -192,7 +192,7 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
         final_context,
     );
 
-    debug!(
+    info!(
         "LLM message for user's request main processing: {}",
         llm_message
     );

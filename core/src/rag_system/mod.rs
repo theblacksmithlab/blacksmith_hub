@@ -377,7 +377,7 @@ where
         let mut top_doc_counter = 1;
 
         for document in &top_documents {
-            debug!(
+            info!(
                 "Selected document ({}/{}) for final context:\n{}",
                 top_doc_counter,
                 top_documents.len(),
