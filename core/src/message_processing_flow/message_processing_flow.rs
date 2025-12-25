@@ -19,7 +19,7 @@ use crate::utils::tg_bot::tg_bot::{add_user_message_to_cache, get_cache_as_strin
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 pub async fn process_user_raw_request<
     T: OpenAIClientInit + QdrantClientInit + TempCacheInit + Send + Sync,
@@ -185,15 +185,15 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
     // );
 
     let llm_message = format!(
-        "<user_request>{}</user_request>\n\n<clarified_request>{}</clarified_request>\n\n<chat_history>{}</chat_history>\n\n<knowledge_base>{}</knowledge_base>",
-        user_raw_request,
-        clarified_request,
-        current_cache,
+        "<knowledge_base>\n{}\n</knowledge_base>\n\n<chat_history>\n{}\n</chat_history>\n\n<clarified_request>\n{}\n</clarified_request>\n\n<user_request>\n{}\n</user_request>",
         final_context,
+        current_cache,
+        clarified_request,
+        user_raw_request,
     );
 
     info!(
-        "LLM message for user's request main processing: {}",
+        "LLM message for user's request main processing:\n{}",
         llm_message
     );
 
@@ -230,7 +230,7 @@ pub async fn handle_common_case_request<T: OpenAIClientInit + Send + Sync>(
     app_name: AppName,
 ) -> Result<String> {
     let llm_message = format!(
-        "<user_request>{}</user_request>\n\n<chat_history>{}</chat_history>",
+        "<user_request>\n{}\n</user_request>\n\n<chat_history>\n{}\n</chat_history>",
         user_raw_request, current_cache
     );
 
@@ -271,7 +271,7 @@ pub async fn handle_invalid_request<T: OpenAIClientInit + Send + Sync>(
     app_name: AppName,
 ) -> Result<String> {
     let llm_message = format!(
-        "<user_request>{}</user_request>\n\n<chat_history>{}</chat_history>",
+        "<user_request>\n{}\n</user_request>\n\n<chat_history>\n{}\n</chat_history>",
         user_raw_request, current_cache
     );
 

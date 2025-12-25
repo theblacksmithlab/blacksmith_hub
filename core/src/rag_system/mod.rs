@@ -7,7 +7,7 @@ use crate::rag_system::types::{
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 pub mod context_builder;
 pub mod get_results_via_rag_system;
