@@ -104,7 +104,7 @@ pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
     }
 }
 
-pub async fn tokenize_and_truncate(data: &str, max_tokens: usize) -> Result<(String, usize)> {
+pub async fn tokenize_and_truncate(data: &str, max_tokens: usize) -> Result<String> {
     let bpe = cl100k_base()?;
     let tokens = bpe.encode_ordinary(&*data);
     let token_count = tokens.len();
@@ -119,12 +119,12 @@ pub async fn tokenize_and_truncate(data: &str, max_tokens: usize) -> Result<(Str
 
         info!("Truncated input tokens: {:?}", truncated_count);
 
-        Ok((truncated_data, truncated_count))
+        Ok(truncated_data)
     } else {
         info!(
             "Input tokens {} < max_tokens, no need to truncate",
             token_count
         );
-        Ok((data.to_string(), token_count))
+        Ok(data.to_string())
     }
 }

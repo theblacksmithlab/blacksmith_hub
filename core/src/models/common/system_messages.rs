@@ -107,6 +107,7 @@ pub enum CommonMessages {
     InvalidRequestContent,
     PrivateCmdUsedInPublicChat,
     NoUsernameWarning,
+    ServiceUnavailable,
 }
 
 impl CommonMessages {
@@ -126,6 +127,7 @@ impl CommonMessages {
             CommonMessages::InvalidRequestContent => "invalid_request_content",
             CommonMessages::PrivateCmdUsedInPublicChat => "private_cmd_used_in_public_chat",
             CommonMessages::NoUsernameWarning => "no_username_warning",
+            CommonMessages::ServiceUnavailable => "service_unavailable",
         }
     }
 }

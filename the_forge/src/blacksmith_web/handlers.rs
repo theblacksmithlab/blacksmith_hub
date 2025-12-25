@@ -15,8 +15,7 @@ use core::models::common::ai::LlmModel;
 use core::models::common::app_name::AppName;
 use core::models::common::system_roles::{AppsSystemRoles, BlacksmithLabRoleType, W3ARoleType};
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
-use core::utils::common::{build_resource_file_path, get_system_role_or_fallback};
-use serde_json::Value;
+use core::utils::common::get_system_role_or_fallback;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
@@ -60,22 +59,8 @@ pub(crate) async fn handle_blacksmith_web_user_request(
         request_text, response
     );
 
-    let extra_data_map = if matches!(app_name, AppName::W3AWeb) && !extra_data.is_empty() {
-        let all_lesson_urls = load_lesson_urls(&app_name).await;
-
-        let mut data_map = HashMap::new();
-        for item in extra_data {
-            let item_lower = item.to_lowercase();
-            if let Some(url) = all_lesson_urls.get(&item_lower) {
-                data_map.insert(item, url.clone());
-            } else {
-                warn!("URL for item '{}' not found in database", item);
-            }
-        }
-        data_map
-    } else {
-        HashMap::new()
-    };
+    // NEW: extra_data is now HashMap<String, String> directly from RAG system
+    let extra_data_map = extra_data;
 
     Json(BlacksmithWebServerResponse {
         text: response,
@@ -234,44 +219,4 @@ async fn prepare_text_for_tts_fn(
     Ok(processed_text)
 }
 
-pub async fn load_lesson_urls(app_name: &AppName) -> HashMap<String, String> {
-    let file_path = build_resource_file_path(app_name, "learning_structure_with_urls.json");
-    let file_content = match tokio::fs::read_to_string(&file_path).await {
-        Ok(content) => content,
-        Err(err) => {
-            error!(
-                "Failed to read lesson URLs file at {:?}: {}",
-                file_path, err
-            );
-            return HashMap::new();
-        }
-    };
-
-    let structure: Value = match serde_json::from_str(&file_content) {
-        Ok(value) => value,
-        Err(err) => {
-            error!("Failed to parse learning structure urls JSON: {}", err);
-            return HashMap::new();
-        }
-    };
-
-    let mut lesson_urls = HashMap::new();
-
-    if let Some(categories) = structure.as_object() {
-        for (_, category_value) in categories {
-            if let Some(category) = category_value.as_object() {
-                for (_, subcategory_value) in category {
-                    if let Some(lessons) = subcategory_value.as_object() {
-                        for (lesson_title, url_value) in lessons {
-                            if let Some(url) = url_value.as_str() {
-                                lesson_urls.insert(lesson_title.to_lowercase(), url.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    lesson_urls
-}
+// REMOVED: load_lesson_urls() - no longer needed, lesson URLs come directly from Qdrant metadata

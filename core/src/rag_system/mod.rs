@@ -7,7 +7,7 @@ use crate::rag_system::types::{
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 pub mod context_builder;
 pub mod get_results_via_rag_system;
@@ -373,6 +373,18 @@ where
             "Selected {} documents for final context",
             top_documents.len()
         );
+
+        let mut top_doc_counter = 1;
+
+        for document in &top_documents {
+            debug!(
+                "Selected document ({}/{}) for final context:\n{}",
+                top_doc_counter,
+                top_documents.len(),
+                document.metadata.title
+            );
+            top_doc_counter += 1;
+        }
 
         // ============ Step 5: Retrieving full documents' content ============
         let mut final_documents = Vec::new();

@@ -46,7 +46,7 @@ pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
             Ok(clarified_request)
         }
         Err(err) => {
-            error!("Error in raw_llm_processing: {}", err);
+            error!("Error while clarifying user's raw request: {}", err);
             Ok(user_raw_request.to_string())
         }
     }

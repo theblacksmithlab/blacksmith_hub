@@ -4,6 +4,7 @@ use crate::rag_system::types::PointId;
 pub struct DocumentMetadata {
     pub title: String,
     pub extra: Option<String>,
+    pub hierarchy: Option<String>,
 }
 
 #[derive(Clone, Debug)]

@@ -19,8 +19,7 @@ use tracing::info;
 
 pub async fn start_blacksmith_web_server(server_app_state: Arc<ServerAppState>) -> Result<()> {
     let qdrant_client = Arc::new(
-        Qdrant::from_url(&env::var("QDRANT_URL")?)
-            .api_key(env::var("QDRANT_API_KEY")?)
+        Qdrant::from_url(&env::var("QDRANT_LOCAL_URL")?)
             .build()?,
     );
 

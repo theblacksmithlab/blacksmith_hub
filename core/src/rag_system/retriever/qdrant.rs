@@ -449,7 +449,7 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
 
                         let chunk_text = point
                             .payload
-                            .get("chunk_text")
+                            .get("final_chunk_text")
                             .and_then(|v| v.as_str())
                             .map(String::from)
                             .unwrap_or_else(|| String::new());
@@ -463,7 +463,13 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
 
                         let extra = point
                             .payload
-                            .get("extra")
+                            .get("lesson_link")
+                            .and_then(|v| v.as_str())
+                            .map(String::from);
+
+                        let hierarchy = point
+                            .payload
+                            .get("hierarchy")
                             .and_then(|v| v.as_str())
                             .map(String::from);
 
@@ -475,6 +481,7 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
                             metadata: DocumentMetadata {
                                 title: document_title,
                                 extra,
+                                hierarchy,
                             },
                         }
                     });
@@ -545,7 +552,7 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
 
                         let description_text = point
                             .payload
-                            .get("description_text")
+                            .get("final_description_text")
                             .and_then(|v| v.as_str())
                             .map(String::from)
                             .unwrap_or_else(|| String::new());
@@ -559,7 +566,13 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
 
                         let extra = point
                             .payload
-                            .get("extra")
+                            .get("lesson_link")
+                            .and_then(|v| v.as_str())
+                            .map(String::from);
+
+                        let hierarchy = point
+                            .payload
+                            .get("hierarchy")
                             .and_then(|v| v.as_str())
                             .map(String::from);
 
@@ -570,6 +583,7 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
                             metadata: DocumentMetadata {
                                 title: document_title,
                                 extra,
+                                hierarchy,
                             },
                         }
                     });
@@ -662,7 +676,7 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
 
                     let chunk_text = point
                         .payload
-                        .get("chunk_text")
+                        .get("final_chunk_text")
                         .and_then(|v| v.as_str())
                         .map(String::from)
                         .unwrap_or_else(|| String::new());
@@ -676,7 +690,13 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
 
                     let extra = point
                         .payload
-                        .get("extra")
+                        .get("lesson_link")
+                        .and_then(|v| v.as_str())
+                        .map(String::from);
+
+                    let hierarchy = point
+                        .payload
+                        .get("hierarchy")
                         .and_then(|v| v.as_str())
                         .map(String::from);
 
@@ -688,6 +708,7 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
                         metadata: DocumentMetadata {
                             title: document_title,
                             extra,
+                            hierarchy,
                         },
                     }
                 });

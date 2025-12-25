@@ -88,19 +88,21 @@ impl AsRef<str> for UniframeStudioRoleType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProbiotRoleType {
-    CommonCaseDetection,
+    RequestTypeDetection,
     ClarifyRequest,
     MainProcessing,
     CommonCaseRequestProcessing,
+    InvalidCaseRequestProcessing,
 }
 
 impl ProbiotRoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            ProbiotRoleType::CommonCaseDetection => "common_case_detection",
+            ProbiotRoleType::RequestTypeDetection => "request_type_detection",
             ProbiotRoleType::ClarifyRequest => "clarify_request",
             ProbiotRoleType::MainProcessing => "main_processing",
             ProbiotRoleType::CommonCaseRequestProcessing => "common_case_request_processing",
+            ProbiotRoleType::InvalidCaseRequestProcessing => "invalid_case_request_processing",
         }
     }
 }
@@ -113,29 +115,25 @@ impl AsRef<str> for ProbiotRoleType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum W3ARoleType {
-    CommonCaseDetection,
+    RequestTypeDetection,
     ClarifyRequest,
     MainProcessing,
     CommonCaseRequestProcessing,
+    InvalidCaseRequestProcessing,
     Recommendation,
     TTSPreProcessing,
-    ModuleRecommendation,
-    BlockRecommendation,
-    LessonRecommendation,
 }
 
 impl W3ARoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            W3ARoleType::CommonCaseDetection => "common_case_detection",
+            W3ARoleType::RequestTypeDetection => "request_type_detection",
             W3ARoleType::ClarifyRequest => "clarify_request",
             W3ARoleType::MainProcessing => "main_processing",
             W3ARoleType::CommonCaseRequestProcessing => "common_case_request_processing",
+            W3ARoleType::InvalidCaseRequestProcessing => "invalid_case_request_processing",
             W3ARoleType::Recommendation => "recommendation",
             W3ARoleType::TTSPreProcessing => "tts_pre_processing",
-            W3ARoleType::ModuleRecommendation => "module_recommendation",
-            W3ARoleType::BlockRecommendation => "block_recommendation",
-            W3ARoleType::LessonRecommendation => "lesson_recommendation",
         }
     }
 }
@@ -176,8 +174,9 @@ impl AsRef<str> for TheViperRoomRoleType {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlacksmithLabRoleType {
     ClarifyRequest,
-    CommonCaseDetection,
+    RequestTypeDetection,
     CommonCaseRequestProcessing,
+    InvalidCaseRequestProcessing,
     TTSPreProcessing,
     MainProcessing,
 }
@@ -186,8 +185,11 @@ impl BlacksmithLabRoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
             BlacksmithLabRoleType::ClarifyRequest => "clarify_request",
-            BlacksmithLabRoleType::CommonCaseDetection => "common_case_detection",
+            BlacksmithLabRoleType::RequestTypeDetection => "request_type_detection",
             BlacksmithLabRoleType::CommonCaseRequestProcessing => "common_case_request_processing",
+            BlacksmithLabRoleType::InvalidCaseRequestProcessing => {
+                "invalid_case_request_processing"
+            }
             BlacksmithLabRoleType::TTSPreProcessing => "tts_pre_processing",
             BlacksmithLabRoleType::MainProcessing => "main_processing",
         }
