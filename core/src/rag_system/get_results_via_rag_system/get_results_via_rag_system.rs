@@ -7,7 +7,6 @@ use crate::rag_system::RAGSystem;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use std::sync::Arc;
-use tracing::info;
 
 pub async fn get_results_via_rag_system<T: OpenAIClientInit + QdrantClientInit + Send + Sync>(
     input_data: &str,
@@ -31,11 +30,6 @@ pub async fn get_results_via_rag_system<T: OpenAIClientInit + QdrantClientInit +
     );
 
     let result = rag_system.process(input_data).await?;
-
-    info!(
-        "Docs' total amount retrieved by the RAG system in the main search: {}",
-        result.documents.len()
-    );
 
     Ok(result)
 }

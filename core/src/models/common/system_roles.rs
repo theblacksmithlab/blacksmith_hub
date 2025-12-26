@@ -159,7 +159,7 @@ impl TheViperRoomRoleType {
             TheViperRoomRoleType::CaptionGeneration => "caption_generation",
             TheViperRoomRoleType::ExtractingNews => "extracting_news",
             TheViperRoomRoleType::SystemNicknameGeneration => "system_nickname_generation",
-            TheViperRoomRoleType::CreatingPodcast => "creating_podcast",
+            TheViperRoomRoleType::CreatingPodcast => "creating_podcast_xml",
             TheViperRoomRoleType::CheckUsefulness => "system_role_usefulness",
         }
     }
