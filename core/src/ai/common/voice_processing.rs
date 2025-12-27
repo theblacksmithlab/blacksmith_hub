@@ -835,7 +835,7 @@ pub async fn merge_audio_parts(
 
     let final_path = format!("{}/{}.mp3", user_tmp_dir, final_filename);
 
-    const PAUSE_DURATION_SEC: f32 = 1.0;
+    const PAUSE_DURATION_SEC: f32 = 1.5;
 
     let mut filter_parts = Vec::new();
     let mut input_args = Vec::new();

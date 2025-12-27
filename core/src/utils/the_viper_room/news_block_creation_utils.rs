@@ -337,14 +337,14 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
     let podcast_structure: PodcastStructure = serde_json::from_str(&updates_summarized_json)
         .map_err(|e| anyhow::anyhow!("Failed to parse podcast structure from JSON: {}", e))?;
 
-    // Save for debugging
-    let updates_summarized_file_path = format!("{}/updates_summarized.json", user_tmp_dir);
-    let mut updates_summarized_file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(updates_summarized_file_path.clone())?;
-    writeln!(updates_summarized_file, "{}", updates_summarized_json)?;
+    // // Save for debugging
+    // let updates_summarized_file_path = format!("{}/updates_summarized.json", user_tmp_dir);
+    // let mut updates_summarized_file = OpenOptions::new()
+    //     .create(true)
+    //     .write(true)
+    //     .truncate(true)
+    //     .open(updates_summarized_file_path.clone())?;
+    // writeln!(updates_summarized_file, "{}", updates_summarized_json)?;
 
     info!(
         "Podcast structure parsed successfully: {} intro, {} body parts, {} outro",
