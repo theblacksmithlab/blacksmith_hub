@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /tmp/whisper
 RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
-    WHISPER_STATIC=1 make
+    make
 
 # =============================================================================
 # Stage 2: Prepare cargo-chef for dependency caching
@@ -118,6 +118,11 @@ COPY --from=builder /tmp/bot_foundry .
 
 # Copy whisper.cpp from dedicated builder stage
 COPY --from=whisper-builder /tmp/whisper/whisper.cpp /app/whisper.cpp
+
+# Copy shared libraries to system directory
+RUN cp /app/whisper.cpp/build/src/*.so* /usr/local/lib/ 2>/dev/null || true && \
+    cp /app/whisper.cpp/build/*.so* /usr/local/lib/ 2>/dev/null || true && \
+    ldconfig
 
 RUN chown -R 1001:1000 /app/whisper.cpp && \
     chmod -R 755 /app/whisper.cpp
