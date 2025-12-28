@@ -37,6 +37,9 @@ WORKDIR /app
 COPY --from=builder /usr/src/app/target/release/bot_foundry .
 COPY --from=builder /tmp/whisper/whisper.cpp /app/whisper.cpp
 
+# Set library path so whisper-cli can find its shared libraries
+ENV LD_LIBRARY_PATH="/app/whisper.cpp/build/src:/app/whisper.cpp/build/ggml/src:${LD_LIBRARY_PATH}"
+
 RUN chown -R 1001:1000 /app/whisper.cpp && \
     chmod -R 755 /app/whisper.cpp
 
