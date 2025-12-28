@@ -28,8 +28,6 @@ use teloxide::types::{KeyboardButton, KeyboardMarkup, UpdateKind};
 use teloxide::Bot;
 use teloxide_core::payloads::SendDocumentSetters;
 use teloxide_core::prelude::ChatId;
-use teloxide_core::RequestError;
-use teloxide_core::types::True;
 use tracing::{error, info};
 
 pub async fn groot_bot_command_handler(
@@ -368,16 +366,6 @@ pub async fn groot_bot_command_handler(
 
     match cmd {
         GrootBotCommands::Start => {
-            let chat_to_leave = ChatId(-1001323824194);
-            match bot.leave_chat(chat_to_leave).await{
-                Ok(_) => {
-                    info!("bot has left unpaid chat")
-                }
-                _ => {
-                    error!("error leaving the unpaid chat")
-                }
-            }
-
             let bot_msg = get_message(AppsSystemMessages::GrootBot(
                 GrootBotMessages::StartCmdUsedInPublicChat,
             ))

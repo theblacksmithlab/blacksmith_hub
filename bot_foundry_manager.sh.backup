@@ -43,12 +43,14 @@ rebuild_base() {
         docker compose rm -f $bot
     done
 
-    # OPTIMIZATION: Do NOT remove the base image - this preserves BuildKit cache layers!
-    # The old approach `docker rmi -f` destroyed all cached layers, forcing full rebuilds
-    print_message "${YELLOW}" "Note: Keeping bot_foundry_base image for cache optimization"
+    BASE_IMAGE_ID=$(docker images -q bot_foundry_base)
+    if [[ -n "$BASE_IMAGE_ID" ]]; then
+        print_message "${YELLOW}" "Removing bot_foundry_base image: $BASE_IMAGE_ID"
+        docker rmi -f "$BASE_IMAGE_ID"
+    fi
 
-    print_message "${GREEN}" "Building bot_foundry_base image with BuildKit cache..."
-    DOCKER_BUILDKIT=1 docker compose build bot_foundry_base
+    print_message "${GREEN}" "Building bot_foundry_base image..."
+    docker compose build bot_foundry_base
 
     print_message "${GREEN}" "Rebuilding dependent bots..."
     for bot in $DEPENDENT_BOTS; do
@@ -119,10 +121,13 @@ if [ "$1" == "full-redeploy" ]; then
     fi
 
     print_message "${YELLOW}" "2. Rebuilding base image..."
-    # OPTIMIZATION: Keep base image for cache optimization
-    print_message "${YELLOW}" "Note: Keeping bot_foundry_base image for cache optimization"
+    BASE_IMAGE_ID=$(docker images -q bot_foundry_base)
+    if [[ -n "$BASE_IMAGE_ID" ]]; then
+        print_message "${YELLOW}" "Removing bot_foundry_base image: $BASE_IMAGE_ID"
+        docker rmi -f "$BASE_IMAGE_ID"
+    fi
 
-    DOCKER_BUILDKIT=1 docker compose build bot_foundry_base
+    docker compose build bot_foundry_base
 
     print_message "${YELLOW}" "3. Rebuilding and starting $BOT_NAME..."
     docker compose build $BOT_NAME

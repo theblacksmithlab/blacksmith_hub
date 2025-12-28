@@ -1,0 +1,60 @@
+# Rust build artifacts
+target/
+**/*.rs.bk
+**/*.pdb
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile*
+.dockerignore
+
+# Documentation
+docs/
+*.md
+!CLAUDE.md
+
+# Scripts
+*.sh
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node (if any frontend exists)
+node_modules/
+npm-debug.log*
+
+# Python (for uniframe_studio integration)
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.cache
