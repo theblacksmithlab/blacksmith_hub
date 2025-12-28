@@ -124,6 +124,9 @@ RUN chown -R 1001:1000 /app/whisper.cpp && \
 
 RUN ln -s /app/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
 
+# Add whisper.cpp libraries to LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH="/app/whisper.cpp/build/src:${LD_LIBRARY_PATH}"
+
 RUN mkdir -p tmp && \
     chown 1001:1000 tmp && \
     chmod 700 tmp && \
