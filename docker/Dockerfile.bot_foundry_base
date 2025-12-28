@@ -1,8 +1,11 @@
 # =============================================================================
-# Stage 1: Build whisper.cpp (cached separately for faster rebuilds)
+# Stage 1: Prepare cargo-chef for dependency caching
 # =============================================================================
-FROM debian:bookworm-slim AS whisper-builder
+FROM rust:bookworm AS chef
 
+RUN cargo install cargo-chef --locked
+
+# Install whisper.cpp dependencies
 RUN apt-get update && apt-get install -y \
     git \
     cmake \
@@ -10,21 +13,10 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /tmp/whisper
-RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
-    cd whisper.cpp && \
-    make
-
-# =============================================================================
-# Stage 2: Prepare cargo-chef for dependency caching
-# =============================================================================
-FROM rust:bookworm AS chef
-
-RUN cargo install cargo-chef --locked
 WORKDIR /usr/src/app
 
 # =============================================================================
-# Stage 3: Analyze dependencies with cargo-chef
+# Stage 2: Analyze dependencies with cargo-chef
 # =============================================================================
 FROM chef AS planner
 
@@ -46,7 +38,7 @@ RUN mkdir -p core/src bot_foundry/src the_forge/src agent_foundry/src && \
 RUN cargo chef prepare --recipe-path recipe.json
 
 # =============================================================================
-# Stage 4: Build dependencies (HEAVILY CACHED!)
+# Stage 3: Build dependencies (HEAVILY CACHED!)
 # =============================================================================
 FROM chef AS dependency-builder
 
@@ -67,7 +59,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo chef cook --release --recipe-path recipe.json -p bot_foundry
 
 # =============================================================================
-# Stage 5: Build the actual application
+# Stage 4: Build the actual application + whisper.cpp
 # =============================================================================
 FROM chef AS builder
 
@@ -77,6 +69,14 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/app
+
+# Build whisper.cpp (in the same image as Rust - has all needed libs!)
+WORKDIR /tmp/whisper
+RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
+    cd whisper.cpp && \
+    make
 
 WORKDIR /usr/src/app
 
@@ -100,7 +100,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cp target/release/bot_foundry /tmp/bot_foundry
 
 # =============================================================================
-# Stage 6: Final runtime image
+# Stage 5: Final runtime image
 # =============================================================================
 FROM debian:bookworm-slim AS bot_foundry_base
 
@@ -116,13 +116,8 @@ WORKDIR /app
 # Copy built binary
 COPY --from=builder /tmp/bot_foundry .
 
-# Copy whisper.cpp from dedicated builder stage
-COPY --from=whisper-builder /tmp/whisper/whisper.cpp /app/whisper.cpp
-
-# Copy shared libraries to system directory
-RUN cp /app/whisper.cpp/build/src/*.so* /usr/local/lib/ 2>/dev/null || true && \
-    cp /app/whisper.cpp/build/*.so* /usr/local/lib/ 2>/dev/null || true && \
-    ldconfig
+# Copy whisper.cpp (built in rust:bookworm, same as old approach!)
+COPY --from=builder /tmp/whisper/whisper.cpp /app/whisper.cpp
 
 RUN chown -R 1001:1000 /app/whisper.cpp && \
     chmod -R 755 /app/whisper.cpp
