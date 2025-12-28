@@ -47,6 +47,7 @@ impl BotState {
     }
 }
 
+// optimization test
 #[tokio::main]
 async fn main() -> Result<()> {
     if let Err(e) = CryptoProvider::install_default(aws_lc_rs::default_provider()) {
