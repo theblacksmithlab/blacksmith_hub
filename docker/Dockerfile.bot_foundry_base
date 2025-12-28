@@ -1,46 +1,33 @@
 # =============================================================================
-# Stage 1: Prepare cargo-chef for dependency caching
+# Stage 1: cargo-chef planner
 # =============================================================================
-FROM rust:bookworm AS chef
+FROM rust:bookworm AS planner
 
 RUN cargo install cargo-chef --locked
-
-# Install whisper.cpp dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    cmake \
-    make \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /usr/src/app
 
-# =============================================================================
-# Stage 2: Analyze dependencies with cargo-chef
-# =============================================================================
-FROM chef AS planner
-
-# Copy only files needed for dependency resolution
+# Copy only Cargo files for dependency analysis
 COPY Cargo.toml Cargo.lock ./
 COPY core/Cargo.toml core/Cargo.toml
 COPY bot_foundry/Cargo.toml bot_foundry/Cargo.toml
 COPY the_forge/Cargo.toml the_forge/Cargo.toml
 COPY agent_foundry/Cargo.toml agent_foundry/Cargo.toml
 
-# Create dummy source files to make cargo-chef happy
+# Create dummy files
 RUN mkdir -p core/src bot_foundry/src the_forge/src agent_foundry/src && \
     echo "fn main() {}" > bot_foundry/src/main.rs && \
     echo "fn main() {}" > the_forge/src/main.rs && \
     echo "fn main() {}" > agent_foundry/src/main.rs && \
     echo "pub fn dummy() {}" > core/src/lib.rs
 
-# Generate dependency recipe
 RUN cargo chef prepare --recipe-path recipe.json
 
 # =============================================================================
-# Stage 3: Build dependencies (HEAVILY CACHED!)
+# Stage 2: Build dependencies
 # =============================================================================
-FROM chef AS dependency-builder
+FROM rust:bookworm AS cacher
+
+RUN cargo install cargo-chef --locked
 
 RUN apt-get update && apt-get install -y \
     pkg-config \
@@ -48,31 +35,27 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the recipe from planner
+WORKDIR /usr/src/app
 COPY --from=planner /usr/src/app/recipe.json recipe.json
 
-# Build dependencies using cargo-chef
-# This layer is cached and only rebuilds when dependencies change!
-# NOTE: We cache registry/git but NOT target, so compiled deps are saved in the layer
+# Build dependencies - this layer is cached!
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     cargo chef cook --release --recipe-path recipe.json -p bot_foundry
 
 # =============================================================================
-# Stage 4: Build the actual application + whisper.cpp
+# Stage 3: Build application (EXACTLY like old Dockerfile!)
 # =============================================================================
-FROM chef AS builder
+FROM rust:bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl3 \
-    libssl-dev \
     ffmpeg \
+    cmake \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /usr/src/app
-
-# Build whisper.cpp (in the same image as Rust - has all needed libs!)
+# Build whisper EXACTLY as before
 WORKDIR /tmp/whisper
 RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
@@ -80,19 +63,17 @@ RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
 
 WORKDIR /usr/src/app
 
-# Copy compiled dependencies from previous stage
-# (cargo-chef already compiled all dependencies into target/)
-COPY --from=dependency-builder /usr/src/app/target target
+# Copy cached dependencies
+COPY --from=cacher /usr/src/app/target target
 
-# Now copy the actual source code
+# Copy source code EXACTLY as before
 COPY Cargo.toml Cargo.lock ./
 COPY core core/
 COPY the_forge the_forge/
 COPY bot_foundry bot_foundry/
 COPY agent_foundry agent_foundry/
 
-# Build only bot_foundry with cache mounts for incremental compilation
-# This rebuilds only changed code, dependencies are already compiled!
+# Build with cache mount
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/src/app/target,sharing=locked \
@@ -100,7 +81,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cp target/release/bot_foundry /tmp/bot_foundry
 
 # =============================================================================
-# Stage 5: Final runtime image
+# Stage 4: Runtime (EXACTLY like old Dockerfile!)
 # =============================================================================
 FROM debian:bookworm-slim AS bot_foundry_base
 
@@ -113,10 +94,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy built binary
+# Copy binary from /tmp (not from target!)
 COPY --from=builder /tmp/bot_foundry .
 
-# Copy whisper.cpp (built in rust:bookworm, same as old approach!)
+# Copy whisper EXACTLY as before
 COPY --from=builder /tmp/whisper/whisper.cpp /app/whisper.cpp
 
 RUN chown -R 1001:1000 /app/whisper.cpp && \
