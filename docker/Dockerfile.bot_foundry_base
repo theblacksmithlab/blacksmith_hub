@@ -1,10 +1,38 @@
-FROM rust:bookworm AS builder
+# =============================================================================
+# Stage 1: cargo-chef planner - analyze dependencies
+# =============================================================================
+FROM rust:bookworm AS planner
+
+RUN cargo install cargo-chef --locked
+WORKDIR /usr/src/app
+
+# Copy only Cargo files for dependency analysis
+COPY Cargo.toml Cargo.lock ./
+COPY core/Cargo.toml core/Cargo.toml
+COPY bot_foundry/Cargo.toml bot_foundry/Cargo.toml
+COPY the_forge/Cargo.toml the_forge/Cargo.toml
+COPY agent_foundry/Cargo.toml agent_foundry/Cargo.toml
+
+# Create dummy source files
+RUN mkdir -p core/src bot_foundry/src the_forge/src agent_foundry/src && \
+    echo "fn main() {}" > bot_foundry/src/main.rs && \
+    echo "fn main() {}" > the_forge/src/main.rs && \
+    echo "fn main() {}" > agent_foundry/src/main.rs && \
+    echo "pub fn dummy() {}" > core/src/lib.rs
+
+# Generate dependency recipe
+RUN cargo chef prepare --recipe-path recipe.json
+
+# =============================================================================
+# Stage 2: Build whisper.cpp (INDEPENDENT - cached separately!)
+# =============================================================================
+FROM rust:bookworm AS whisper-builder
 
 RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl3 \
-    ffmpeg \
+    git \
     cmake \
+    make \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/whisper
@@ -12,17 +40,61 @@ RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
     make
 
+# =============================================================================
+# Stage 3: Build Rust dependencies (CACHED!)
+# =============================================================================
+FROM rust:bookworm AS cacher
+
+RUN cargo install cargo-chef --locked
+
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl3 \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/app
+COPY --from=planner /usr/src/app/recipe.json recipe.json
+
+# Build dependencies - this layer is heavily cached!
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo chef cook --release --recipe-path recipe.json -p bot_foundry
+
+# =============================================================================
+# Stage 4: Build Rust application ONLY (whisper is cached separately!)
+# =============================================================================
+FROM rust:bookworm AS builder
+
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl3 \
+    libssl-dev \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /usr/src/app
 
-COPY Cargo.toml Cargo.lock ./
+# Copy cached Rust dependencies from cacher stage
+COPY --from=cacher /usr/src/app/target target
 
+# Copy source code
+COPY Cargo.toml Cargo.lock ./
 COPY core core/
 COPY the_forge the_forge/
 COPY bot_foundry bot_foundry/
 COPY agent_foundry agent_foundry/
 
-RUN cargo build -p bot_foundry --release -j 4
+# Build bot_foundry with cache mounts for incremental compilation
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/usr/src/app/target,sharing=locked \
+    cargo build -p bot_foundry --release -j 4 && \
+    cp target/release/bot_foundry /tmp/bot_foundry
 
+# =============================================================================
+# Stage 5: Runtime image
+# =============================================================================
 FROM debian:bookworm-slim AS bot_foundry_base
 
 RUN apt-get update && apt-get install -y \
@@ -34,8 +106,11 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY --from=builder /usr/src/app/target/release/bot_foundry .
-COPY --from=builder /tmp/whisper/whisper.cpp /app/whisper.cpp
+# Copy Rust binary from builder
+COPY --from=builder /tmp/bot_foundry .
+
+# Copy whisper from INDEPENDENT whisper-builder stage
+COPY --from=whisper-builder /tmp/whisper/whisper.cpp /app/whisper.cpp
 
 # Set library path so whisper-cli can find its shared libraries
 ENV LD_LIBRARY_PATH="/app/whisper.cpp/build/src:/app/whisper.cpp/build/ggml/src:${LD_LIBRARY_PATH}"
