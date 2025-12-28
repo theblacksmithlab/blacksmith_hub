@@ -59,11 +59,11 @@ RUN apt-get update && apt-get install -y \
 # Copy the recipe from planner
 COPY --from=planner /usr/src/app/recipe.json recipe.json
 
-# Build dependencies using cargo-chef with BuildKit cache mount
+# Build dependencies using cargo-chef
 # This layer is cached and only rebuilds when dependencies change!
+# NOTE: We cache registry/git but NOT target, so compiled deps are saved in the layer
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/usr/src/app/target \
     cargo chef cook --release --recipe-path recipe.json -p bot_foundry
 
 # =============================================================================
@@ -80,9 +80,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /usr/src/app
 
-# Copy dependency artifacts from previous stage
+# Copy compiled dependencies from previous stage
+# (cargo-chef already compiled all dependencies into target/)
 COPY --from=dependency-builder /usr/src/app/target target
-COPY --from=dependency-builder /usr/local/cargo /usr/local/cargo
 
 # Now copy the actual source code
 COPY Cargo.toml Cargo.lock ./
