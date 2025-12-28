@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /tmp/whisper
 RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
-    make
+    WHISPER_STATIC=1 make
 
 # =============================================================================
 # Stage 2: Prepare cargo-chef for dependency caching
@@ -123,9 +123,6 @@ RUN chown -R 1001:1000 /app/whisper.cpp && \
     chmod -R 755 /app/whisper.cpp
 
 RUN ln -s /app/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
-
-# Add whisper.cpp libraries to LD_LIBRARY_PATH
-ENV LD_LIBRARY_PATH="/app/whisper.cpp/build/src:${LD_LIBRARY_PATH}"
 
 RUN mkdir -p tmp && \
     chown 1001:1000 tmp && \
