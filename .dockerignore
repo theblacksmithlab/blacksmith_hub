@@ -1,4 +1,4 @@
-# Rust build artifacts
+# Rust build artifacts (HUGE - ~5GB!)
 target/
 **/*.rs.bk
 **/*.pdb
@@ -14,12 +14,12 @@ target/
 *.swo
 *~
 
-# Environment files
+# Environment files (secrets!)
 .env
 .env.local
 .env.*.local
 
-# Docker
+# Docker (don't copy docker files into build)
 docker-compose.yml
 docker-compose.*.yml
 Dockerfile*
@@ -30,9 +30,6 @@ docs/
 *.md
 !CLAUDE.md
 
-# Scripts
-*.sh
-
 # Logs
 *.log
 logs/
@@ -41,14 +38,13 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Node (if any frontend exists)
+# Node (if any)
 node_modules/
 npm-debug.log*
 
-# Python (for uniframe_studio integration)
+# Python
 __pycache__/
 *.py[cod]
-*.so
 .Python
 venv/
 env/
@@ -58,3 +54,10 @@ tmp/
 temp/
 *.tmp
 *.cache
+
+# Backups
+*.backup*
+*.bak
+
+# Note: DO NOT exclude *.sh - we need entrypoint.sh!
+# Note: DO NOT exclude *.so - not relevant (whisper builds inside image)
