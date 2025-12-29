@@ -14,19 +14,22 @@ print_message() {
 
 print_help() {
     print_message "${BLUE}" "=== The Forge Manager ==="
+    echo ""
     print_message "${YELLOW}" "Usage:"
-    echo "  ./the_forge_manager.sh base [rebuild]             - Rebuild the base image"
-    echo "  ./the_forge_manager.sh <service> [restart|redeploy]  - Manage a specific service"
-    echo "  ./the_forge_manager.sh full-redeploy <service>    - Rebuild base and redeploy specific service only"
+    echo "  ./the_forge_manager.sh <COMMAND> <OBJECT>"
     echo ""
-    echo "Examples:"
-    echo "  ./the_forge_manager.sh base rebuild               - Rebuild the_forge_base image"
-    echo "  ./the_forge_manager.sh blacksmith_web restart     - Restart the blacksmith_web service"
-    echo "  ./the_forge_manager.sh uniframe_studio redeploy   - Full redeploy of the uniframe_studio service"
-    echo "  ./the_forge_manager.sh the_viper_room redeploy    - Full redeploy of the the_viper_room service"
-    echo "  ./the_forge_manager.sh full-redeploy blacksmith_web - Rebuild base and redeploy blacksmith_web only"
+    print_message "${YELLOW}" "Commands:"
+    echo "  restart <service>          - Restart service container (no rebuild)"
+    echo "  redeploy <service>         - Rebuild service only (base untouched) + start"
+    echo "  rebuild base               - Rebuild base image only (services untouched)"
+    echo "  full-redeploy <service>    - Rebuild base + service + start"
     echo ""
-
+    print_message "${YELLOW}" "Examples:"
+    echo "  ./the_forge_manager.sh restart blacksmith_web"
+    echo "  ./the_forge_manager.sh redeploy uniframe_studio"
+    echo "  ./the_forge_manager.sh rebuild base"
+    echo "  ./the_forge_manager.sh full-redeploy the_viper_room"
+    echo ""
     print_message "${YELLOW}" "Available services:"
     SERVICES=$(docker compose config --services | grep -E "^(blacksmith_web|uniframe_studio|the_viper_room)$")
     for service in $SERVICES; do
@@ -34,108 +37,99 @@ print_help() {
     done
 }
 
-rebuild_base() {
-    print_message "${GREEN}" "Rebuilding the_forge_base image..."
-
-    print_message "${YELLOW}" "Stopping and removing dependent containers..."
-    DEPENDENT_SERVICES=$(docker compose config --services | grep -E "^(blacksmith_web|uniframe_studio|the_viper_room)$")
-    for service in $DEPENDENT_SERVICES; do
-        docker compose stop $service
-        docker compose rm -f $service
-    done
-
-    BASE_IMAGE_ID=$(docker images -q the_forge_base)
-    if [[ -n "$BASE_IMAGE_ID" ]]; then
-        print_message "${YELLOW}" "Removing the_forge_base image: $BASE_IMAGE_ID"
-        docker rmi -f "$BASE_IMAGE_ID"
-    fi
-
-    print_message "${GREEN}" "Building the_forge_base image..."
-    docker compose build the_forge_base
-
-    print_message "${GREEN}" "Rebuilding dependent services..."
-    for service in $DEPENDENT_SERVICES; do
-        docker compose build $service
-    done
-
-    print_message "${GREEN}" "Base image and dependent services rebuilt successfully!"
-    print_message "${YELLOW}" "To start services, use: docker compose up -d <service_name>"
-}
-
+# ============================================================================
+# Command: restart <service>
+# ============================================================================
 restart_service() {
     local service=$1
-    print_message "${GREEN}" "Simple restart for service: $service..."
+    print_message "${GREEN}" "Restarting service: $service..."
     docker compose restart $service
     print_message "${GREEN}" "Service restarted successfully!"
 }
 
+# ============================================================================
+# Command: redeploy <service>
+# ============================================================================
 redeploy_service() {
     local service=$1
-    print_message "${GREEN}" "Full redeployment for service: $service..."
+    print_message "${GREEN}" "Redeploying service: $service (base image untouched)..."
+
+    print_message "${YELLOW}" "1. Stopping and removing $service container..."
     docker compose stop $service
     docker compose rm -f $service
 
     IMAGE_ID=$(docker images -q blacksmith_lab_${service})
     if [[ -n "$IMAGE_ID" ]]; then
-        print_message "${YELLOW}" "Removing old image: $IMAGE_ID"
+        print_message "${YELLOW}" "2. Removing old $service image: $IMAGE_ID"
         docker rmi -f "$IMAGE_ID"
     fi
 
+    print_message "${YELLOW}" "3. Building $service..."
     docker compose build $service
+
+    print_message "${YELLOW}" "4. Starting $service..."
     docker compose up -d $service
+
     print_message "${GREEN}" "Service redeployed successfully!"
 }
 
-if [ -z "$1" ]; then
-    print_message "${RED}" "ACHTUNG! No service specified."
-    print_help
-    exit 1
-fi
+# ============================================================================
+# Command: rebuild base
+# ============================================================================
+rebuild_base() {
+    print_message "${GREEN}" "Rebuilding the_forge_base image only..."
 
-if [ "$1" == "full-redeploy" ]; then
-    SERVICE_NAME=$2
+    # OPTIMIZATION: Do NOT remove the base image - this preserves BuildKit cache layers!
+    print_message "${YELLOW}" "Note: Keeping existing base image for cache optimization"
 
-    if [ -z "$SERVICE_NAME" ]; then
-        print_message "${RED}" "ACHTUNG! No service specified for full-redeploy."
-        print_help
-        exit 1
-    fi
+    print_message "${YELLOW}" "Building the_forge_base with BuildKit cache..."
+    DOCKER_BUILDKIT=1 docker compose build the_forge_base
 
-    SERVICES=$(docker compose config --services | grep -E "^(blacksmith_web|uniframe_studio|the_viper_room)$")
-    if ! echo "$SERVICES" | grep -q "$SERVICE_NAME"; then
-        print_message "${RED}" "ACHTUNG! Service '$SERVICE_NAME' does not exist."
-        print_message "${YELLOW}" "Available services:"
-        echo "$SERVICES"
-        exit 1
-    fi
+    print_message "${GREEN}" "Base image rebuilt successfully!"
+    print_message "${YELLOW}" "Tip: Use 'redeploy <service>' to rebuild specific service, or 'full-redeploy <service>' to rebuild both"
+}
 
-    print_message "${BLUE}" "=== Full redeployment process for $SERVICE_NAME ==="
+# ============================================================================
+# Command: full-redeploy <service>
+# ============================================================================
+full_redeploy_service() {
+    local service=$1
+    print_message "${BLUE}" "=== Full redeploy: $service ==="
+    print_message "${BLUE}" "This will rebuild base + service and start the service"
+    echo ""
 
-    print_message "${YELLOW}" "1. Stopping and removing $SERVICE_NAME..."
-    docker compose stop $SERVICE_NAME
-    docker compose rm -f $SERVICE_NAME
+    print_message "${YELLOW}" "1. Stopping and removing $service container..."
+    docker compose stop $service
+    docker compose rm -f $service
 
-    IMAGE_ID=$(docker images -q blacksmith_lab_${SERVICE_NAME})
+    IMAGE_ID=$(docker images -q blacksmith_lab_${service})
     if [[ -n "$IMAGE_ID" ]]; then
-        print_message "${YELLOW}" "Removing $SERVICE_NAME image: $IMAGE_ID"
+        print_message "${YELLOW}" "2. Removing old $service image: $IMAGE_ID"
         docker rmi -f "$IMAGE_ID"
     fi
 
-    print_message "${YELLOW}" "2. Rebuilding base image..."
-    BASE_IMAGE_ID=$(docker images -q the_forge_base)
-    if [[ -n "$BASE_IMAGE_ID" ]]; then
-        print_message "${YELLOW}" "Removing the_forge_base image: $BASE_IMAGE_ID"
-        docker rmi -f "$BASE_IMAGE_ID"
-    fi
+    # OPTIMIZATION: Keep base image for cache optimization
+    print_message "${YELLOW}" "3. Rebuilding base image (with cache)..."
+    DOCKER_BUILDKIT=1 docker compose build the_forge_base
 
-    docker compose build the_forge_base
+    print_message "${YELLOW}" "4. Building $service..."
+    docker compose build $service
 
-    print_message "${YELLOW}" "3. Rebuilding and starting $SERVICE_NAME..."
-    docker compose build $SERVICE_NAME
-    docker compose up -d $SERVICE_NAME
+    print_message "${YELLOW}" "5. Starting $service..."
+    docker compose up -d $service
 
-    print_message "${GREEN}" "Full redeployment of $SERVICE_NAME completed successfully!"
-    exit 0
+    print_message "${GREEN}" "Full redeploy of $service completed successfully!"
+}
+
+# ============================================================================
+# Argument parsing
+# ============================================================================
+
+if [ -z "$1" ]; then
+    print_message "${RED}" "ERROR: No command specified"
+    echo ""
+    print_help
+    exit 1
 fi
 
 if [ "$1" == "help" ] || [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
@@ -143,45 +137,61 @@ if [ "$1" == "help" ] || [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
     exit 0
 fi
 
-SERVICE_NAME=$1
-ACTION=$2
+COMMAND=$1
+OBJECT=$2
 
-if [ "$SERVICE_NAME" == "base" ]; then
-    if [ "$ACTION" == "rebuild" ]; then
-        rebuild_base
-    else
-        print_message "${RED}" "ACHTUNG! Invalid action for base. Use 'rebuild'."
-        print_help
-        exit 1
-    fi
-    exit 0
-fi
+# Validate command
+case "$COMMAND" in
+    restart|redeploy|full-redeploy)
+        # These commands require a service name
+        if [ -z "$OBJECT" ]; then
+            print_message "${RED}" "ERROR: Command '$COMMAND' requires a service name"
+            echo ""
+            print_help
+            exit 1
+        fi
 
-SERVICES=$(docker compose config --services | grep -E "^(blacksmith_web|uniframe_studio|the_viper_room)$")
-if ! echo "$SERVICES" | grep -q "$SERVICE_NAME"; then
-    print_message "${RED}" "ACHTUNG! Service '$SERVICE_NAME' does not exist."
-    print_message "${YELLOW}" "Available services:"
-    echo "$SERVICES"
-    exit 1
-fi
-
-if [ -z "$ACTION" ]; then
-    print_message "${RED}" "ACHTUNG! No action specified."
-    print_help
-    exit 1
-fi
-
-case "$ACTION" in
-    restart)
-        restart_service $SERVICE_NAME
+        # Validate service exists
+        SERVICES=$(docker compose config --services | grep -E "^(blacksmith_web|uniframe_studio|the_viper_room)$")
+        if ! echo "$SERVICES" | grep -q "^${OBJECT}$"; then
+            print_message "${RED}" "ERROR: Service '$OBJECT' does not exist"
+            print_message "${YELLOW}" "Available services:"
+            echo "$SERVICES"
+            exit 1
+        fi
         ;;
-    redeploy)
-        redeploy_service $SERVICE_NAME
+    rebuild)
+        # rebuild command expects 'base' as object
+        if [ "$OBJECT" != "base" ]; then
+            print_message "${RED}" "ERROR: Command 'rebuild' only supports 'base' as object"
+            echo "Usage: ./the_forge_manager.sh rebuild base"
+            exit 1
+        fi
         ;;
     *)
-        print_message "${RED}" "ACHTUNG! Invalid action: $ACTION"
+        print_message "${RED}" "ERROR: Unknown command: $COMMAND"
+        echo ""
         print_help
         exit 1
+        ;;
+esac
+
+# ============================================================================
+# Execute command
+# ============================================================================
+
+case "$COMMAND" in
+    restart)
+        restart_service $OBJECT
+        ;;
+    redeploy)
+        redeploy_service $OBJECT
+        ;;
+    rebuild)
+        rebuild_base
+        ;;
+    full-redeploy)
+        full_redeploy_service $OBJECT
         ;;
 esac
 
