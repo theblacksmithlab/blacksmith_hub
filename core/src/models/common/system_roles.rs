@@ -150,7 +150,8 @@ pub enum TheViperRoomRoleType {
     ExtractingNews,
     SystemNicknameGeneration,
     CreatingPodcast,
-    CheckUsefulness,
+    CheckPublicUsefulness,
+    CheckPrivateUsefulness,
 }
 
 impl TheViperRoomRoleType {
@@ -160,7 +161,8 @@ impl TheViperRoomRoleType {
             TheViperRoomRoleType::ExtractingNews => "extracting_news",
             TheViperRoomRoleType::SystemNicknameGeneration => "system_nickname_generation",
             TheViperRoomRoleType::CreatingPodcast => "creating_podcast_xml",
-            TheViperRoomRoleType::CheckUsefulness => "system_role_usefulness",
+            TheViperRoomRoleType::CheckPublicUsefulness => "system_role_public_usefulness",
+            TheViperRoomRoleType::CheckPrivateUsefulness => "system_role_private_usefulness",
         }
     }
 }
