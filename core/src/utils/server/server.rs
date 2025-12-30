@@ -5,23 +5,38 @@ use axum::response::IntoResponse;
 use axum::Router;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tower_http::cors::{AllowHeaders, CorsLayer};
+use tower_http::cors::{AllowHeaders, AllowOrigin, CorsLayer};
 use tracing::info;
 
 pub async fn start_server(server_app_state: Arc<ServerAppState>, app: Router) -> Result<()> {
-    let allowed_origins = server_app_state
+    let has_wildcard = server_app_state
         .config
         .cors
         .allowed_origins
         .iter()
-        .filter_map(|origin| origin.parse::<HeaderValue>().ok())
-        .collect::<Vec<_>>();
+        .any(|origin| origin == "*");
 
-    let cors = CorsLayer::new()
-        .allow_origin(allowed_origins)
-        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-        .allow_headers(AllowHeaders::any())
-        .allow_credentials(false);
+    let cors = if has_wildcard {
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::any())
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+            .allow_headers(AllowHeaders::any())
+            .allow_credentials(false)
+    } else {
+        let allowed_origins = server_app_state
+            .config
+            .cors
+            .allowed_origins
+            .iter()
+            .filter_map(|origin| origin.parse::<HeaderValue>().ok())
+            .collect::<Vec<_>>();
+
+        CorsLayer::new()
+            .allow_origin(allowed_origins)
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+            .allow_headers(AllowHeaders::any())
+            .allow_credentials(false)
+    };
 
     let app = app.fallback(handler_404).layer(cors);
 

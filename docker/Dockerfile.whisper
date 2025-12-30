@@ -121,7 +121,7 @@ COPY --from=builder /tmp/whisper .
 COPY --from=whisper-builder /tmp/whisper/whisper.cpp /app/whisper.cpp
 
 # Set library path so whisper-cli can find its shared libraries
-ENV LD_LIBRARY_PATH="/app/whisper.cpp/build/src:/app/whisper.cpp/build/ggml/src:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="/app/whisper.cpp/build/src:/app/whisper.cpp/build/ggml/src"
 
 # Set default whisper model path
 ARG WHISPER_MODEL=medium
