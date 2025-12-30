@@ -25,7 +25,7 @@ print_help() {
     echo "  stop             - Stop whisper service"
     echo "  restart          - Restart whisper service (no rebuild)"
     echo "  rebuild [MODEL]  - Rebuild whisper image and restart"
-    echo "                     MODEL: base|small|medium|large (default: medium)"
+    echo "                     MODEL: base|small|medium|large (default: small)"
     echo "  logs             - Show whisper service logs"
     echo "  status           - Show whisper service status"
     echo "  help             - Show this help"
@@ -38,8 +38,8 @@ print_help() {
     echo ""
     print_message "${BLUE}" "Model sizes:"
     echo "  base   - 142 MB  (fast, lower quality)"
-    echo "  small  - 466 MB  (balanced)"
-    echo "  medium - 1.5 GB  (best quality, default)"
+    echo "  small  - 466 MB  (balanced, default)"
+    echo "  medium - 1.5 GB  (better quality, slower)"
     echo "  large  - 2.9 GB  (maximum quality)"
 }
 
@@ -74,7 +74,7 @@ restart_service() {
 # Command: rebuild
 # ============================================================================
 rebuild_service() {
-    local model=${1:-medium}
+    local model=${1:-small}
 
     print_message "${GREEN}" "Rebuilding whisper service with model: $model..."
 

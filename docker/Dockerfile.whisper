@@ -43,8 +43,8 @@ RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
     make
 
-# Download whisper model (medium by default for better quality)
-ARG WHISPER_MODEL=medium
+# Download whisper model (small by default - good balance)
+ARG WHISPER_MODEL=small
 RUN cd whisper.cpp && \
     bash ./models/download-ggml-model.sh ${WHISPER_MODEL}
 
@@ -124,7 +124,7 @@ COPY --from=whisper-builder /tmp/whisper/whisper.cpp /app/whisper.cpp
 ENV LD_LIBRARY_PATH="/app/whisper.cpp/build/src:/app/whisper.cpp/build/ggml/src"
 
 # Set default whisper model path
-ARG WHISPER_MODEL=medium
+ARG WHISPER_MODEL=small
 ENV WHISPER_MODEL_PATH="/app/whisper.cpp/models/ggml-${WHISPER_MODEL}.bin"
 
 RUN chown -R 1001:1000 /app/whisper.cpp && \

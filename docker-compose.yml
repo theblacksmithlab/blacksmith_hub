@@ -46,14 +46,14 @@ services:
       context: .
       dockerfile: docker/Dockerfile.whisper
       args:
-        WHISPER_MODEL: medium
+        WHISPER_MODEL: small
     container_name: whisper_service
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          cpus: '4'
-          memory: 4G
+          cpus: '2'
+          memory: 2G
     logging:
       driver: "json-file"
       options:
