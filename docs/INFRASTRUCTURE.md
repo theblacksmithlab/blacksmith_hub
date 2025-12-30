@@ -20,8 +20,9 @@ Nginx выступает как reverse proxy для всех сервисов, 
 | `/api/uniframe/*` | uniframe_studio | 8080 | HTTPS |
 | `/the_viper_room_user_request`, `/the_viper_room_avatar_request` | the_viper_room | 3001 | HTTPS |
 | `/user_action`, `/get_user_avatar`, `/blacksmith_web_*` | blacksmith_web | 3000 | HTTPS |
-| `/whisper/*` | whisper_service | 9000 | HTTP |
 | `/` (default) | Static files | - | - |
+
+**Примечание:** Whisper сервис (порт 9000) доступен только внутри docker-compose network и не проксируется через nginx.
 
 ### Домены
 
@@ -53,12 +54,6 @@ Nginx выступает как reverse proxy для всех сервисов, 
 - Send: 600s
 - Read: 600s
 - Причина: длительные AI-запросы и обработка
-
-**Whisper Service:**
-- Connect: 60s
-- Send: 60s
-- Read: 60s
-- Причина: транскрипция голосовых сообщений (обычно < 30 секунд)
 
 ### Логи
 
@@ -136,20 +131,6 @@ server {
         send_timeout 600s;
     }
 
-    # Whisper Service (internal service for transcription)
-    location /whisper/ {
-        proxy_pass http://127.0.0.1:9000/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-        client_max_body_size 10M;  # Allow audio file uploads
-    }
-
     # Static files
     location / {
         root /var/www/html;
@@ -162,13 +143,18 @@ server {
 
 ## Docker Networks
 
-Все сервисы работают в Docker и слушают localhost:
-- **uniframe_studio:** `127.0.0.1:8080`
-- **the_viper_room:** `127.0.0.1:3001`
-- **blacksmith_web:** `127.0.0.1:3000`
-- **whisper_service:** `127.0.0.1:9000` (внутренний сервис для транскрипции)
-- **Боты:** не имеют HTTP интерфейса, работают через Telegram API
-- **Агенты:** не имеют HTTP интерфейса, работают через Telegram User API
+### Сервисы с внешним доступом (через nginx):
+- **uniframe_studio:** `127.0.0.1:8080` → nginx → `/api/uniframe/`
+- **the_viper_room:** `127.0.0.1:3001` → nginx → `/the_viper_room_*`
+- **blacksmith_web:** `127.0.0.1:3000` → nginx → `/user_action`, `/blacksmith_web_*`
+
+### Внутренние сервисы (только docker-compose network):
+- **whisper:** `whisper:9000` - доступен только для ботов внутри docker-compose
+- **qdrant:** `qdrant:6333` - векторная БД для RAG-системы
+
+### Сервисы без HTTP интерфейса:
+- **Боты** (probiot_bot, groot_bot, the_viper_room_bot) - работают через Telegram Bot API
+- **Агенты** (agent_davon) - работают через Telegram User API
 
 ---
 
@@ -247,12 +233,6 @@ sudo ufw allow 22/tcp   # SSH
 sudo ufw status
 ```
 
-### Рекомендации
-1. Регулярно обновлять сертификаты (certbot делает автоматически)
-2. Мониторить логи на подозрительную активность
-3. Использовать fail2ban для защиты от брутфорса
-4. Регулярно обновлять Nginx: `sudo apt update && sudo apt upgrade nginx`
-
 ---
 
 ---
@@ -263,15 +243,16 @@ sudo ufw status
 Внутренний микросервис для транскрипции голосовых сообщений. Используется всеми Telegram ботами (probiot_bot, the_viper_room_bot, groot_bot).
 
 ### Конфигурация
-- **Порт:** 9000
+- **Порт:** 9000 (только внутри docker-compose network)
 - **Endpoint:** `POST /transcribe`
-- **Модель:** ggml-medium.bin (1.5 GB) - лучшее качество транскрипции
+- **Модель:** ggml-small.bin (466 MB) - оптимальный баланс скорости и качества
 - **Язык:** русский
+- **Доступ:** только внутри docker-compose через `http://whisper:9000`
 
-### Использование
+### Использование из ботов
 ```bash
 # Внутренний вызов из ботов (через WHISPER_SERVICE_URL)
-curl -X POST http://127.0.0.1:9000/transcribe \
+curl -X POST http://whisper:9000/transcribe \
   -F "audio=@voice_message.ogg"
 
 # Ответ:
@@ -282,25 +263,40 @@ curl -X POST http://127.0.0.1:9000/transcribe \
 ```
 
 ### Environment Variables
-- `WHISPER_MODEL_PATH` - путь к модели (default: /app/whisper.cpp/models/ggml-medium.bin)
-- `WHISPER_SERVICE_URL` - URL сервиса для клиентов (default: http://127.0.0.1:9000)
-
-### Модели
-Можно выбрать модель при сборке Docker-образа:
+Добавить в `.env` для ботов:
 ```bash
-# Medium (default) - лучшее качество, 1.5 GB
-docker build --build-arg WHISPER_MODEL=medium -f docker/Dockerfile.whisper -t whisper:latest .
-
-# Base - быстрее, но хуже качество, 142 MB
-docker build --build-arg WHISPER_MODEL=base -f docker/Dockerfile.whisper -t whisper:latest .
-
-# Small - баланс качество/скорость, 466 MB
-docker build --build-arg WHISPER_MODEL=small -f docker/Dockerfile.whisper -t whisper:latest .
+WHISPER_SERVICE_URL=http://whisper:9000
 ```
+
+**Важно:** Используй `http://whisper:9000` (имя сервиса), а не `127.0.0.1`!
+
+### Управление через docker-compose
+```bash
+# Запустить
+./whisper_manager.sh start
+# или
+docker-compose up -d whisper
+
+# Пересобрать с другой моделью
+./whisper_manager.sh rebuild small   # 466 MB (default)
+./whisper_manager.sh rebuild medium  # 1.5 GB (лучше качество)
+./whisper_manager.sh rebuild base    # 142 MB (быстрее)
+
+# Логи
+./whisper_manager.sh logs
+
+# Статус
+./whisper_manager.sh status
+```
+
+### Доступные модели
+- **small** (466 MB) - default, оптимальный баланс
+- **medium** (1.5 GB) - лучшее качество, медленнее
+- **base** (142 MB) - быстро, ниже качество
+- **large** (2.9 GB) - максимальное качество
 
 ---
 
-**Версия документа:** 1.2
+**Версия документа:** 1.3
 **Дата создания:** 2025-11-23
 **Последнее обновление:** 2025-12-30
-**Изменения в 1.2:** Добавлен Whisper Service (порт 9000) для транскрипции голосовых сообщений

@@ -69,8 +69,8 @@ docker-compose logs -f whisper
 ./whisper_manager.sh start
 
 # Пересборка с другой моделью
-./whisper_manager.sh rebuild small    # 466 MB
-./whisper_manager.sh rebuild medium   # 1.5 GB (default)
+./whisper_manager.sh rebuild small    # 466 MB (default)
+./whisper_manager.sh rebuild medium   # 1.5 GB
 
 # Просмотр статуса
 ./whisper_manager.sh status
@@ -99,7 +99,7 @@ cors:
 
 | Переменная | Значение по умолчанию | Описание |
 |------------|----------------------|----------|
-| `WHISPER_MODEL_PATH` | `/app/whisper.cpp/models/ggml-medium.bin` | Путь к модели whisper |
+| `WHISPER_MODEL_PATH` | `/app/whisper.cpp/models/ggml-small.bin` | Путь к модели whisper |
 | `CONFIG_PATH` | `/app/config.yaml` | Путь к конфигу (опционально) |
 
 ---
