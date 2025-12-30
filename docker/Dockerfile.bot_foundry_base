@@ -86,6 +86,7 @@ COPY core core/
 COPY the_forge the_forge/
 COPY bot_foundry bot_foundry/
 COPY agent_foundry agent_foundry/
+COPY tooling/whisper tooling/whisper/
 
 # Build bot_foundry with cache mounts for incremental compilation
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
