@@ -39,7 +39,7 @@ impl FromStr for AppName {
             "the_viper_room" => Ok(AppName::TheViperRoom),
             "the_viper_room_bot" => Ok(AppName::TheViperRoomBot),
             "w3a_web" => Ok(AppName::W3AWeb),
-            "blacksmith_web" => Ok(AppName::BlacksmithWeb),
+            "blacksmith_web" | "bls_web" => Ok(AppName::BlacksmithWeb),
             "groot_bot" => Ok(AppName::GrootBot),
             "uniframe_studio" => Ok(AppName::UniframeStudio),
             "agent_davon" => Ok(AppName::AgentDavon),
