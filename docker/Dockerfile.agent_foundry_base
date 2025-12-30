@@ -1,4 +1,55 @@
-FROM rust:latest AS builder
+# =============================================================================
+# Stage 1: cargo-chef planner - analyze dependencies
+# =============================================================================
+FROM rust:bookworm AS planner
+
+RUN cargo install cargo-chef --locked
+WORKDIR /usr/src/app
+
+# Copy only Cargo files for dependency analysis
+COPY Cargo.toml Cargo.lock ./
+COPY core/Cargo.toml core/Cargo.toml
+COPY bot_foundry/Cargo.toml bot_foundry/Cargo.toml
+COPY the_forge/Cargo.toml the_forge/Cargo.toml
+COPY agent_foundry/Cargo.toml agent_foundry/Cargo.toml
+COPY tooling/whisper/Cargo.toml tooling/whisper/Cargo.toml
+
+# Create dummy source files
+RUN mkdir -p core/src bot_foundry/src the_forge/src agent_foundry/src tooling/whisper/src && \
+    echo "fn main() {}" > bot_foundry/src/main.rs && \
+    echo "fn main() {}" > the_forge/src/main.rs && \
+    echo "fn main() {}" > agent_foundry/src/main.rs && \
+    echo "fn main() {}" > tooling/whisper/src/main.rs && \
+    echo "pub fn dummy() {}" > core/src/lib.rs
+
+# Generate dependency recipe
+RUN cargo chef prepare --recipe-path recipe.json
+
+# =============================================================================
+# Stage 2: Build Rust dependencies (CACHED!)
+# =============================================================================
+FROM rust:bookworm AS cacher
+
+RUN cargo install cargo-chef --locked
+
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl3 \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/app
+COPY --from=planner /usr/src/app/recipe.json recipe.json
+
+# Build dependencies - this layer is heavily cached!
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo chef cook --release --recipe-path recipe.json -p agent_foundry
+
+# =============================================================================
+# Stage 3: Build agent_foundry application
+# =============================================================================
+FROM rust:bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config \
@@ -8,15 +59,27 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /usr/src/app
 
-COPY Cargo.toml Cargo.lock ./
+# Copy cached dependencies from cacher stage
+COPY --from=cacher /usr/src/app/target target
 
+# Copy source code
+COPY Cargo.toml Cargo.lock ./
 COPY core core/
 COPY the_forge the_forge/
 COPY bot_foundry bot_foundry/
 COPY agent_foundry agent_foundry/
+COPY tooling/whisper tooling/whisper/
 
-RUN cargo build -p agent_foundry --release -j 4
+# Build agent_foundry with cache mounts for incremental compilation
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/usr/src/app/target,sharing=locked \
+    cargo build -p agent_foundry --release -j 4 && \
+    cp target/release/agent_foundry /tmp/agent_foundry
 
+# =============================================================================
+# Stage 4: Runtime image
+# =============================================================================
 FROM debian:bookworm-slim AS agent_foundry_base
 
 RUN apt-get update && apt-get install -y \
@@ -27,7 +90,8 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY --from=builder /usr/src/app/target/release/agent_foundry .
+# Copy binary from builder
+COPY --from=builder /tmp/agent_foundry .
 
 RUN mkdir -p tmp && \
     chown 1001:1000 tmp && \

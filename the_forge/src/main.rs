@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         "w3a_web" => {
-            info!("W3A Web is serving by 'Blacksmith Web' App ...");
+            info!("W3A Web is serving by 'Blacksmith Web' App...");
             return Ok(());
         }
         _ => return Err(anyhow!("Unknown APP_NAME: {}", app_name_str)),

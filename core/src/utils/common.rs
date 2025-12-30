@@ -11,7 +11,6 @@ use pulldown_cmark::{html, Parser};
 use std::env;
 use std::fs::{read_to_string, remove_file};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -159,8 +158,8 @@ pub async fn get_user_avatar(
 ) -> Result<Json<AvatarResponse>, StatusCode> {
     let user_id = params.user_id.to_string();
 
-    let bot_token = env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM")
-        .expect("TELOXIDE_TOKEN_THE_VIPER_ROOM must be set in the environment");
+    let bot_token = env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM_BOT")
+        .expect("TELOXIDE_TOKEN_THE_VIPER_ROOM_BOT must be set in the environment");
 
     let url = format!(
         "https://api.telegram.org/bot{}/getUserProfilePhotos?user_id={}",
@@ -249,52 +248,11 @@ pub fn split_text_into_chunks(text: &str, max_chars: usize) -> Vec<String> {
     chunks
 }
 
-pub fn convert_to_wav(file_path: &Path) -> Result<PathBuf> {
-    let mut wav_path = file_path.to_path_buf();
-    wav_path.set_extension("wav");
-
-    let output = Command::new("ffmpeg")
-        .arg("-i")
-        .arg(file_path)
-        .arg("-ar")
-        .arg("16000")
-        .arg(&wav_path)
-        .output();
-
-    match output {
-        Ok(output) if output.status.success() => Ok(wav_path),
-        Ok(output) => Err(anyhow::anyhow!(
-            "FFmpeg conversion failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )),
-        Err(err) => Err(anyhow::anyhow!("Failed to execute FFmpeg: {}", err)),
-    }
-}
-
-pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
-    let output = Command::new("whisper-cli").arg("--help").output();
-
-    match output {
-        Ok(output) if output.status.success() => Ok(()),
-        Ok(output) => Err(anyhow::anyhow!(
-            "Whisper CLI failed to respond correctly: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )),
-        Err(err) => Err(anyhow::anyhow!("Whisper CLI not found: {}", err)),
-    }
-}
-
 pub async fn transcribe_voice_message(file_path: &Path) -> Result<Option<String>> {
-    check_whisper_installed()?;
-
-    let wav_path = convert_to_wav(file_path)?;
-
-    let transcription = speech_to_text(&wav_path).await?;
+    let transcription = speech_to_text(file_path).await?;
 
     remove_file(file_path).ok();
     info!("Successfully removed file: {:?}", file_path);
-    remove_file(&wav_path).ok();
-    info!("Successfully removed file: {:?}", &wav_path);
 
     if transcription.trim().is_empty() {
         info!("Voice message transcription is empty, looks like user sent message by mistake");

@@ -44,7 +44,14 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
                 "Processing {} channels for podcast generation",
                 channels.len()
             );
-            processing_dialogs(&client, channels, app_state.clone(), user_tmp_dir.clone()).await?;
+            processing_dialogs(
+                &client,
+                channels,
+                app_state.clone(),
+                user_tmp_dir.clone(),
+                recipient,
+            )
+            .await?;
         }
         Recipient::Private(user_id) => {
             info!("Fetching channels for user {} from database", user_id);
@@ -52,7 +59,14 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
                 let chats = get_user_dialogs_from_db(&client, *user_id, pool).await?;
 
                 info!("Processing {} channels for podcast generation", chats.len());
-                processing_chats(&client, chats, app_state.clone(), user_tmp_dir.clone()).await?;
+                processing_chats(
+                    &client,
+                    chats,
+                    app_state.clone(),
+                    user_tmp_dir.clone(),
+                    recipient,
+                )
+                .await?;
             } else {
                 return Err(anyhow::anyhow!(
                     "Database pool is required for private podcast generation"

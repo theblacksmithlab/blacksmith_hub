@@ -22,6 +22,8 @@ Nginx выступает как reverse proxy для всех сервисов, 
 | `/user_action`, `/get_user_avatar`, `/blacksmith_web_*` | blacksmith_web | 3000 | HTTPS |
 | `/` (default) | Static files | - | - |
 
+**Примечание:** Whisper сервис (порт 9000) доступен только внутри docker-compose network и не проксируется через nginx.
+
 ### Домены
 
 - **api.blacksmith-lab.com** - основной API домен
@@ -141,12 +143,18 @@ server {
 
 ## Docker Networks
 
-Все сервисы работают в Docker и слушают localhost:
-- **uniframe_studio:** `127.0.0.1:8080`
-- **the_viper_room:** `127.0.0.1:3001`
-- **blacksmith_web:** `127.0.0.1:3000`
-- **Боты:** не имеют HTTP интерфейса, работают через Telegram API
-- **Агенты:** не имеют HTTP интерфейса, работают через Telegram User API
+### Сервисы с внешним доступом (через nginx):
+- **uniframe_studio:** `127.0.0.1:8080` → nginx → `/api/uniframe/`
+- **the_viper_room:** `127.0.0.1:3001` → nginx → `/the_viper_room_*`
+- **blacksmith_web:** `127.0.0.1:3000` → nginx → `/user_action`, `/blacksmith_web_*`
+
+### Внутренние сервисы (только docker-compose network):
+- **whisper:** `whisper:9000` - доступен только для ботов внутри docker-compose
+- **qdrant:** `qdrant:6333` - векторная БД для RAG-системы
+
+### Сервисы без HTTP интерфейса:
+- **Боты** (probiot_bot, groot_bot, the_viper_room_bot) - работают через Telegram Bot API
+- **Агенты** (agent_davon) - работают через Telegram User API
 
 ---
 
@@ -155,7 +163,6 @@ server {
 ### Применение изменений Nginx
 
 ```bash
-# Проверить конфиг на ошибки
 sudo nginx -t
 
 # Перезагрузить конфигурацию (без downtime)
@@ -178,10 +185,8 @@ sudo certbot certificates
 ### Просмотр логов
 
 ```bash
-# Access log (последние 100 строк)
 sudo tail -n 100 /var/log/nginx/api.blacksmith-lab.com.access.log
 
-# Error log (в реальном времени)
 sudo tail -f /var/log/nginx/api.blacksmith-lab.com.error.log
 ```
 
@@ -216,24 +221,90 @@ sudo journalctl -u nginx -n 50
 
 ### Firewall (ufw)
 ```bash
-# Разрешенные порты
 sudo ufw allow 80/tcp   # HTTP
 sudo ufw allow 443/tcp  # HTTPS
 sudo ufw allow 22/tcp   # SSH
 
-# Проверить статус
 sudo ufw status
 ```
 
-### Рекомендации
-1. Регулярно обновлять сертификаты (certbot делает автоматически)
-2. Мониторить логи на подозрительную активность
-3. Использовать fail2ban для защиты от брутфорса
-4. Регулярно обновлять Nginx: `sudo apt update && sudo apt upgrade nginx`
+---
 
 ---
 
-**Версия документа:** 1.1
+## Whisper Service
+
+### Назначение
+Внутренний микросервис для транскрипции голосовых сообщений. Используется всеми Telegram ботами (probiot_bot, the_viper_room_bot, groot_bot).
+
+### Интеграция в инфраструктуру
+
+**Docker-compose конфигурация:**
+```yaml
+whisper:
+  build:
+    context: .
+    dockerfile: docker/Dockerfile.whisper
+    args:
+      WHISPER_MODEL: small
+  container_name: whisper_service
+  restart: unless-stopped
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+```
+
+**Networking:**
+- **Внутренний доступ:** `http://whisper:9000` (только docker-compose network)
+- **Внешний доступ:** НЕТ (не проксируется через nginx)
+- **Используется:** ботами внутри docker-compose
+
+**Environment Variables для ботов:**
+
+Добавить в `.env`:
+```bash
+WHISPER_SERVICE_URL=http://whisper:9000
+```
+
+**⚠️ Важно:** Используй `http://whisper:9000` (имя сервиса в docker-compose), а не `127.0.0.1`!
+
+### Управление
+
+```bash
+# Запуск/остановка
+./whisper_manager.sh start
+./whisper_manager.sh stop
+./whisper_manager.sh restart
+
+# Логи и статус
+./whisper_manager.sh logs
+./whisper_manager.sh status
+
+# Пересборка с другой моделью
+./whisper_manager.sh rebuild small   # default
+./whisper_manager.sh rebuild medium  # лучше качество
+```
+
+### Дополнительная информация
+
+**📖 Полная документация:** [tooling/whisper/README.md](../tooling/whisper/README.md)
+- API спецификация
+- Сравнение моделей
+- Примеры интеграции
+- Troubleshooting
+- Производительность
+
+---
+
+**Версия документа:** 1.4
 **Дата создания:** 2025-11-23
-**Последнее обновление:** 2025-11-27
-**Изменения в 1.1:** Добавлен The Viper Room сервер (порт 3001), исправлена маршрутизация эндпоинтов
+**Последнее обновление:** 2025-12-30
+
+**История изменений:**
+- **1.4 (2025-12-30):** Реорганизация Whisper документации - инфраструктура в INFRASTRUCTURE.md, API в tooling/whisper/README.md
+- **1.3 (2025-12-30):** Whisper Service - переход на docker-compose, модель small
+- **1.2 (2025-12-30):** Добавлен Whisper Service
+- **1.1:** Добавлен Uniframe Studio
+- **1.0 (2025-11-23):** Первая версия

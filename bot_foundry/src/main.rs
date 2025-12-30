@@ -82,8 +82,8 @@ async fn main() -> Result<()> {
     }
 
     let qdrant_client = Arc::new(
-        Qdrant::from_url(&env::var("QDRANT_URL")?) // point at local var in .env QDRANT_URL=http://localhost:6333
-            .api_key(env::var("QDRANT_API_KEY")?) // delete to use local qdrant
+        Qdrant::from_url(&env::var("QDRANT_CLOUD_URL")?)
+            .api_key(env::var("QDRANT_API_KEY")?)
             .build()?,
     );
 

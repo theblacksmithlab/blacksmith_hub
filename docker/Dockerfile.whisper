@@ -35,12 +35,18 @@ RUN apt-get update && apt-get install -y \
     cmake \
     make \
     g++ \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/whisper
 RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
     cd whisper.cpp && \
     make
+
+# Download whisper model (small by default - good balance)
+ARG WHISPER_MODEL=small
+RUN cd whisper.cpp && \
+    bash ./models/download-ggml-model.sh ${WHISPER_MODEL}
 
 # =============================================================================
 # Stage 3: Build Rust dependencies (CACHED!)
@@ -61,10 +67,10 @@ COPY --from=planner /usr/src/app/recipe.json recipe.json
 # Build dependencies - this layer is heavily cached!
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
-    cargo chef cook --release --recipe-path recipe.json -p bot_foundry
+    cargo chef cook --release --recipe-path recipe.json -p whisper
 
 # =============================================================================
-# Stage 4: Build Rust application ONLY (whisper is cached separately!)
+# Stage 4: Build Rust application
 # =============================================================================
 FROM rust:bookworm AS builder
 
@@ -72,7 +78,6 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl3 \
     libssl-dev \
-    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
@@ -88,17 +93,17 @@ COPY bot_foundry bot_foundry/
 COPY agent_foundry agent_foundry/
 COPY tooling/whisper tooling/whisper/
 
-# Build bot_foundry with cache mounts for incremental compilation
+# Build whisper service with cache mounts for incremental compilation
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/usr/src/app/target,sharing=locked \
-    cargo build -p bot_foundry --release -j 4 && \
-    cp target/release/bot_foundry /tmp/bot_foundry
+    cargo build -p whisper --release -j 4 && \
+    cp target/release/whisper /tmp/whisper
 
 # =============================================================================
 # Stage 5: Runtime image
 # =============================================================================
-FROM debian:bookworm-slim AS bot_foundry_base
+FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \
@@ -110,28 +115,39 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy Rust binary from builder
-COPY --from=builder /tmp/bot_foundry .
+COPY --from=builder /tmp/whisper .
 
-# Copy whisper from INDEPENDENT whisper-builder stage
+# Copy whisper from whisper-builder stage
 COPY --from=whisper-builder /tmp/whisper/whisper.cpp /app/whisper.cpp
 
 # Set library path so whisper-cli can find its shared libraries
-ENV LD_LIBRARY_PATH="/app/whisper.cpp/build/src:/app/whisper.cpp/build/ggml/src:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="/app/whisper.cpp/build/src:/app/whisper.cpp/build/ggml/src"
+
+# Set default whisper model path
+ARG WHISPER_MODEL=small
+ENV WHISPER_MODEL_PATH="/app/whisper.cpp/models/ggml-${WHISPER_MODEL}.bin"
 
 RUN chown -R 1001:1000 /app/whisper.cpp && \
     chmod -R 755 /app/whisper.cpp
 
 RUN ln -s /app/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
 
+# Copy config
+COPY tooling/whisper/config.yaml /app/config.yaml
+
 RUN mkdir -p tmp && \
     chown 1001:1000 tmp && \
     chmod 700 tmp && \
     chown 1001:1000 /app && \
-    chmod 755 /app
+    chmod 755 /app && \
+    chown 1001:1000 /app/whisper && \
+    chmod +x /app/whisper
 
-COPY docker/bot_foundry_entrypoint.sh ./entrypoint.sh
+COPY docker/whisper_entrypoint.sh ./entrypoint.sh
 RUN chmod +x entrypoint.sh
 
 USER 1001:1000
+
+EXPOSE 9000
 
 ENTRYPOINT ["./entrypoint.sh"]

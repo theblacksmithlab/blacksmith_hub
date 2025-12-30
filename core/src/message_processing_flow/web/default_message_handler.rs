@@ -1,10 +1,12 @@
 use crate::local_db::local_db::save_message_to_db;
 use crate::message_processing_flow::message_processing_flow::process_user_raw_request;
 use crate::models::common::app_name::AppName;
+use crate::models::common::system_messages::{AppsSystemMessages, CommonMessages};
 use crate::state::blacksmith_web::app_state::BlacksmithWebAppState;
-use crate::utils::common::markdown_to_html;
+use crate::utils::common::{get_message, markdown_to_html};
 use crate::utils::tg_bot::tg_bot::add_llm_response_to_cache;
 use crate::utils::tg_bot::tg_bot::append_footer_if_needed;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -13,7 +15,7 @@ pub async fn default_message_handler(
     app_state: Arc<BlacksmithWebAppState>,
     user_id: &str,
     app_name: &AppName,
-) -> (String, Vec<String>) {
+) -> (String, HashMap<String, String>) {
     info!(
         "Message received from user: {} is a text message. Processing it...",
         user_id
@@ -66,11 +68,17 @@ pub async fn default_message_handler(
         Err(err) => {
             error!("Error processing text request from user: {}", err);
 
-            let error_msg_for_user = "В данный момент на сервере проводятся технические работы.\n\
-            Пожалуйста, повторите попытку позднее, мы работаем для Вас 🙏"
-                .to_string();
+            let error_msg_for_user = get_message(AppsSystemMessages::Common(
+                CommonMessages::ServiceUnavailable,
+            ))
+            .await
+            .unwrap_or_else(|_| {
+                "В данный момент на сервере проводятся технические работы.\n\
+                Пожалуйста, повторите попытку позднее, мы работаем для Вас 🙏"
+                    .to_string()
+            });
 
-            (error_msg_for_user, Vec::new())
+            (error_msg_for_user, HashMap::new())
         }
     }
 }

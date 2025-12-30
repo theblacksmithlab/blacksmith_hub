@@ -19,7 +19,6 @@ common_res/the_viper_room/daily_public_podcast/
 common_res/groot_bot/current.session
 common_res/agent_davon/current.session
 common_res/the_viper_room/background_music.mp3
-common_res/w3a/w3a_qdrant_index.json
 DEV_NOTES.md
 *.log
 certs/

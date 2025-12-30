@@ -31,8 +31,8 @@ impl ContextBuilder for DefaultContextBuilder {
                 DocumentType::HybridSearch(d) => {
                     let mut header = format!("=== {} ===", d.metadata.title);
 
-                    if let Some(extra) = &d.metadata.extra {
-                        header.push_str(&format!("\n{}", extra));
+                    if let Some(hierarchy) = &d.metadata.hierarchy {
+                        header.push_str(&format!("\n{}", hierarchy));
                     }
 
                     format!("{}\n\n{}", header, d.text)

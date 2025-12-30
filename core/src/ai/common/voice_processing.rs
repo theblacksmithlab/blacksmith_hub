@@ -5,7 +5,9 @@ use anyhow::anyhow;
 use async_openai::types::{CreateSpeechRequestArgs, CreateSpeechResponse, SpeechModel, Voice};
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{Duration, Utc};
+use reqwest::multipart;
 use reqwest::Client as ReqwestClient;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -218,6 +220,12 @@ pub async fn simple_openai_tts<T: OpenAIClientInit + Send + Sync>(
     Ok(response)
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct WhisperTranscribeResponse {
+    text: String,
+    duration_ms: u128,
+}
+
 pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
     let start = Instant::now();
 
@@ -228,40 +236,48 @@ pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
         ));
     }
 
-    let model_path = std::env::var("WHISPER_MODEL_PATH")
-        .unwrap_or_else(|_| "/root/projects/whisper.cpp/models/ggml-base.bin".to_string());
+    let whisper_url = std::env::var("WHISPER_SERVICE_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:9000".to_string());
 
-    let output = Command::new("whisper-cli")
-        .arg("-m")
-        .arg(model_path)
-        .arg("-f")
-        .arg(file_path)
-        .arg("-l")
-        .arg("ru")
-        .arg("--no-timestamps")
-        .output();
+    info!("Using whisper service at: {}", whisper_url);
 
-    match output {
-        Ok(output) if output.status.success() => {
-            info!("Transcription took: {:?}", start.elapsed());
+    let audio_data = fs::read(file_path)?;
 
-            let stdout = String::from_utf8(output.stdout)?;
+    let file_name = file_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("audio.ogg");
 
-            if stdout.trim().is_empty() {
-                Ok("Empty text".to_string())
-            } else {
-                Ok(stdout)
-            }
-        }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            error!("Whisper CLI failed: {}", stderr);
-            Err(anyhow!("Whisper CLI failed: {}", stderr))
-        }
-        Err(err) => {
-            error!("Failed to execute Whisper CLI: {}", err);
-            Err(anyhow!("Failed to execute Whisper CLI: {}", err))
-        }
+    let part = multipart::Part::bytes(audio_data)
+        .file_name(file_name.to_string())
+        .mime_str("audio/ogg")?;
+
+    let form = multipart::Form::new().part("audio", part);
+
+    let client = ReqwestClient::new();
+    let response = client
+        .post(format!("{}/transcribe", whisper_url))
+        .multipart(form)
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        let error_text = response.text().await?;
+        return Err(anyhow!("Whisper service error: {}", error_text));
+    }
+
+    let transcribe_response: WhisperTranscribeResponse = response.json().await?;
+
+    info!(
+        "Transcription completed in {:?} (service: {}ms)",
+        start.elapsed(),
+        transcribe_response.duration_ms
+    );
+
+    if transcribe_response.text.trim().is_empty() {
+        Ok("Empty text".to_string())
+    } else {
+        Ok(transcribe_response.text)
     }
 }
 
@@ -835,7 +851,7 @@ pub async fn merge_audio_parts(
 
     let final_path = format!("{}/{}.mp3", user_tmp_dir, final_filename);
 
-    const PAUSE_DURATION_SEC: f32 = 1.0;
+    const PAUSE_DURATION_SEC: f32 = 1.5;
 
     let mut filter_parts = Vec::new();
     let mut input_args = Vec::new();

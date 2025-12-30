@@ -16,7 +16,7 @@ pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
     app_name: AppName,
 ) -> anyhow::Result<String> {
     let llm_message = format!(
-        "Текущий запрос пользователя: {}\nИстория чата: {}",
+        "<user_request>\n{}\n</user_request>\n\n<chat_history>\n{}\n</chat_history>",
         user_raw_request, current_cache
     );
 
@@ -46,7 +46,7 @@ pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
             Ok(clarified_request)
         }
         Err(err) => {
-            error!("Error in raw_llm_processing: {}", err);
+            error!("Error while clarifying user's raw request: {}", err);
             Ok(user_raw_request.to_string())
         }
     }

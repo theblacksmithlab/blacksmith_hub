@@ -5,6 +5,21 @@ networks:
       com.docker.network.bridge.enable_ip_masquerade: "true"
 
 services:
+  qdrant:
+    image: qdrant/qdrant
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - /root/qdrant_data:/qdrant/storage
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   bot_foundry_base:
     build:
       context: .
@@ -25,6 +40,25 @@ services:
       dockerfile: docker/Dockerfile.the_forge_base
     image: the_forge_base
     profiles: [ "never-start" ]
+
+  whisper:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.whisper
+      args:
+        WHISPER_MODEL: small
+    container_name: whisper_service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   probiot_bot:
     build:
@@ -130,6 +164,8 @@ services:
       - .env
     ports:
       - "127.0.0.1:3000:3000"
+    depends_on:
+      - qdrant
     deploy:
       resources:
         limits:

@@ -374,6 +374,18 @@ where
             top_documents.len()
         );
 
+        let mut top_doc_counter = 1;
+
+        for document in &top_documents {
+            info!(
+                "Selected document ({}/{}) for final context:\n{}",
+                top_doc_counter,
+                top_documents.len(),
+                document.metadata.title
+            );
+            top_doc_counter += 1;
+        }
+
         // ============ Step 5: Retrieving full documents' content ============
         let mut final_documents = Vec::new();
 

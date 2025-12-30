@@ -3,7 +3,8 @@ members = [
     "core",
     "the_forge",
     "bot_foundry",
-    "agent_foundry"
+    "agent_foundry",
+    "tooling/whisper"
 ]
 default-members = ["the_forge"]
 
@@ -67,3 +68,4 @@ rustls = "0.23.27"
 md-5 = "0.10.6"
 url = "2.5.4"
 csv = "1.3.1"
+tempfile = "3.0"

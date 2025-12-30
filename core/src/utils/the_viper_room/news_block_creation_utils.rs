@@ -137,6 +137,7 @@ pub(crate) async fn processing_dialogs<T: OpenAIClientInit + Send + Sync>(
     channels: Vec<types::Dialog>,
     app_state: Arc<T>,
     user_tmp_dir: String,
+    recipient: Recipient,
 ) -> Result<(), anyhow::Error> {
     // info!("\nReceiving updates from each group...\n");
     // for dialog in groups {
@@ -171,6 +172,7 @@ pub(crate) async fn processing_dialogs<T: OpenAIClientInit + Send + Sync>(
                 &channel_name,
                 app_state.clone(),
                 user_tmp_dir.clone(),
+                recipient,
             )
             .await?;
         }
@@ -184,6 +186,7 @@ pub(crate) async fn processing_chats<T: OpenAIClientInit + Send + Sync>(
     chats: Vec<types::Chat>,
     app_state: Arc<T>,
     user_tmp_dir: String,
+    recipient: Recipient,
 ) -> Result<(), anyhow::Error> {
     for chat in &chats {
         if let Channel(channel) = chat {
@@ -195,6 +198,7 @@ pub(crate) async fn processing_chats<T: OpenAIClientInit + Send + Sync>(
                 &channel_name,
                 app_state.clone(),
                 user_tmp_dir.clone(),
+                recipient,
             )
             .await?;
         }
@@ -227,7 +231,7 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
 
     let now = Utc::now();
     let utc_plus_3_now = now + ChronoDuration::hours(3);
-    let utc_plus_3_start = utc_plus_3_now - ChronoDuration::hours(9);
+    let utc_plus_3_start = utc_plus_3_now - ChronoDuration::hours(12);
 
     writeln!(
         updates_file,
@@ -337,14 +341,14 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
     let podcast_structure: PodcastStructure = serde_json::from_str(&updates_summarized_json)
         .map_err(|e| anyhow::anyhow!("Failed to parse podcast structure from JSON: {}", e))?;
 
-    // Save for debugging
-    let updates_summarized_file_path = format!("{}/updates_summarized.json", user_tmp_dir);
-    let mut updates_summarized_file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(updates_summarized_file_path.clone())?;
-    writeln!(updates_summarized_file, "{}", updates_summarized_json)?;
+    // // Save for debugging
+    // let updates_summarized_file_path = format!("{}/updates_summarized.json", user_tmp_dir);
+    // let mut updates_summarized_file = OpenOptions::new()
+    //     .create(true)
+    //     .write(true)
+    //     .truncate(true)
+    //     .open(updates_summarized_file_path.clone())?;
+    // writeln!(updates_summarized_file, "{}", updates_summarized_json)?;
 
     info!(
         "Podcast structure parsed successfully: {} intro, {} body parts, {} outro",
@@ -362,6 +366,7 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
     chat_name: &str,
     app_state: Arc<T>,
     user_tmp_dir: String,
+    recipient: Recipient,
 ) -> anyhow::Result<()> {
     let mut messages = client.iter_messages(chat);
     let now = Utc::now();
@@ -381,11 +386,18 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
 
     writeln!(file, "ИСТОЧНИК ОБНОВЛЕНИЙ: {}\n", chat_name)?;
 
-    let system_role = get_system_role_or_fallback(
-        &AppName::TheViperRoom,
-        TheViperRoomRoleType::CheckUsefulness,
-        None,
-    );
+    let system_role = match recipient {
+        Recipient::Public => get_system_role_or_fallback(
+            &AppName::TheViperRoom,
+            TheViperRoomRoleType::CheckPublicUsefulness,
+            None,
+        ),
+        Recipient::Private(_) => get_system_role_or_fallback(
+            &AppName::TheViperRoom,
+            TheViperRoomRoleType::CheckPrivateUsefulness,
+            None,
+        ),
+    };
 
     while let Some(message) = messages.next().await? {
         if message.date() < period {
