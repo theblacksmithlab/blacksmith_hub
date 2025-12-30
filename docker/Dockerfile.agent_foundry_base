@@ -12,12 +12,14 @@ COPY core/Cargo.toml core/Cargo.toml
 COPY bot_foundry/Cargo.toml bot_foundry/Cargo.toml
 COPY the_forge/Cargo.toml the_forge/Cargo.toml
 COPY agent_foundry/Cargo.toml agent_foundry/Cargo.toml
+COPY tooling/whisper/Cargo.toml tooling/whisper/Cargo.toml
 
 # Create dummy source files
-RUN mkdir -p core/src bot_foundry/src the_forge/src agent_foundry/src && \
+RUN mkdir -p core/src bot_foundry/src the_forge/src agent_foundry/src tooling/whisper/src && \
     echo "fn main() {}" > bot_foundry/src/main.rs && \
     echo "fn main() {}" > the_forge/src/main.rs && \
     echo "fn main() {}" > agent_foundry/src/main.rs && \
+    echo "fn main() {}" > tooling/whisper/src/main.rs && \
     echo "pub fn dummy() {}" > core/src/lib.rs
 
 # Generate dependency recipe
