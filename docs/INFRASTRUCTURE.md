@@ -20,6 +20,7 @@ Nginx выступает как reverse proxy для всех сервисов, 
 | `/api/uniframe/*` | uniframe_studio | 8080 | HTTPS |
 | `/the_viper_room_user_request`, `/the_viper_room_avatar_request` | the_viper_room | 3001 | HTTPS |
 | `/user_action`, `/get_user_avatar`, `/blacksmith_web_*` | blacksmith_web | 3000 | HTTPS |
+| `/whisper/*` | whisper_service | 9000 | HTTP |
 | `/` (default) | Static files | - | - |
 
 ### Домены
@@ -52,6 +53,12 @@ Nginx выступает как reverse proxy для всех сервисов, 
 - Send: 600s
 - Read: 600s
 - Причина: длительные AI-запросы и обработка
+
+**Whisper Service:**
+- Connect: 60s
+- Send: 60s
+- Read: 60s
+- Причина: транскрипция голосовых сообщений (обычно < 30 секунд)
 
 ### Логи
 
@@ -129,6 +136,20 @@ server {
         send_timeout 600s;
     }
 
+    # Whisper Service (internal service for transcription)
+    location /whisper/ {
+        proxy_pass http://127.0.0.1:9000/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        client_max_body_size 10M;  # Allow audio file uploads
+    }
+
     # Static files
     location / {
         root /var/www/html;
@@ -145,6 +166,7 @@ server {
 - **uniframe_studio:** `127.0.0.1:8080`
 - **the_viper_room:** `127.0.0.1:3001`
 - **blacksmith_web:** `127.0.0.1:3000`
+- **whisper_service:** `127.0.0.1:9000` (внутренний сервис для транскрипции)
 - **Боты:** не имеют HTTP интерфейса, работают через Telegram API
 - **Агенты:** не имеют HTTP интерфейса, работают через Telegram User API
 
@@ -233,7 +255,52 @@ sudo ufw status
 
 ---
 
-**Версия документа:** 1.1
+---
+
+## Whisper Service
+
+### Назначение
+Внутренний микросервис для транскрипции голосовых сообщений. Используется всеми Telegram ботами (probiot_bot, the_viper_room_bot, groot_bot).
+
+### Конфигурация
+- **Порт:** 9000
+- **Endpoint:** `POST /transcribe`
+- **Модель:** ggml-medium.bin (1.5 GB) - лучшее качество транскрипции
+- **Язык:** русский
+
+### Использование
+```bash
+# Внутренний вызов из ботов (через WHISPER_SERVICE_URL)
+curl -X POST http://127.0.0.1:9000/transcribe \
+  -F "audio=@voice_message.ogg"
+
+# Ответ:
+{
+  "text": "Транскрибированный текст",
+  "duration_ms": 1234
+}
+```
+
+### Environment Variables
+- `WHISPER_MODEL_PATH` - путь к модели (default: /app/whisper.cpp/models/ggml-medium.bin)
+- `WHISPER_SERVICE_URL` - URL сервиса для клиентов (default: http://127.0.0.1:9000)
+
+### Модели
+Можно выбрать модель при сборке Docker-образа:
+```bash
+# Medium (default) - лучшее качество, 1.5 GB
+docker build --build-arg WHISPER_MODEL=medium -f docker/Dockerfile.whisper -t whisper:latest .
+
+# Base - быстрее, но хуже качество, 142 MB
+docker build --build-arg WHISPER_MODEL=base -f docker/Dockerfile.whisper -t whisper:latest .
+
+# Small - баланс качество/скорость, 466 MB
+docker build --build-arg WHISPER_MODEL=small -f docker/Dockerfile.whisper -t whisper:latest .
+```
+
+---
+
+**Версия документа:** 1.2
 **Дата создания:** 2025-11-23
-**Последнее обновление:** 2025-11-27
-**Изменения в 1.1:** Добавлен The Viper Room сервер (порт 3001), исправлена маршрутизация эндпоинтов
+**Последнее обновление:** 2025-12-30
+**Изменения в 1.2:** Добавлен Whisper Service (порт 9000) для транскрипции голосовых сообщений

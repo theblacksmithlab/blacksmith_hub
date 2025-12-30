@@ -6,6 +6,8 @@ use async_openai::types::{CreateSpeechRequestArgs, CreateSpeechResponse, SpeechM
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{Duration, Utc};
 use reqwest::Client as ReqwestClient;
+use reqwest::multipart;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -218,6 +220,75 @@ pub async fn simple_openai_tts<T: OpenAIClientInit + Send + Sync>(
     Ok(response)
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct WhisperTranscribeResponse {
+    text: String,
+    duration_ms: u128,
+}
+
+/// Transcribe audio using HTTP API (recommended)
+/// Uses the whisper HTTP service instead of local CLI
+pub async fn speech_to_text_http(file_path: &Path) -> anyhow::Result<String> {
+    let start = Instant::now();
+
+    if !file_path.exists() {
+        return Err(anyhow!(
+            "Voice message file not found: {}",
+            file_path.display()
+        ));
+    }
+
+    // Get whisper service URL from env or use default
+    let whisper_url = std::env::var("WHISPER_SERVICE_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:9000".to_string());
+
+    info!("Using whisper service at: {}", whisper_url);
+
+    // Read audio file
+    let audio_data = fs::read(file_path)?;
+
+    // Create multipart form with audio file
+    let file_name = file_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("audio.ogg");
+
+    let part = multipart::Part::bytes(audio_data)
+        .file_name(file_name.to_string())
+        .mime_str("audio/ogg")?;
+
+    let form = multipart::Form::new().part("audio", part);
+
+    // Send request to whisper service
+    let client = ReqwestClient::new();
+    let response = client
+        .post(format!("{}/transcribe", whisper_url))
+        .multipart(form)
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        let error_text = response.text().await?;
+        return Err(anyhow!("Whisper service error: {}", error_text));
+    }
+
+    let transcribe_response: WhisperTranscribeResponse = response.json().await?;
+
+    info!(
+        "Transcription completed in {:?} (service: {}ms)",
+        start.elapsed(),
+        transcribe_response.duration_ms
+    );
+
+    if transcribe_response.text.trim().is_empty() {
+        Ok("Empty text".to_string())
+    } else {
+        Ok(transcribe_response.text)
+    }
+}
+
+/// Transcribe audio using local whisper-cli (legacy)
+/// Use speech_to_text_http instead for better performance
 pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
     let start = Instant::now();
 

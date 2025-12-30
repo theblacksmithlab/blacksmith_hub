@@ -1,0 +1,19 @@
+[package]
+name = "whisper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+core = { path = "../../core" }
+
+anyhow.workspace = true
+config.workspace = true
+dotenv.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tempfile.workspace = true
+
+# Local overrides (need multipart feature)
+axum = { version = "0.7.9", features = ["multipart"] }
