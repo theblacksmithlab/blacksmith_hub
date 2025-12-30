@@ -6,7 +6,7 @@ use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::state::tg_bot::app_state::AppNameProvider;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
-use crate::utils::common::{convert_markdown_to_telegram, get_message, transcribe_voice_message_http};
+use crate::utils::common::{convert_markdown_to_telegram, get_message, transcribe_voice_message};
 use crate::utils::tg_bot::tg_bot::{
     add_llm_response_to_cache, download_voice, start_bots_chat_action, stop_bots_chat_action,
 };
@@ -80,7 +80,7 @@ where
                 }
             };
 
-            match transcribe_voice_message_http(&file_path).await {
+            match transcribe_voice_message(&file_path).await {
                 Ok(Some(user_voice_transcribed)) => {
                     info!("Voice message transcribed successfully...");
                     match process_user_raw_request(

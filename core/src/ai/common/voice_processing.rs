@@ -5,8 +5,8 @@ use anyhow::anyhow;
 use async_openai::types::{CreateSpeechRequestArgs, CreateSpeechResponse, SpeechModel, Voice};
 use base64::{engine::general_purpose, Engine as _};
 use chrono::{Duration, Utc};
-use reqwest::Client as ReqwestClient;
 use reqwest::multipart;
+use reqwest::Client as ReqwestClient;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs;
@@ -226,9 +226,7 @@ struct WhisperTranscribeResponse {
     duration_ms: u128,
 }
 
-/// Transcribe audio using HTTP API (recommended)
-/// Uses the whisper HTTP service instead of local CLI
-pub async fn speech_to_text_http(file_path: &Path) -> anyhow::Result<String> {
+pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
     let start = Instant::now();
 
     if !file_path.exists() {
@@ -238,16 +236,13 @@ pub async fn speech_to_text_http(file_path: &Path) -> anyhow::Result<String> {
         ));
     }
 
-    // Get whisper service URL from env or use default
     let whisper_url = std::env::var("WHISPER_SERVICE_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:9000".to_string());
 
     info!("Using whisper service at: {}", whisper_url);
 
-    // Read audio file
     let audio_data = fs::read(file_path)?;
 
-    // Create multipart form with audio file
     let file_name = file_path
         .file_name()
         .and_then(|n| n.to_str())
@@ -259,7 +254,6 @@ pub async fn speech_to_text_http(file_path: &Path) -> anyhow::Result<String> {
 
     let form = multipart::Form::new().part("audio", part);
 
-    // Send request to whisper service
     let client = ReqwestClient::new();
     let response = client
         .post(format!("{}/transcribe", whisper_url))
@@ -284,55 +278,6 @@ pub async fn speech_to_text_http(file_path: &Path) -> anyhow::Result<String> {
         Ok("Empty text".to_string())
     } else {
         Ok(transcribe_response.text)
-    }
-}
-
-/// Transcribe audio using local whisper-cli (legacy)
-/// Use speech_to_text_http instead for better performance
-pub async fn speech_to_text(file_path: &Path) -> anyhow::Result<String> {
-    let start = Instant::now();
-
-    if !file_path.exists() {
-        return Err(anyhow!(
-            "Voice message file not found: {}",
-            file_path.display()
-        ));
-    }
-
-    let model_path = std::env::var("WHISPER_MODEL_PATH")
-        .unwrap_or_else(|_| "/root/projects/whisper.cpp/models/ggml-base.bin".to_string());
-
-    let output = Command::new("whisper-cli")
-        .arg("-m")
-        .arg(model_path)
-        .arg("-f")
-        .arg(file_path)
-        .arg("-l")
-        .arg("ru")
-        .arg("--no-timestamps")
-        .output();
-
-    match output {
-        Ok(output) if output.status.success() => {
-            info!("Transcription took: {:?}", start.elapsed());
-
-            let stdout = String::from_utf8(output.stdout)?;
-
-            if stdout.trim().is_empty() {
-                Ok("Empty text".to_string())
-            } else {
-                Ok(stdout)
-            }
-        }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            error!("Whisper CLI failed: {}", stderr);
-            Err(anyhow!("Whisper CLI failed: {}", stderr))
-        }
-        Err(err) => {
-            error!("Failed to execute Whisper CLI: {}", err);
-            Err(anyhow!("Failed to execute Whisper CLI: {}", err))
-        }
     }
 }
 

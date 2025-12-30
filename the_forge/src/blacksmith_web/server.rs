@@ -18,10 +18,7 @@ use std::sync::Arc;
 use tracing::info;
 
 pub async fn start_blacksmith_web_server(server_app_state: Arc<ServerAppState>) -> Result<()> {
-    let qdrant_client = Arc::new(
-        Qdrant::from_url(&env::var("QDRANT_LOCAL_URL")?)
-            .build()?,
-    );
+    let qdrant_client = Arc::new(Qdrant::from_url(&env::var("QDRANT_LOCAL_URL")?).build()?);
 
     let llm_client = LLM_Client::new();
 

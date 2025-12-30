@@ -172,7 +172,7 @@ pub(crate) async fn processing_dialogs<T: OpenAIClientInit + Send + Sync>(
                 &channel_name,
                 app_state.clone(),
                 user_tmp_dir.clone(),
-                recipient
+                recipient,
             )
             .await?;
         }
@@ -198,7 +198,7 @@ pub(crate) async fn processing_chats<T: OpenAIClientInit + Send + Sync>(
                 &channel_name,
                 app_state.clone(),
                 user_tmp_dir.clone(),
-                recipient
+                recipient,
             )
             .await?;
         }
@@ -387,20 +387,16 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
     writeln!(file, "ИСТОЧНИК ОБНОВЛЕНИЙ: {}\n", chat_name)?;
 
     let system_role = match recipient {
-        Recipient::Public => {
-            get_system_role_or_fallback(
-                &AppName::TheViperRoom,
-                TheViperRoomRoleType::CheckPublicUsefulness,
-                None,
-            )
-        },
-        Recipient::Private(_) => {
-            get_system_role_or_fallback(
-                &AppName::TheViperRoom,
-                TheViperRoomRoleType::CheckPrivateUsefulness,
-                None,
-            )
-        }
+        Recipient::Public => get_system_role_or_fallback(
+            &AppName::TheViperRoom,
+            TheViperRoomRoleType::CheckPublicUsefulness,
+            None,
+        ),
+        Recipient::Private(_) => get_system_role_or_fallback(
+            &AppName::TheViperRoom,
+            TheViperRoomRoleType::CheckPrivateUsefulness,
+            None,
+        ),
     };
 
     while let Some(message) = messages.next().await? {

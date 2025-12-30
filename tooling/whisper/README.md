@@ -2,30 +2,20 @@
 
 HTTP-сервис для транскрипции голосовых сообщений на базе whisper.cpp.
 
+> **📖 Документация по деплою и инфраструктуре:** [docs/INFRASTRUCTURE.md](../../docs/INFRASTRUCTURE.md#whisper-service)
+> Этот README содержит API спецификацию, примеры использования и troubleshooting.
+
 ## 🎯 Назначение
 
 Внутренний микросервис для транскрипции аудио в текст. Используется всеми Telegram ботами (probiot_bot, the_viper_room_bot, groot_bot) для обработки голосовых сообщений.
 
 ## 🚀 Быстрый старт
 
-### 1. Добавить в .env
+**Предварительные требования:**
+- Whisper сервис развернут в docker-compose ([см. INFRASTRUCTURE.md](../../docs/INFRASTRUCTURE.md))
+- `WHISPER_SERVICE_URL=http://whisper:9000` в `.env`
 
-```bash
-WHISPER_SERVICE_URL=http://whisper:9000
-```
-
-### 2. Запуск через docker-compose
-
-```bash
-# Из корня проекта
-docker-compose up -d whisper
-
-# Или через manager скрипт
-./whisper_manager.sh start
-./whisper_manager.sh status
-```
-
-### 3. Проверка работы
+### Тестирование API
 
 ```bash
 # Из другого контейнера в docker-compose
@@ -33,51 +23,13 @@ curl -X POST http://whisper:9000/transcribe \
   -F "audio=@test_voice.ogg"
 
 # Ответ:
-# {
-#   "text": "Транскрибированный текст",
-#   "duration_ms": 1234
-# }
+{
+  "text": "Транскрибированный текст",
+  "duration_ms": 1234
+}
 ```
 
-### 4. Просмотр логов
-
-```bash
-./whisper_manager.sh logs
-# или
-docker-compose logs -f whisper
-```
-
----
-
-## 📋 Команды управления
-
-### Основные команды
-
-| Команда | Описание |
-|---------|----------|
-| `./whisper_manager.sh start` | Запустить сервис |
-| `./whisper_manager.sh stop` | Остановить сервис |
-| `./whisper_manager.sh restart` | Перезапустить (без пересборки) |
-| `./whisper_manager.sh rebuild [MODEL]` | Пересобрать и запустить |
-| `./whisper_manager.sh logs` | Показать логи |
-| `./whisper_manager.sh status` | Статус сервиса |
-
-### Примеры
-
-```bash
-# Запуск сервиса
-./whisper_manager.sh start
-
-# Пересборка с другой моделью
-./whisper_manager.sh rebuild small    # 466 MB (default)
-./whisper_manager.sh rebuild medium   # 1.5 GB
-
-# Просмотр статуса
-./whisper_manager.sh status
-
-# Логи
-./whisper_manager.sh logs
-```
+**Управление сервисом:** См. [docs/INFRASTRUCTURE.md](../../docs/INFRASTRUCTURE.md#whisper-service)
 
 ---
 
@@ -166,120 +118,69 @@ WHISPER_SERVICE_URL=http://whisper:9000
 
 **Важно**: Используй `http://whisper:9000` (имя сервиса) для docker-compose, а не `127.0.0.1`!
 
----
-
-## 🐳 Docker
-
-### Интеграция через docker-compose
-
-Whisper уже добавлен в `docker-compose.yml`:
-
-```yaml
-whisper:
-  build:
-    context: .
-    dockerfile: docker/Dockerfile.whisper
-    args:
-      WHISPER_MODEL: medium
-  container_name: whisper_service
-  restart: unless-stopped
-```
-
-Управление через docker-compose или `./whisper_manager.sh`.
-
----
 
 ## 🔍 Troubleshooting
-
-### Сервис не запускается
-
-```bash
-# Проверить логи
-./whisper_manager.sh logs
-
-# Проверить статус
-./whisper_manager.sh status
-
-# Пересобрать
-./whisper_manager.sh rebuild medium
-```
 
 ### Ошибка подключения из бота
 
 **Проблема**: `error sending request for url (http://whisper:9000/transcribe)`
 
-**Решение**: Проверьте:
-1. Whisper запущен: `./whisper_manager.sh status`
-2. Бот в той же docker-compose network
-3. В `.env` указано: `WHISPER_SERVICE_URL=http://whisper:9000` (не 127.0.0.1!)
-4. Перезапустите бота: `docker-compose restart probiot_bot`
+**Возможные причины:**
+1. ❌ Whisper сервис не запущен
+2. ❌ Бот не в той же docker-compose network
+3. ❌ Неправильный URL в `.env`
 
-### Ошибка "whisper-cli not found"
+**Решение:**
+1. Проверь что сервис запущен ([см. INFRASTRUCTURE.md](../../docs/INFRASTRUCTURE.md#whisper-service))
+2. Убедись что в `.env` указано: `WHISPER_SERVICE_URL=http://whisper:9000` (не 127.0.0.1!)
+3. Перезапусти бота: `docker-compose restart <bot_name>`
 
-Модель не скачалась при сборке. Пересоберите:
+### Медленная транскрипция
 
-```bash
-./whisper_manager.sh rebuild medium
-```
+**Проблема**: Обработка голосового сообщения занимает слишком много времени.
+
+**Решение:**
+- Используй модель **small** вместо medium (в 2-3 раза быстрее)
+- Увеличь CPU лимиты в docker-compose.yml
+- Проверь загрузку CPU на хосте
+
+### Ошибка транскрипции
+
+**Проблема**: API возвращает ошибку 500
+
+**Проверь:**
+1. Логи whisper сервиса
+2. Формат аудио файла (должен быть поддержан ffmpeg)
+3. Размер файла (< 10 MB)
 
 ---
 
 ## 📈 Производительность
 
-### Время транскрипции (модель small)
+### Требования (модель small)
 
-| Длительность аудио | Время обработки |
-|-------------------|-----------------|
-| 5 секунд | ~1-2 секунды |
-| 30 секунд | ~5-10 секунд |
-| 1 минута | ~10-20 секунд |
-
-*На CPU Intel i7, без GPU ускорения*
-
-### Требования
-
-- **RAM:** 1-2 GB (для модели small)
+- **RAM:** 1-2 GB
 - **CPU:** 2+ ядра рекомендуется
 - **Диск:** 2 GB (образ + модель)
 
----
+### Типичное время обработки
 
-## 🔄 Миграция с локального whisper
+Модель **small** на CPU Intel i7:
+- 5 сек аудио → ~1-2 сек
+- 30 сек аудио → ~5-10 сек
+- 1 мин аудио → ~10-20 сек
 
-### Старый подход (legacy):
-
-```
-use core::utils::common::transcribe_voice_message;
-
-let transcription = transcribe_voice_message(&file_path).await?;
-// ↑ Требует whisper-cli в контейнере, компилируется при каждом билде
-```
-
-### Новый подход (рекомендуется):
-
-```
-use core::utils::common::transcribe_voice_message_http;
-
-let transcription = transcribe_voice_message_http(&file_path).await?;
-// ↑ Использует HTTP-сервис, не требует whisper в контейнере бота
-```
-
-### Преимущества HTTP-подхода:
-
-- ✅ **Быстрая сборка ботов** — не нужно компилировать whisper.cpp
-- ✅ **Один whisper для всех** — переиспользование сервиса
-- ✅ **Легко обновить модель** — пересобрать только whisper-сервис
-- ✅ **Масштабируемость** — можно запустить несколько реплик
+Модель **medium** медленнее в ~2-3 раза.
 
 ---
 
-## 📝 Лицензия
+## 📚 Связанная документация
 
-Whisper.cpp: MIT License
-Проект: Blacksmith Lab
+- **[docs/INFRASTRUCTURE.md](../../docs/INFRASTRUCTURE.md#whisper-service)** - Деплой, docker-compose, управление
+- **[CLAUDE.md](../../CLAUDE.md)** - Общая архитектура проекта
 
 ---
 
-**Версия:** 1.0
-**Дата:** 2025-12-30
-**Автор:** Blacksmith Lab Team
+**Версия:** 1.1
+**Дата обновления:** 2025-12-30
+**Изменения:** Реорганизация документации - разделение на инфраструктуру и использование

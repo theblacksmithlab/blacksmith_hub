@@ -1,4 +1,4 @@
-use crate::ai::common::voice_processing::{speech_to_text, speech_to_text_http};
+use crate::ai::common::voice_processing::speech_to_text;
 use crate::models::common::app_name::AppName;
 use crate::models::common::avatar_request_response::{AvatarRequest, AvatarResponse};
 use crate::models::common::system_messages::AppsSystemMessages;
@@ -11,7 +11,6 @@ use pulldown_cmark::{html, Parser};
 use std::env;
 use std::fs::{read_to_string, remove_file};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -249,79 +248,8 @@ pub fn split_text_into_chunks(text: &str, max_chars: usize) -> Vec<String> {
     chunks
 }
 
-pub fn convert_to_wav(file_path: &Path) -> Result<PathBuf> {
-    let mut wav_path = file_path.to_path_buf();
-    wav_path.set_extension("wav");
-
-    let output = Command::new("ffmpeg")
-        .arg("-i")
-        .arg(file_path)
-        .arg("-ar")
-        .arg("16000")
-        .arg(&wav_path)
-        .output();
-
-    match output {
-        Ok(output) if output.status.success() => Ok(wav_path),
-        Ok(output) => Err(anyhow::anyhow!(
-            "FFmpeg conversion failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )),
-        Err(err) => Err(anyhow::anyhow!("Failed to execute FFmpeg: {}", err)),
-    }
-}
-
-pub fn check_whisper_installed() -> Result<(), anyhow::Error> {
-    let output = Command::new("whisper-cli").arg("--help").output();
-
-    match output {
-        Ok(output) if output.status.success() => Ok(()),
-        Ok(output) => Err(anyhow::anyhow!(
-            "Whisper CLI failed to respond correctly: {}",
-            String::from_utf8_lossy(&output.stderr)
-        )),
-        Err(err) => Err(anyhow::anyhow!("Whisper CLI not found: {}", err)),
-    }
-}
-
 pub async fn transcribe_voice_message(file_path: &Path) -> Result<Option<String>> {
-    check_whisper_installed()?;
-
-    let wav_path = convert_to_wav(file_path)?;
-
-    let transcription = speech_to_text(&wav_path).await?;
-
-    remove_file(file_path).ok();
-    info!("Successfully removed file: {:?}", file_path);
-    remove_file(&wav_path).ok();
-    info!("Successfully removed file: {:?}", &wav_path);
-
-    if transcription.trim().is_empty() {
-        info!("Voice message transcription is empty, looks like user sent message by mistake");
-        Ok(None)
-    } else {
-        Ok(Some(transcription))
-    }
-}
-
-/// Transcribe voice message using HTTP whisper service (recommended)
-///
-/// This function sends the audio file to the whisper HTTP service for transcription.
-/// Unlike the legacy `transcribe_voice_message()`, it doesn't require local whisper-cli
-/// installation and doesn't need to convert files to WAV (the service handles it).
-///
-/// # Arguments
-/// * `file_path` - Path to the audio file (any format supported by ffmpeg)
-///
-/// # Returns
-/// * `Ok(Some(String))` - Transcribed text
-/// * `Ok(None)` - Empty transcription (user sent empty audio)
-/// * `Err(...)` - Transcription failed
-///
-/// # Environment Variables
-/// * `WHISPER_SERVICE_URL` - URL of whisper service (default: http://127.0.0.1:9000)
-pub async fn transcribe_voice_message_http(file_path: &Path) -> Result<Option<String>> {
-    let transcription = speech_to_text_http(file_path).await?;
+    let transcription = speech_to_text(file_path).await?;
 
     remove_file(file_path).ok();
     info!("Successfully removed file: {:?}", file_path);

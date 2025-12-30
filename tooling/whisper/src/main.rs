@@ -40,9 +40,9 @@ async fn main() -> Result<()> {
 
     let router = get_whisper_router();
 
-    info!("Whisper service configured on {}:{}",
-        server_app_state.config.server.host,
-        server_app_state.config.server.port
+    info!(
+        "Whisper service configured on {}:{}",
+        server_app_state.config.server.host, server_app_state.config.server.port
     );
 
     start_server(server_app_state, router).await

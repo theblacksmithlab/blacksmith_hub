@@ -163,7 +163,6 @@ server {
 ### Применение изменений Nginx
 
 ```bash
-# Проверить конфиг на ошибки
 sudo nginx -t
 
 # Перезагрузить конфигурацию (без downtime)
@@ -186,10 +185,8 @@ sudo certbot certificates
 ### Просмотр логов
 
 ```bash
-# Access log (последние 100 строк)
 sudo tail -n 100 /var/log/nginx/api.blacksmith-lab.com.access.log
 
-# Error log (в реальном времени)
 sudo tail -f /var/log/nginx/api.blacksmith-lab.com.error.log
 ```
 
@@ -224,12 +221,10 @@ sudo journalctl -u nginx -n 50
 
 ### Firewall (ufw)
 ```bash
-# Разрешенные порты
 sudo ufw allow 80/tcp   # HTTP
 sudo ufw allow 443/tcp  # HTTPS
 sudo ufw allow 22/tcp   # SSH
 
-# Проверить статус
 sudo ufw status
 ```
 
@@ -242,61 +237,74 @@ sudo ufw status
 ### Назначение
 Внутренний микросервис для транскрипции голосовых сообщений. Используется всеми Telegram ботами (probiot_bot, the_viper_room_bot, groot_bot).
 
-### Конфигурация
-- **Порт:** 9000 (только внутри docker-compose network)
-- **Endpoint:** `POST /transcribe`
-- **Модель:** ggml-small.bin (466 MB) - оптимальный баланс скорости и качества
-- **Язык:** русский
-- **Доступ:** только внутри docker-compose через `http://whisper:9000`
+### Интеграция в инфраструктуру
 
-### Использование из ботов
-```bash
-# Внутренний вызов из ботов (через WHISPER_SERVICE_URL)
-curl -X POST http://whisper:9000/transcribe \
-  -F "audio=@voice_message.ogg"
-
-# Ответ:
-{
-  "text": "Транскрибированный текст",
-  "duration_ms": 1234
-}
+**Docker-compose конфигурация:**
+```yaml
+whisper:
+  build:
+    context: .
+    dockerfile: docker/Dockerfile.whisper
+    args:
+      WHISPER_MODEL: small
+  container_name: whisper_service
+  restart: unless-stopped
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
 ```
 
-### Environment Variables
-Добавить в `.env` для ботов:
+**Networking:**
+- **Внутренний доступ:** `http://whisper:9000` (только docker-compose network)
+- **Внешний доступ:** НЕТ (не проксируется через nginx)
+- **Используется:** ботами внутри docker-compose
+
+**Environment Variables для ботов:**
+
+Добавить в `.env`:
 ```bash
 WHISPER_SERVICE_URL=http://whisper:9000
 ```
 
-**Важно:** Используй `http://whisper:9000` (имя сервиса), а не `127.0.0.1`!
+**⚠️ Важно:** Используй `http://whisper:9000` (имя сервиса в docker-compose), а не `127.0.0.1`!
 
-### Управление через docker-compose
+### Управление
+
 ```bash
-# Запустить
+# Запуск/остановка
 ./whisper_manager.sh start
-# или
-docker-compose up -d whisper
+./whisper_manager.sh stop
+./whisper_manager.sh restart
 
-# Пересобрать с другой моделью
-./whisper_manager.sh rebuild small   # 466 MB (default)
-./whisper_manager.sh rebuild medium  # 1.5 GB (лучше качество)
-./whisper_manager.sh rebuild base    # 142 MB (быстрее)
-
-# Логи
+# Логи и статус
 ./whisper_manager.sh logs
-
-# Статус
 ./whisper_manager.sh status
+
+# Пересборка с другой моделью
+./whisper_manager.sh rebuild small   # default
+./whisper_manager.sh rebuild medium  # лучше качество
 ```
 
-### Доступные модели
-- **small** (466 MB) - default, оптимальный баланс
-- **medium** (1.5 GB) - лучшее качество, медленнее
-- **base** (142 MB) - быстро, ниже качество
-- **large** (2.9 GB) - максимальное качество
+### Дополнительная информация
+
+**📖 Полная документация:** [tooling/whisper/README.md](../tooling/whisper/README.md)
+- API спецификация
+- Сравнение моделей
+- Примеры интеграции
+- Troubleshooting
+- Производительность
 
 ---
 
-**Версия документа:** 1.3
+**Версия документа:** 1.4
 **Дата создания:** 2025-11-23
 **Последнее обновление:** 2025-12-30
+
+**История изменений:**
+- **1.4 (2025-12-30):** Реорганизация Whisper документации - инфраструктура в INFRASTRUCTURE.md, API в tooling/whisper/README.md
+- **1.3 (2025-12-30):** Whisper Service - переход на docker-compose, модель small
+- **1.2 (2025-12-30):** Добавлен Whisper Service
+- **1.1:** Добавлен Uniframe Studio
+- **1.0 (2025-11-23):** Первая версия
