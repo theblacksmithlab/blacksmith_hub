@@ -41,6 +41,25 @@ services:
     image: the_forge_base
     profiles: [ "never-start" ]
 
+  whisper:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.whisper
+      args:
+        WHISPER_MODEL: medium
+    container_name: whisper_service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   probiot_bot:
     build:
       context: .
