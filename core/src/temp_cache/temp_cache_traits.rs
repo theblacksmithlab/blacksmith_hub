@@ -14,7 +14,6 @@ impl TempCacheInit for BlacksmithWebAppState {
     }
 }
 
-// Реализации для новых bot states
 impl TempCacheInit for ProbiotBotState {
     fn get_temp_cache(&self) -> &Mutex<HashMap<String, DialogueCache>> {
         &self.core.temp_cache

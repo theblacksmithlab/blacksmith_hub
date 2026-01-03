@@ -89,6 +89,7 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
         &blacksmith_web_app_state.local_db_pool,
         &user_id,
         app_name.as_str(),
+        Some(20), // Лимит в 20 последних сообщений
     )
     .await
     {

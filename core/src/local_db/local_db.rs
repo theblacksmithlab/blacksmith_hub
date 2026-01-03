@@ -169,17 +169,35 @@ pub async fn fetch_chat_history_from_db(
     pool: &SqlitePool,
     user_id: &str,
     app_name: &str,
+    limit: Option<usize>,
 ) -> Result<Vec<ChatMessage>, Error> {
-    // info!("Executing query: SELECT id, user_id, sender, message, app_name FROM chat_messages WHERE user_id = '{}' AND app_name = '{}'", user_id, app_name);
-
-    let messages = sqlx::query_as::<_, ChatMessage>(
-        "SELECT id, user_id, sender, message, app_name FROM chat_messages
-         WHERE user_id = ? AND app_name = ? ORDER BY id ASC",
-    )
-    .bind(user_id)
-    .bind(app_name)
-    .fetch_all(pool)
-    .await?;
+    let messages = if let Some(limit_value) = limit {
+        sqlx::query_as::<_, ChatMessage>(
+            "SELECT * FROM (
+                SELECT id, user_id, sender, message, app_name
+                FROM chat_messages
+                WHERE user_id = ? AND app_name = ?
+                ORDER BY id DESC
+                LIMIT ?
+            ) ORDER BY id ASC"
+        )
+        .bind(user_id)
+        .bind(app_name)
+        .bind(limit_value as i64)
+        .fetch_all(pool)
+        .await?
+    } else {
+        sqlx::query_as::<_, ChatMessage>(
+            "SELECT id, user_id, sender, message, app_name
+             FROM chat_messages
+             WHERE user_id = ? AND app_name = ?
+             ORDER BY id ASC"
+        )
+        .bind(user_id)
+        .bind(app_name)
+        .fetch_all(pool)
+        .await?
+    };
 
     Ok(messages)
 }
