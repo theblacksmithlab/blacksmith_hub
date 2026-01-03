@@ -3,7 +3,7 @@ use axum::extract::{Query, State};
 use axum::Json;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use core::ai::common::common::raw_llm_processing;
-use core::ai::common::voice_processing::simple_openai_tts;
+use core::ai::common::voice_processing::openai_base_tts;
 use core::local_db::local_db::fetch_chat_history_from_db;
 use core::message_processing_flow::web::default_message_handler::default_message_handler;
 use core::models::blacksmith_web::blacksmith_web::ChatMessage;
@@ -133,7 +133,7 @@ pub(crate) async fn handle_blacksmith_web_tts_request(
             }
         };
 
-    match simple_openai_tts(&processed_text, blacksmith_web_app_state.clone()).await {
+    match openai_base_tts(&processed_text, blacksmith_web_app_state.clone(), 1.3).await {
         Ok(audio_response) => {
             let temp_file_id = Uuid::new_v4().to_string();
             let audio_file_path = temp_dir.join(format!("{}.mp3", temp_file_id));

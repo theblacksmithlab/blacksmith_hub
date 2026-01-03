@@ -13,7 +13,6 @@ impl QdrantClientInit for BlacksmithWebAppState {
     }
 }
 
-// Реализации для новых bot states
 impl QdrantClientInit for ProbiotBotState {
     fn get_qdrant_client(&self) -> Arc<Qdrant> {
         self.core.qdrant_client.clone()
