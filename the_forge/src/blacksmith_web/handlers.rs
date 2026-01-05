@@ -4,7 +4,7 @@ use axum::Json;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use core::ai::common::common::raw_llm_processing;
 use core::ai::common::voice_processing::openai_base_tts;
-use core::local_db::local_db::fetch_chat_history_from_db;
+use core::local_db::blacksmith_web::chat_history_storage::fetch_chat_history_from_db;
 use core::message_processing_flow::web::default_message_handler::default_message_handler;
 use core::models::blacksmith_web::blacksmith_web::ChatMessage;
 use core::models::blacksmith_web::blacksmith_web::{
