@@ -9,7 +9,7 @@ use tracing::{info, warn};
 
 pub async fn setup_app_db_pool(app_name: &AppName) -> anyhow::Result<SqlitePool> {
     let env_var_name = match app_name {
-        AppName::BlacksmithWeb | AppName::W3AWeb => "BLACKSMITH_LAB_DATABASE_URL",
+        AppName::BlacksmithWeb | AppName::W3AWeb | AppName::StatBot => "BLACKSMITH_LAB_DATABASE_URL",
         AppName::GrootBot => "GROOT_BOT_DATABASE_URL",
         AppName::AgentDavon => "AGENT_DAVON_DATABASE_URL",
         AppName::TheViperRoom | AppName::TheViperRoomBot => "THE_VIPER_ROOM_DATABASE_URL",
@@ -62,7 +62,7 @@ pub async fn setup_app_db_pool(app_name: &AppName) -> anyhow::Result<SqlitePool>
 
 async fn create_app_db_tables(pool: &SqlitePool, app_name: &AppName) -> Result<(), Error> {
     match app_name {
-        AppName::BlacksmithWeb | AppName::W3AWeb => {
+        AppName::BlacksmithWeb | AppName::W3AWeb | AppName::StatBot => {
             let query = "
                 CREATE TABLE IF NOT EXISTS chat_messages (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
