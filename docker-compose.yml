@@ -131,6 +131,27 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  stat_bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.stat_bot
+    env_file:
+      - .env
+    volumes:
+      - ./common_res/messages/common:/app/common_res/messages/common
+      - ./common_res/local_db:/app/common_res/local_db
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   agent_davon:
     build:
       context: .

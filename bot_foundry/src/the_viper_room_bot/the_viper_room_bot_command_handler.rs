@@ -11,7 +11,7 @@ use core::models::the_viper_room::the_viper_room_bot::MainMenuMessageType;
 use core::state::tg_bot::TheViperRoomBotState;
 use core::utils::common::get_message;
 use core::utils::tg_bot::tg_bot::{
-    check_username_from_message, get_chat_title, get_username_from_message,
+    check_username_from_user, get_chat_title, get_username_from_user,
 };
 use std::env;
 use std::sync::Arc;
@@ -27,18 +27,19 @@ pub(crate) async fn the_viper_room_command_handler(
     cmd: TheViperRoomBotCommands,
     app_state: Arc<TheViperRoomBotState>,
 ) -> anyhow::Result<()> {
-    if check_username_from_message(&bot, &msg).await == false {
-        return Ok(());
-    }
-    let username = get_username_from_message(&msg);
     let chat_id = msg.chat.id;
     let user = msg
         .from
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("No user in message"))?;
+    let username = get_username_from_user(&user);
     let user_id = user.id.0;
     let chat_title = get_chat_title(&msg);
     let photo_path = "common_res/the_viper_room/avatar.jpeg";
+
+    if check_username_from_user(&bot, &user, chat_id).await == false {
+        return Ok(());
+    }
 
     let lord_admin_id: u64 = env::var("LORD_ADMIN_ID")
         .expect("LORD_ADMIN_ID environment variable must be set")

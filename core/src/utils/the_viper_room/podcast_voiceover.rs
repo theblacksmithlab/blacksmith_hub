@@ -1,19 +1,16 @@
-use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
-use std::sync::Arc;
-use chrono::{Duration, Utc};
-use tracing::{error, info, warn};
 use crate::ai::common::voice_processing;
 use crate::ai::common::voice_processing::{
-    convert_pcm_to_mp3,
-    elevenlabs_base_tts,
-    gemini_base_tts,
-    openai_base_tts
+    convert_pcm_to_mp3, elevenlabs_base_tts, gemini_base_tts, openai_base_tts,
 };
 use crate::models::common::system_messages::{AppsSystemMessages, TheViperRoomBotMessages};
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::{get_message, split_text_into_chunks};
+use chrono::{Duration, Utc};
+use std::fs;
+use std::path::PathBuf;
+use std::process::Command;
+use std::sync::Arc;
+use tracing::{error, info, warn};
 
 pub async fn podcast_voiceover_via_openai<T: OpenAIClientInit + Send + Sync>(
     text: String,
@@ -221,7 +218,11 @@ pub async fn generate_parts_batched_google(
                 let mut last_error = None;
 
                 for attempt in 1..=MAX_RETRIES {
-                    match voice_processing::generate_single_part_via_gemini(&part_text, &tmp_dir, part_index).await {
+                    match voice_processing::generate_single_part_via_gemini(
+                        &part_text, &tmp_dir, part_index,
+                    )
+                    .await
+                    {
                         Ok(path) => {
                             if attempt > 1 {
                                 info!(

@@ -335,4 +335,3 @@ pub async fn generate_single_part_via_gemini(
     info!("Part {} saved to {}", part_index, mp3_path);
     Ok(PathBuf::from(mp3_path))
 }
-

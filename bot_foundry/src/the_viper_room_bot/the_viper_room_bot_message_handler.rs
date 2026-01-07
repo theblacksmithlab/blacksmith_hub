@@ -1,8 +1,8 @@
-use anyhow::Result;
 use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     parse_channel_input, send_channels_menu, send_daily_podcast, send_main_menu,
     send_settings_menu, ChannelInput,
 };
+use anyhow::Result;
 use core::local_db::the_viper_room::channel_management;
 use core::local_db::the_viper_room::channel_management::{
     clear_user_channels, get_channel, get_user_channels, remove_channel,
@@ -18,7 +18,7 @@ use core::telegram_client::grammers_functionality::initialize_grammers_client;
 use core::utils::common::get_message;
 use core::utils::tg_bot::tg_bot::auto_delete_messages_batch;
 use core::utils::tg_bot::tg_bot::{
-    check_username_from_message, get_chat_title, get_username_from_message, is_bot_addressed,
+    check_username_from_user, get_chat_title, get_username_from_message, is_bot_addressed,
 };
 use grammers_client::types::Chat;
 use std::path::Path;
@@ -42,9 +42,6 @@ pub(crate) async fn the_viper_room_message_handler(
     msg: Message,
     app_state: Arc<TheViperRoomBotState>,
 ) -> Result<()> {
-    if check_username_from_message(&bot, &msg).await == false {
-        return Ok(());
-    }
     let username = get_username_from_message(&msg);
     let chat_id = msg.chat.id;
     let user = msg
@@ -53,6 +50,10 @@ pub(crate) async fn the_viper_room_message_handler(
         .ok_or_else(|| anyhow::anyhow!("No user in message"))?;
     let user_id = user.id.0;
     let chat_title = get_chat_title(&msg);
+
+    if check_username_from_user(&bot, &user, chat_id).await == false {
+        return Ok(());
+    }
 
     if !msg.chat.is_private() {
         let is_bot_mentioned = is_bot_addressed(&bot, &msg).await?;

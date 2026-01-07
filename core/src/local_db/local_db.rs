@@ -1,7 +1,7 @@
 use crate::models::common::app_name::AppName;
 use anyhow::Context;
 use sqlx::sqlite::SqliteConnectOptions;
-use sqlx::{Error, Executor, SqlitePool};
+use sqlx::{Error, SqlitePool};
 use std::path::Path;
 use std::str::FromStr;
 use std::{env, fs};
@@ -69,10 +69,16 @@ async fn create_app_db_tables(pool: &SqlitePool, app_name: &AppName) -> Result<(
                     user_id TEXT NOT NULL,
                     sender TEXT NOT NULL,
                     message TEXT NOT NULL,
-                    app_name TEXT NOT NULL
+                    app_name TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
+
+                CREATE INDEX IF NOT EXISTS idx_chat_messages_app_name ON chat_messages(app_name);
+                CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at);
+                CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages(user_id);
+                CREATE INDEX IF NOT EXISTS idx_chat_messages_app_created ON chat_messages(app_name, created_at);
             ";
-            pool.execute(query).await?;
+            sqlx::query(query).execute(pool).await?;
         }
         AppName::GrootBot => {
             let query = "

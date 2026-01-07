@@ -218,3 +218,19 @@ impl AppNameProvider for TheViperRoomBotState {
         &self.core.app_name
     }
 }
+
+pub struct StatBotState {
+    pub core: Arc<CoreBotState>,
+}
+
+impl StatBotState {
+    pub async fn new(core: Arc<CoreBotState>) -> Result<Self> {
+        Ok(Self { core })
+    }
+}
+
+impl AppNameProvider for StatBotState {
+    fn app_name(&self) -> &AppName {
+        &self.core.app_name
+    }
+}

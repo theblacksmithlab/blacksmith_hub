@@ -14,6 +14,9 @@ use crate::utils::the_viper_room::news_block_creation_utils::{
     get_dialogs, get_user_dialogs_from_db, mix_podcast_with_music, processing_chats,
     processing_dialogs, summarize_updates, updates_file_creation,
 };
+use crate::utils::the_viper_room::podcast_voiceover::{
+    generate_parts_batched_google, merge_audio_parts,
+};
 use grammers_client::Client as g_Client;
 use sqlx::{Pool, Sqlite};
 use std::fs;
@@ -22,7 +25,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::log::warn;
 use tracing::{error, info};
-use crate::utils::the_viper_room::podcast_voiceover::{generate_parts_batched_google, merge_audio_parts};
 
 pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
     client: &g_Client,
@@ -159,7 +161,8 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
 
             let part_audio = match tts_provider {
                 TTSProvider::OpenAI => {
-                    generate_single_part_via_openai(part, &user_tmp_dir, i, app_state.clone()).await?
+                    generate_single_part_via_openai(part, &user_tmp_dir, i, app_state.clone())
+                        .await?
                 }
                 TTSProvider::ElevenLabs => {
                     generate_single_part_via_elevenlabs(part, &user_tmp_dir, i).await?

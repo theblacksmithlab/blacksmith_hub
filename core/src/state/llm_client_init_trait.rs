@@ -1,6 +1,6 @@
 use crate::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use crate::state::tg_agent::app_state::AgentAppState;
-use crate::state::tg_bot::{GrootBotState, ProbiotBotState, TheViperRoomBotState};
+use crate::state::tg_bot::{GrootBotState, ProbiotBotState, StatBotState, TheViperRoomBotState};
 use crate::state::the_viper_room::app_state::TheViperRoomAppState;
 use crate::state::uniframe_studio::app_state::UniframeStudioAppState;
 use async_openai::config::OpenAIConfig;
@@ -46,6 +46,12 @@ impl OpenAIClientInit for GrootBotState {
 }
 
 impl OpenAIClientInit for TheViperRoomBotState {
+    fn get_llm_client(&self) -> &LLM_Client<OpenAIConfig> {
+        &self.core.llm_client
+    }
+}
+
+impl OpenAIClientInit for StatBotState {
     fn get_llm_client(&self) -> &LLM_Client<OpenAIConfig> {
         &self.core.llm_client
     }
