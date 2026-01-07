@@ -193,7 +193,7 @@ pub async fn handle_export_requests(
 
             let description = format!("{}{}{}{}", upper_divider, description_template, lower_divider, description_footer);
 
-            bot.send_message(chat_id, description).await?;
+            bot.send_message(chat_id, description).parse_mode(Html).await?;
 
             match bot
                 .send_document(chat_id, InputFile::file(&file_path))

@@ -15,6 +15,7 @@ use teloxide::prelude::{Message, Requester};
 use teloxide::types::CallbackQuery;
 use teloxide::Bot;
 use teloxide_core::payloads::SendMessageSetters;
+use teloxide_core::types::ParseMode;
 use tracing::info;
 
 pub async fn stat_bot_command_handler(
@@ -93,6 +94,7 @@ pub async fn stat_bot_command_handler(
             let keyboard = create_stats_keyboard(&accessible_apps);
 
             bot.send_message(chat_id, welcome_message)
+                .parse_mode(ParseMode::Html)
                 .reply_markup(keyboard)
                 .await?;
         }
