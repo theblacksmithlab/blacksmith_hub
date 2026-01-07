@@ -86,14 +86,20 @@ pub async fn handle_stats_request(
                 _ => app_name.as_str(),
             };
 
-            let response = format!(
-                "📊 **Статистика {}**\n\
+            let upper_divider = "============================================\n\n".to_string();
+            let lower_divider = "\n\n============================================".to_string();
+            let result_footer = "\n\n<i>Для получения обновлённой статистики перейдите в основное меню, выполнив команду /start</i>".to_string();
+
+            let response_template = format!(
+                "📊 <b>Статистика {}</b>\n\
                 📅 Период: {}\n\n\
-                👥 **Уникальные пользователи:** {}\n\
-                💬 **Всего запросов:** {}\n\n\
-                _Данные обновляются в реальном времени_",
+                👥 Уникальные пользователи: {}\n\
+                💬 Всего запросов: {}\n\n\
+                <i>Данные обновляются в реальном времени</i>",
                 app_display_name, period_name, user_stats.unique_users, request_stats.requests
             );
+
+            let response = format!("{}{}{}{}", upper_divider, response_template, lower_divider, result_footer);
 
             bot.send_message(chat_id, response).parse_mode(Html).await?;
         }
@@ -173,13 +179,20 @@ pub async fn handle_export_requests(
                 _ => app_name.as_str(),
             };
 
-            let description = format!(
-                "📥 Экспорт запросов пользователей\n\
-                📊 Приложение: {}\n\
+            let upper_divider = "============================================\n\n".to_string();
+            let lower_divider = "\n\n============================================".to_string();
+            let description_footer = "\n\n<i>Для получения обновлённой выгрузки перейдите в основное меню, выполнив команду /start</i>".to_string();
+
+            let description_template = format!(
+                "📥 Экспорт запросов пользователей\n\n\
+                📊 Приложение: {}\n\n\
                 📅 Дата: {}",
                 app_display_name,
                 Utc::now().format("%d.%m.%Y %H:%M")
             );
+
+            let description = format!("{}{}{}{}", upper_divider, description_template, lower_divider, description_footer);
+
             bot.send_message(chat_id, description).await?;
 
             match bot
