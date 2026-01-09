@@ -143,7 +143,7 @@ RUN mkdir -p tmp && \
     chown 1001:1000 /app/whisper && \
     chmod +x /app/whisper
 
-COPY docker/whisper_entrypoint.sh ./entrypoint.sh
+COPY infra/docker/whisper_entrypoint.sh ./entrypoint.sh
 RUN chmod +x entrypoint.sh
 
 USER 1001:1000
