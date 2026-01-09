@@ -111,7 +111,7 @@ pub async fn stat_bot_message_handler(
     let chat_id = msg.chat.id;
 
     if let Some(text) = msg.text() {
-        info!("Received message from user: {}", text);
+        info!("Received text message from user: {}", text);
 
         let bot_system_message = get_message(AppsSystemMessages::StatBot(
             StatBotMessages::TextMessageHandling,

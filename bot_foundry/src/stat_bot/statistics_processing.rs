@@ -10,11 +10,13 @@ use core::utils::common::get_message;
 use std::fs;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use teloxide_core::payloads::SendMessageSetters;
 use teloxide_core::requests::Requester;
 use teloxide_core::types::ParseMode::Html;
 use teloxide_core::types::{CallbackQuery, InputFile};
 use teloxide_core::Bot;
+use tokio::time::sleep;
 use tracing::{error, info};
 
 pub async fn handle_stats_request(
@@ -61,10 +63,12 @@ pub async fn handle_stats_request(
         }
     };
 
-    bot.answer_callback_query(&q.id).await?;
-
     bot.send_message(chat_id, "⏳ Загружаю статистику...")
         .await?;
+
+    sleep(Duration::from_secs(2)).await;
+
+    bot.answer_callback_query(&q.id).await?;
 
     let db_pool = app_state
         .core
@@ -149,9 +153,11 @@ pub async fn handle_export_requests(
         return Ok(());
     }
 
-    bot.answer_callback_query(&q.id).await?;
-
     bot.send_message(chat_id, "⏳ Формирую CSV файл...").await?;
+
+    sleep(Duration::from_secs(3)).await;
+
+    bot.answer_callback_query(&q.id).await?;
 
     let db_pool = app_state
         .core
