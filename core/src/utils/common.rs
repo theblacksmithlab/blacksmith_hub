@@ -131,6 +131,10 @@ pub async fn get_message(message_enum: AppsSystemMessages) -> Result<String> {
             Path::new("common_res/messages/agent_davon").to_path_buf(),
             msg.as_str().to_string(),
         ),
+        AppsSystemMessages::StatBot(msg) => (
+            Path::new("common_res/messages/stat_bot").to_path_buf(),
+            msg.as_str().to_string(),
+        ),
     };
 
     let path = base_path.join(format!("{}.txt", message_name));
@@ -252,10 +256,12 @@ pub async fn transcribe_voice_message(file_path: &Path) -> Result<Option<String>
     let transcription = speech_to_text(file_path).await?;
 
     remove_file(file_path).ok();
-    info!("Successfully removed file: {:?}", file_path);
+    info!("Successfully removed temp file: {:?}", file_path);
 
     if transcription.trim().is_empty() {
-        info!("Voice message transcription is empty, looks like user sent message by mistake");
+        info!(
+            "Voice message transcription is empty, looks like user sent empty message by mistake"
+        );
         Ok(None)
     } else {
         Ok(Some(transcription))

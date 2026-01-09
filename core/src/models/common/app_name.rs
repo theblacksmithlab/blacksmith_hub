@@ -13,6 +13,7 @@ pub enum AppName {
     GrootBot,
     UniframeStudio,
     AgentDavon,
+    StatBot,
 }
 
 impl AppName {
@@ -22,10 +23,11 @@ impl AppName {
             AppName::TheViperRoom => "the_viper_room",
             AppName::TheViperRoomBot => "the_viper_room_bot",
             AppName::W3AWeb => "w3a_web",
-            AppName::BlacksmithWeb => "blacksmith_web",
+            AppName::BlacksmithWeb => "bls_web",
             AppName::GrootBot => "groot_bot",
             AppName::UniframeStudio => "uniframe_studio",
             AppName::AgentDavon => "agent_davon",
+            AppName::StatBot => "stat_bot",
         }
     }
 }
@@ -43,6 +45,7 @@ impl FromStr for AppName {
             "groot_bot" => Ok(AppName::GrootBot),
             "uniframe_studio" => Ok(AppName::UniframeStudio),
             "agent_davon" => Ok(AppName::AgentDavon),
+            "stat_bot" => Ok(AppName::StatBot),
             _ => Err(()),
         }
     }

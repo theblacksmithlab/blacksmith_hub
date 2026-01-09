@@ -7,6 +7,22 @@ pub enum AppsSystemMessages {
     W3A(W3AMessages),
     GrootBot(GrootBotMessages),
     AgentDavon(AgentDavonMessages),
+    StatBot(StatBotMessages),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StatBotMessages {
+    StartMessage,
+    TextMessageHandling,
+}
+
+impl StatBotMessages {
+    pub fn as_str(&self) -> &str {
+        match self {
+            StatBotMessages::StartMessage => "start_message",
+            StatBotMessages::TextMessageHandling => "text_message_handling",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -108,6 +124,7 @@ pub enum CommonMessages {
     PrivateCmdUsedInPublicChat,
     NoUsernameWarning,
     ServiceUnavailable,
+    NoRightsForAppUse,
 }
 
 impl CommonMessages {
@@ -128,6 +145,7 @@ impl CommonMessages {
             CommonMessages::PrivateCmdUsedInPublicChat => "private_cmd_used_in_public_chat",
             CommonMessages::NoUsernameWarning => "no_username_warning",
             CommonMessages::ServiceUnavailable => "service_unavailable",
+            CommonMessages::NoRightsForAppUse => "no_right_for_app_use",
         }
     }
 }
@@ -145,23 +163,6 @@ impl ProbiotBotMessages {
             ProbiotBotMessages::StartMessage => "start_message",
             ProbiotBotMessages::PrivateChatInvitation => "private_chat_invitation",
             ProbiotBotMessages::ResponseFooter => "response_footer",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum W3ABotMessages {
-    StartMessage,
-    PrivateChatInvitation,
-    ResponseFooter,
-}
-
-impl W3ABotMessages {
-    pub fn as_str(&self) -> &str {
-        match self {
-            W3ABotMessages::StartMessage => "start_message",
-            W3ABotMessages::PrivateChatInvitation => "private_chat_invitation",
-            W3ABotMessages::ResponseFooter => "response_footer",
         }
     }
 }

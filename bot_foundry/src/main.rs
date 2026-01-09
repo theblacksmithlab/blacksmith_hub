@@ -3,6 +3,9 @@ use crate::groot_bot::groot_bot_handlers::{groot_bot_command_handler, groot_bot_
 use crate::probiot_bot::probiot_bot_handlers::{
     probiot_callback_query_handler, probiot_command_handler,
 };
+use crate::stat_bot::stat_bot_handlers::{
+    stat_bot_callback_query_handler, stat_bot_command_handler, stat_bot_message_handler,
+};
 use crate::the_viper_room_bot::the_viper_room_bot_callback_query_handler::the_viper_room_bor_callback_query_handler;
 use crate::the_viper_room_bot::the_viper_room_bot_command_handler::the_viper_room_command_handler;
 use crate::the_viper_room_bot::the_viper_room_bot_message_handler::the_viper_room_message_handler;
@@ -12,8 +15,11 @@ use core::message_processing_flow::tg_bot::default_message_handler::default_mess
 use core::models::common::app_name::AppName;
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
 use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
+use core::models::tg_bot::stat_bot::StatBotCommands;
 use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
-use core::state::tg_bot::{CoreBotState, GrootBotState, ProbiotBotState, TheViperRoomBotState};
+use core::state::tg_bot::{
+    CoreBotState, GrootBotState, ProbiotBotState, StatBotState, TheViperRoomBotState,
+};
 use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
 use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use dotenv::dotenv;
@@ -29,12 +35,14 @@ use tracing_subscriber::EnvFilter;
 
 pub mod groot_bot;
 pub mod probiot_bot;
+pub mod stat_bot;
 pub mod the_viper_room_bot;
 
 enum BotState {
     Probiot(Arc<ProbiotBotState>),
     Groot(Arc<GrootBotState>),
     TheViperRoom(Arc<TheViperRoomBotState>),
+    Stat(Arc<StatBotState>),
 }
 
 impl BotState {
@@ -43,6 +51,7 @@ impl BotState {
             BotState::Probiot(state) => &state.core.app_name,
             BotState::Groot(state) => &state.core.app_name,
             BotState::TheViperRoom(state) => &state.core.app_name,
+            BotState::Stat(state) => &state.core.app_name,
         }
     }
 }
@@ -70,6 +79,7 @@ async fn main() -> Result<()> {
         "probiot_bot" => AppName::ProbiotBot,
         "the_viper_room_bot" => AppName::TheViperRoomBot,
         "groot_bot" => AppName::GrootBot,
+        "stat_bot" => AppName::StatBot,
         "the_viper_room" | "w3a_web" | "blacksmith_web" => {
             info!("No Telegram bot system implementation for {}", app_name_str);
             return Ok(());
@@ -105,6 +115,7 @@ async fn main() -> Result<()> {
 
             BotState::TheViperRoom(state)
         }
+        AppName::StatBot => BotState::Stat(Arc::new(StatBotState::new(core).await?)),
         _ => {
             return Err(anyhow::anyhow!(
                 "Unsupported bot app_name: {}",
@@ -143,9 +154,10 @@ async fn start_bot_with_handlers(
 ) -> Result<()> {
     let (command_handler, message_handler, callback_query_handler, edited_handler) = handlers;
     let bot = match bot_state.app_name() {
-        AppName::ProbiotBot => Bot::new(env::var("TELOXIDE_TOKEN_PROBIOT")?),
+        AppName::ProbiotBot => Bot::new(env::var("TELOXIDE_TOKEN_PROBIOT_BOT")?),
         AppName::TheViperRoomBot => Bot::new(env::var("TELOXIDE_TOKEN_THE_VIPER_ROOM_BOT")?),
-        AppName::GrootBot => Bot::new(env::var("TELOXIDE_TOKEN_GROOT")?),
+        AppName::GrootBot => Bot::new(env::var("TELOXIDE_TOKEN_GROOT_BOT")?),
+        AppName::StatBot => Bot::new(env::var("TELOXIDE_TOKEN_STAT_BOT")?),
         _ => {
             return Err(anyhow::anyhow!(
                 "Unsupported app type of the app: {}",
@@ -175,6 +187,9 @@ async fn start_bot_with_handlers(
             run_bot_dispatcher(bot, main_handler, state, callback_query_handler).await?
         }
         BotState::TheViperRoom(state) => {
+            run_bot_dispatcher(bot, main_handler, state, callback_query_handler).await?
+        }
+        BotState::Stat(state) => {
             run_bot_dispatcher(bot, main_handler, state, callback_query_handler).await?
         }
     }
@@ -216,6 +231,14 @@ fn get_handlers(
             Update::filter_message().endpoint(groot_bot_message_handler),
             Some(Update::filter_callback_query().endpoint(groot_bot_callback_query_handler)),
             Some(Update::filter_edited_message().endpoint(groot_bot_message_handler)),
+        )),
+        AppName::StatBot => Ok((
+            Update::filter_message()
+                .filter_command::<StatBotCommands>()
+                .endpoint(stat_bot_command_handler),
+            Update::filter_message().endpoint(stat_bot_message_handler),
+            Some(Update::filter_callback_query().endpoint(stat_bot_callback_query_handler)),
+            None,
         )),
         AppName::TheViperRoom
         | AppName::W3AWeb

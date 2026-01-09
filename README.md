@@ -11,8 +11,7 @@
 Blacksmith Lab включает в себя:
 
 ### 🌐 Веб-сервисы (The Forge)
-- **Blacksmith Web** - AI-агент поддержки для сайта Blacksmith Lab
-- **W3A Web** - AI-ассистент для онлайн-школы Web3 Academy
+- **Blacksmith Web** - Мультитенантный AI-ассистент (обслуживает Blacksmith Lab и Web3 Academy)
 - **The Viper Room** - Генератор аудио-подкастов через LLM
 - **Uniframe Studio** - Адаптивный дубляж видео с интеграцией Python ML-моделей
 
@@ -20,6 +19,7 @@ Blacksmith Lab включает в себя:
 - **Probiot Bot** - Универсальный бот с RAG-системой для ответов на вопросы
 - **The Viper Room Bot** - Telegram Mini-App для генерации подкастов
 - **Groot Bot** - Модерация чатов, антиспам и управление подписками
+- **Stat Bot** - Статистика использования веб-приложений для админов
 
 ### 🕵️ Telegram агенты (Agent Foundry)
 - **Agent Davon** - Мониторинг публичных чатов на спам/скам (user-mode агент)
@@ -34,7 +34,7 @@ Blacksmith Lab включает в себя:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                         CORE Library                        │
-│  (общий код: AI, RAG, database, Telegram, utils, models)   │
+│  (общий код: AI, RAG, database, Telegram, utils, models)    │
 └─────────────────────────────────────────────────────────────┘
                               ▲
                               │
@@ -53,11 +53,10 @@ Blacksmith Lab включает в себя:
         ▼                   ▼                     ▼
 ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
 │• Blacksmith  │    │• Probiot Bot │    │• Agent Davon │
-│  Web         │    │• Groot Bot   │    │              │
-│• W3A Web     │    │• The Viper   │    │              │
-│• The Viper   │    │  Room Bot    │    │              │
-│  Room        │    │              │    │              │
-│• Uniframe    │    │              │    │              │
+│  Web (multi) │    │• Groot Bot   │    │              │
+│• The Viper   │    │• The Viper   │    │              │
+│  Room        │    │  Room Bot    │    │              │
+│• Uniframe    │    │• Stat Bot    │    │              │
 │  Studio      │    │              │    │              │
 └──────────────┘    └──────────────┘    └──────────────┘
 ```
@@ -94,7 +93,10 @@ Blacksmith Lab включает в себя:
 
 Axum-based веб-серверы с TLS, CORS и reverse proxy через Nginx:
 
-- **Blacksmith Web** (порт 3000) - Веб-интерфейс с AI-агентом поддержки
+- **Blacksmith Web** (порт 3000) - Мультитенантный AI-ассистент
+  - Обслуживает Blacksmith Lab Web UI
+  - Обслуживает Web3 Academy Web UI
+  - Runtime routing по HTTP origin
 - **The Viper Room** (порт 3001) - Генерация подкастов через AI
 - **Uniframe Studio** (порт 8080) - API для дубляжа видео
 
@@ -107,6 +109,7 @@ Telegram боты на базе Teloxide:
 - **Probiot Bot** - RAG-система для ответов на вопросы пользователей
 - **The Viper Room Bot** - Интерфейс к подкаст-платформе через Telegram
 - **Groot Bot** - Модерация, антиспам, управление подписками в чатах
+- **Stat Bot** - Статистика использования веб-приложений для админов
 
 Выбор бота: через переменную окружения `APP_NAME`
 
@@ -137,10 +140,11 @@ blacksmith_lab/
 ├── agent_foundry/          # User-mode агенты
 ├── tooling/
 │   └── whisper/            # Whisper HTTP-сервис
-├── docker/                 # Dockerfiles и скрипты
+├── infra/                  # Инфраструктура и деплой
+│   ├── docker/             # Dockerfiles и entrypoints
+│   └── nginx/              # Nginx конфигурация
 ├── docs/                   # Документация
-│   ├── INFRASTRUCTURE.md   # Nginx, SSL, deployment
-│   └── ...
+│   └── INFRA.md            # Nginx, SSL, deployment
 ├── common_res/             # Общие ресурсы (system_roles, messages, БД)
 ├── CLAUDE.md               # Техническая документация для разработчиков
 └── README.md               # 👈 Вы здесь
@@ -168,7 +172,7 @@ blacksmith_lab/
 
 ## 📚 Документация
 
-- **`docs/INFRASTRUCTURE.md`** - Инфраструктура и деплой:
+- **`docs/INFRA.md`** - Инфраструктура и деплой:
   - Nginx конфигурация
   - SSL/TLS настройка
   - Docker networks

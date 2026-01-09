@@ -34,4 +34,5 @@ pub struct ChatMessage {
     pub sender: String,
     pub message: String,
     pub app_name: String,
+    pub created_at: String,
 }

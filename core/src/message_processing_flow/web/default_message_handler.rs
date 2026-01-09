@@ -1,4 +1,4 @@
-use crate::local_db::local_db::save_message_to_db;
+use crate::local_db::blacksmith_web::chat_history_storage::save_message_to_db;
 use crate::message_processing_flow::message_processing_flow::process_user_raw_request;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::{AppsSystemMessages, CommonMessages};

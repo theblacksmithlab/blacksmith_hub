@@ -1,7 +1,6 @@
 use crate::ai::common::common::raw_llm_processing;
 use crate::ai::common::voice_processing::{
-    generate_parts_batched_google, generate_single_part_elevenlabs, generate_single_part_openai,
-    merge_audio_parts,
+    generate_single_part_via_elevenlabs, generate_single_part_via_openai,
 };
 use crate::local_db::the_viper_room::user_management::get_user_nickname;
 use crate::models::common::ai::LlmModel;
@@ -14,6 +13,9 @@ use crate::utils::common::get_system_role_or_fallback;
 use crate::utils::the_viper_room::news_block_creation_utils::{
     get_dialogs, get_user_dialogs_from_db, mix_podcast_with_music, processing_chats,
     processing_dialogs, summarize_updates, updates_file_creation,
+};
+use crate::utils::the_viper_room::podcast_voiceover::{
+    generate_parts_batched_google, merge_audio_parts,
 };
 use grammers_client::Client as g_Client;
 use sqlx::{Pool, Sqlite};
@@ -159,11 +161,13 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
 
             let part_audio = match tts_provider {
                 TTSProvider::OpenAI => {
-                    generate_single_part_openai(part, &user_tmp_dir, i, app_state.clone()).await?
+                    generate_single_part_via_openai(part, &user_tmp_dir, i, app_state.clone())
+                        .await?
                 }
                 TTSProvider::ElevenLabs => {
-                    generate_single_part_elevenlabs(part, &user_tmp_dir, i).await?
+                    generate_single_part_via_elevenlabs(part, &user_tmp_dir, i).await?
                 }
+                // Google TTS resolved earlier
                 TTSProvider::Google => unreachable!(),
             };
 

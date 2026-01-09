@@ -1,0 +1,11 @@
+FROM bot_foundry_base
+
+USER root
+
+COPY common_res/messages/common /app/common_res/messages/common
+COPY common_res/messages/stat_bot /app/common_res/messages/stat_bot
+COPY common_res/local_db /app/common_res/local_db
+
+USER 1001:1000
+
+ENV APP_NAME="stat_bot"

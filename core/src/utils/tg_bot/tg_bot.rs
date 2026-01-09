@@ -319,7 +319,10 @@ pub fn create_app_tmp_dir(app_name: &AppName) -> std::io::Result<()> {
 }
 
 pub fn is_localdb_implemented(app_name: &AppName) -> bool {
-    matches!(app_name, AppName::GrootBot | AppName::TheViperRoomBot)
+    matches!(
+        app_name,
+        AppName::GrootBot | AppName::TheViperRoomBot | AppName::StatBot
+    )
 }
 
 pub async fn auto_delete_message(

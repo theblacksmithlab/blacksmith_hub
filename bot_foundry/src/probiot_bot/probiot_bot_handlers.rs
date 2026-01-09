@@ -1,5 +1,5 @@
 use anyhow::Result;
-use core::ai::common::voice_processing::simple_openai_tts;
+use core::ai::common::voice_processing::openai_base_tts;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::ProbiotBotMessages;
 use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
@@ -64,7 +64,7 @@ pub(crate) async fn probiot_callback_query_handler(
                             .await;
 
                     if let Some(tts_payload) = tts_payload {
-                        match simple_openai_tts(&tts_payload, app_state.clone()).await {
+                        match openai_base_tts(&tts_payload, app_state.clone(), 1.3).await {
                             Ok(audio_response) => {
                                 let audio_file_path = format!("tmp/{}.mp3", message_id);
                                 audio_response.save(&audio_file_path).await?;

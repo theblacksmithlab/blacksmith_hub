@@ -23,28 +23,28 @@ services:
   bot_foundry_base:
     build:
       context: .
-      dockerfile: docker/Dockerfile.bot_foundry_base
+      dockerfile: infra/docker/Dockerfile.bot_foundry_base
     image: bot_foundry_base
     profiles: [ "never-start" ]
 
   agent_foundry_base:
     build:
       context: .
-      dockerfile: docker/Dockerfile.agent_foundry_base
+      dockerfile: infra/docker/Dockerfile.agent_foundry_base
     image: agent_foundry_base
     profiles: [ "never-start" ]
 
   the_forge_base:
     build:
       context: .
-      dockerfile: docker/Dockerfile.the_forge_base
+      dockerfile: infra/docker/Dockerfile.the_forge_base
     image: the_forge_base
     profiles: [ "never-start" ]
 
   whisper:
     build:
       context: .
-      dockerfile: docker/Dockerfile.whisper
+      dockerfile: infra/docker/Dockerfile.whisper
       args:
         WHISPER_MODEL: small
     container_name: whisper_service
@@ -63,7 +63,7 @@ services:
   probiot_bot:
     build:
       context: .
-      dockerfile: docker/Dockerfile.probiot_bot
+      dockerfile: infra/docker/Dockerfile.probiot_bot
     env_file:
       - .env
     volumes:
@@ -83,7 +83,7 @@ services:
   groot_bot:
     build:
       context: .
-      dockerfile: docker/Dockerfile.groot_bot
+      dockerfile: infra/docker/Dockerfile.groot_bot
     env_file:
       - .env
     volumes:
@@ -110,7 +110,7 @@ services:
   the_viper_room_bot:
     build:
       context: .
-      dockerfile: docker/Dockerfile.the_viper_room_bot
+      dockerfile: infra/docker/Dockerfile.the_viper_room_bot
     env_file:
       - .env
     volumes:
@@ -131,10 +131,31 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  stat_bot:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.stat_bot
+    env_file:
+      - .env
+    volumes:
+      - ./common_res/messages/common:/app/common_res/messages/common
+      - ./common_res/local_db:/app/common_res/local_db
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   agent_davon:
     build:
       context: .
-      dockerfile: docker/Dockerfile.agent_davon
+      dockerfile: infra/docker/Dockerfile.agent_davon
     env_file:
       - .env
     volumes:
@@ -157,7 +178,7 @@ services:
   blacksmith_web:
     build:
       context: .
-      dockerfile: docker/Dockerfile.blacksmith_web
+      dockerfile: infra/docker/Dockerfile.blacksmith_web
     volumes:
       - ./common_res:/app/common_res
     env_file:
@@ -181,7 +202,7 @@ services:
   uniframe_studio:
     build:
       context: .
-      dockerfile: docker/Dockerfile.uniframe_studio
+      dockerfile: infra/docker/Dockerfile.uniframe_studio
     volumes:
       - ./common_res:/app/common_res
     env_file:
@@ -205,7 +226,7 @@ services:
   the_viper_room:
     build:
       context: .
-      dockerfile: docker/Dockerfile.the_viper_room
+      dockerfile: infra/docker/Dockerfile.the_viper_room
     volumes:
       - ./common_res:/app/common_res
     env_file:
