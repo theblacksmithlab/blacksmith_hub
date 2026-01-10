@@ -76,12 +76,15 @@ pub async fn handle_stats_request(
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("Database pool not initialized"))?;
 
-    match get_statistics_for_period(db_pool, app_name.as_str(), stats_period).await {
+    match get_statistics_for_period(db_pool, app_name.as_str(), &stats_period).await {
         Ok((user_stats, request_stats)) => {
-            let period_name = match stats_period {
-                StatisticsPeriod::LastWeek => "за последнюю неделю",
-                StatisticsPeriod::LastMonth => "за последний месяц",
-                StatisticsPeriod::AllTime => "за всё время (90 дней)",
+            let period_name = match &stats_period {
+                StatisticsPeriod::LastWeek => "за последнюю неделю".to_string(),
+                StatisticsPeriod::LastMonth => "за последний месяц".to_string(),
+                StatisticsPeriod::AllTime => "за всё время (90 дней)".to_string(),
+                StatisticsPeriod::CustomRange { start, end } => {
+                    format!("с {} по {}", start, end)
+                }
             };
 
             let app_display_name = match app_name {

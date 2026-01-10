@@ -3,6 +3,7 @@ use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
 use crate::models::tg_bot::groot_bot::groot_bot::{ChatMessageStats, ResourcesDialogState};
 use crate::models::tg_bot::groot_bot::groot_bot::{MessageCounts, MessageReports};
+use crate::models::tg_bot::stat_bot::DateSelectionState;
 use crate::models::tg_bot::the_viper_room_bot::podcast_manager::PodcastManager;
 use crate::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
 use crate::models::the_viper_room::db_models::PendingChannel;
@@ -221,11 +222,15 @@ impl AppNameProvider for TheViperRoomBotState {
 
 pub struct StatBotState {
     pub core: Arc<CoreBotState>,
+    pub date_selection: Mutex<HashMap<u64, DateSelectionState>>,
 }
 
 impl StatBotState {
     pub async fn new(core: Arc<CoreBotState>) -> Result<Self> {
-        Ok(Self { core })
+        Ok(Self {
+            core,
+            date_selection: Mutex::new(HashMap::new()),
+        })
     }
 }
 

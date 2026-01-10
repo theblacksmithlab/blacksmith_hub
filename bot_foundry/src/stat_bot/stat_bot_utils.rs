@@ -1,6 +1,15 @@
+use anyhow::Result;
 use core::models::common::app_name::AppName;
+use core::models::common::system_messages::{AppsSystemMessages, StatBotMessages};
+use core::state::tg_bot::StatBotState;
+use core::utils::common::get_message;
 use std::env;
-use teloxide_core::types::{InlineKeyboardButton, InlineKeyboardMarkup};
+use std::sync::Arc;
+use teloxide::prelude::Requester;
+use teloxide::types::ChatId;
+use teloxide::Bot;
+use teloxide_core::payloads::SendMessageSetters;
+use teloxide_core::types::{InlineKeyboardButton, InlineKeyboardMarkup, ParseMode};
 
 pub fn check_admin_access(user_id: u64) -> Vec<AppName> {
     let mut accessible_apps = Vec::new();
@@ -59,10 +68,55 @@ pub fn create_stats_keyboard(accessible_apps: &[AppName]) -> InlineKeyboardMarku
             format!("stats:{}:all", app_code),
         )]);
         keyboard.push(vec![InlineKeyboardButton::callback(
+            format!("📅 {}: Кастомный период", app_label),
+            format!("custom:{}", app_code),
+        )]);
+        keyboard.push(vec![InlineKeyboardButton::callback(
             format!("📥 {}: Экспорт запросов", app_label),
             format!("export:{}:requests", app_code),
         )]);
     }
 
     InlineKeyboardMarkup::new(keyboard)
+}
+
+pub async fn send_main_menu(
+    bot: &Bot,
+    chat_id: ChatId,
+    user_id: u64,
+    app_state: &Arc<StatBotState>,
+    accessible_apps: &[AppName],
+) -> Result<()> {
+    let mut date_selection = app_state.date_selection.lock().await;
+    date_selection.remove(&user_id);
+    drop(date_selection);
+
+    let app_names: Vec<String> = accessible_apps
+        .iter()
+        .map(|app| match app {
+            AppName::BlacksmithWeb => "Blacksmith Web".to_string(),
+            AppName::W3AWeb => "W3A Web".to_string(),
+            _ => String::new(),
+        })
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let apps = app_names
+        .iter()
+        .map(|name| format!("• {}", name))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let welcome_message_template =
+        get_message(AppsSystemMessages::StatBot(StatBotMessages::StartMessage)).await?;
+    let welcome_message = welcome_message_template.replace("{apps}", &apps);
+
+    let keyboard = create_stats_keyboard(accessible_apps);
+
+    bot.send_message(chat_id, welcome_message)
+        .parse_mode(ParseMode::Html)
+        .reply_markup(keyboard)
+        .await?;
+
+    Ok(())
 }

@@ -22,25 +22,27 @@ pub struct RequestStatistics {
     pub app_name: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum StatisticsPeriod {
     LastWeek,
     LastMonth,
     AllTime,
+    CustomRange { start: String, end: String },
 }
 
 impl StatisticsPeriod {
-    fn get_start_datetime(&self) -> Option<String> {
+    fn get_date_range(&self) -> (Option<String>, Option<String>) {
         match self {
             Self::LastWeek => {
                 let start = Utc::now() - Duration::days(DAYS_IN_WEEK);
-                Some(start.to_rfc3339())
+                (Some(start.to_rfc3339()), None)
             }
             Self::LastMonth => {
                 let start = Utc::now() - Duration::days(DAYS_IN_MONTH);
-                Some(start.to_rfc3339())
+                (Some(start.to_rfc3339()), None)
             }
-            Self::AllTime => None,
+            Self::AllTime => (None, None),
+            Self::CustomRange { start, end } => (Some(start.clone()), Some(end.clone())),
         }
     }
 }
@@ -48,10 +50,27 @@ impl StatisticsPeriod {
 pub async fn get_unique_users_count(
     pool: &SqlitePool,
     app_name: &str,
-    period: StatisticsPeriod,
+    period: &StatisticsPeriod,
 ) -> Result<UserStatistics, Error> {
-    let count = match period.get_start_datetime() {
-        Some(start_date) => {
+    let (start_date, end_date) = period.get_date_range();
+
+    let count = match (start_date, end_date) {
+        (Some(start), Some(end)) => {
+            let result: (i64,) = sqlx::query_as(
+                "SELECT COUNT(DISTINCT user_id)
+                 FROM chat_messages
+                 WHERE app_name = ?
+                 AND datetime(created_at) >= datetime(?)
+                 AND datetime(created_at) <= datetime(?)",
+            )
+            .bind(app_name)
+            .bind(start)
+            .bind(end)
+            .fetch_one(pool)
+            .await?;
+            result.0
+        }
+        (Some(start), None) => {
             let result: (i64,) = sqlx::query_as(
                 "SELECT COUNT(DISTINCT user_id)
                  FROM chat_messages
@@ -59,12 +78,12 @@ pub async fn get_unique_users_count(
                  AND datetime(created_at) >= datetime(?)",
             )
             .bind(app_name)
-            .bind(start_date)
+            .bind(start)
             .fetch_one(pool)
             .await?;
             result.0
         }
-        None => {
+        (None, None) => {
             let result: (i64,) = sqlx::query_as(
                 "SELECT COUNT(DISTINCT user_id)
                  FROM chat_messages
@@ -75,10 +94,13 @@ pub async fn get_unique_users_count(
             .await?;
             result.0
         }
+        (None, Some(_)) => {
+            unreachable!("Invalid date range: end without start")
+        }
     };
 
     Ok(UserStatistics {
-        period,
+        period: period.clone(),
         unique_users: count,
         app_name: app_name.to_string(),
     })
@@ -87,10 +109,28 @@ pub async fn get_unique_users_count(
 pub async fn get_request_count(
     pool: &SqlitePool,
     app_name: &str,
-    period: StatisticsPeriod,
+    period: &StatisticsPeriod,
 ) -> Result<RequestStatistics, Error> {
-    let count = match period.get_start_datetime() {
-        Some(start_date) => {
+    let (start_date, end_date) = period.get_date_range();
+
+    let count = match (start_date, end_date) {
+        (Some(start), Some(end)) => {
+            let result: (i64,) = sqlx::query_as(
+                "SELECT COUNT(*)
+                 FROM chat_messages
+                 WHERE app_name = ?
+                 AND sender = 'user'
+                 AND datetime(created_at) >= datetime(?)
+                 AND datetime(created_at) <= datetime(?)",
+            )
+            .bind(app_name)
+            .bind(start)
+            .bind(end)
+            .fetch_one(pool)
+            .await?;
+            result.0
+        }
+        (Some(start), None) => {
             let result: (i64,) = sqlx::query_as(
                 "SELECT COUNT(*)
                  FROM chat_messages
@@ -99,12 +139,12 @@ pub async fn get_request_count(
                  AND datetime(created_at) >= datetime(?)",
             )
             .bind(app_name)
-            .bind(start_date)
+            .bind(start)
             .fetch_one(pool)
             .await?;
             result.0
         }
-        None => {
+        (None, None) => {
             let result: (i64,) = sqlx::query_as(
                 "SELECT COUNT(*)
                  FROM chat_messages
@@ -116,10 +156,13 @@ pub async fn get_request_count(
             .await?;
             result.0
         }
+        (None, Some(_)) => {
+            unreachable!("Invalid date range: end without start")
+        }
     };
 
     Ok(RequestStatistics {
-        period,
+        period: period.clone(),
         requests: count,
         app_name: app_name.to_string(),
     })
@@ -128,7 +171,7 @@ pub async fn get_request_count(
 pub async fn get_statistics_for_period(
     pool: &SqlitePool,
     app_name: &str,
-    period: StatisticsPeriod,
+    period: &StatisticsPeriod,
 ) -> Result<(UserStatistics, RequestStatistics), Error> {
     let user_stats = get_unique_users_count(pool, app_name, period).await?;
     let request_stats = get_request_count(pool, app_name, period).await?;
@@ -194,69 +237,5 @@ pub async fn export_user_requests_to_csv(
     }
 
     info!("CSV export completed: {}", output_path);
-    Ok(())
-}
-
-pub async fn export_statistics_to_csv(
-    pool: &SqlitePool,
-    app_name: &str,
-    period: StatisticsPeriod,
-    output_path: &str,
-) -> Result<(), anyhow::Error> {
-    info!(
-        "Starting statistics CSV export for app: {} (period: {:?})",
-        app_name, period
-    );
-
-    let (user_stats, request_stats) = get_statistics_for_period(pool, app_name, period).await?;
-
-    let mut file = match File::create(output_path) {
-        Ok(f) => {
-            info!("Created statistics CSV file: {}", output_path);
-            f
-        }
-        Err(e) => {
-            error!(
-                "Failed to create statistics CSV file {}: {}",
-                output_path, e
-            );
-            return Err(e.into());
-        }
-    };
-
-    if let Err(e) = file.write_all(b"\xEF\xBB\xBF") {
-        error!("Failed to write BOM to statistics CSV: {}", e);
-        return Err(e.into());
-    }
-
-    let mut wtr = WriterBuilder::new().from_writer(file);
-
-    if let Err(e) = wtr.write_record(&["period", "unique_users", "requests"]) {
-        error!("Failed to write statistics CSV headers: {}", e);
-        return Err(e.into());
-    }
-
-    let period_name = format!("{:?}", period);
-    if let Err(e) = wtr.write_record(&[
-        &period_name,
-        &user_stats.unique_users.to_string(),
-        &request_stats.requests.to_string(),
-    ]) {
-        error!(
-            "Failed to write statistics CSV record for {:?}: {}",
-            period, e
-        );
-        return Err(e.into());
-    }
-
-    if let Err(e) = wtr.flush() {
-        error!(
-            "Failed to flush statistics CSV file: {}. File may be incomplete.",
-            e
-        );
-        return Err(e.into());
-    }
-
-    info!("Statistics CSV export completed: {}", output_path);
     Ok(())
 }
