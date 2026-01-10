@@ -9,6 +9,7 @@ use core::local_db::blacksmith_web::statistics::StatisticsPeriod;
 use core::models::common::app_name::AppName;
 use core::models::tg_bot::stat_bot::{DateSelectionState, SelectionStep};
 use core::state::tg_bot::StatBotState;
+use core::utils::moscow_time::{moscow_date_to_rfc3339_end, moscow_date_to_rfc3339_start};
 use std::str::FromStr;
 use std::sync::Arc;
 use teloxide::payloads::SendMessageSetters;
@@ -256,8 +257,8 @@ pub async fn handle_day_selection(
         );
 
         let custom_period = StatisticsPeriod::CustomRange {
-            start: start_date.format("%Y-%m-%d").to_string(),
-            end: date.format("%Y-%m-%d").to_string(),
+            start: moscow_date_to_rfc3339_start(start_date),
+            end: moscow_date_to_rfc3339_end(date),
         };
 
         handle_stats_request_with_period(bot, q, app_state, app_code, custom_period).await?;

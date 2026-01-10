@@ -1,4 +1,5 @@
-use chrono::{Datelike, Months, NaiveDate, Utc};
+use chrono::{Datelike, Months, NaiveDate};
+use core::utils::moscow_time::moscow_today;
 use teloxide_core::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
 const MAX_DATA_AGE_DAYS: i64 = 90;
@@ -23,7 +24,7 @@ pub fn format_month_name(month: u32) -> &'static str {
 
 // Check if a date is available (not in the future, not older than 90 days, and not before optional minimum date)
 pub fn is_date_available(date: NaiveDate, unavailable_before: Option<NaiveDate>) -> bool {
-    let now = Utc::now().naive_utc().date();
+    let now = moscow_today();
     let min_date = now - chrono::Duration::days(MAX_DATA_AGE_DAYS);
 
     date <= now && date >= min_date && unavailable_before.map_or(true, |before| date >= before)
@@ -31,7 +32,7 @@ pub fn is_date_available(date: NaiveDate, unavailable_before: Option<NaiveDate>)
 
 // Generate keyboard with available months (current + 3 months back to cover 90 days)
 pub fn create_month_selection_keyboard(app_code: &str, for_end_date: bool) -> InlineKeyboardMarkup {
-    let now = Utc::now().naive_utc().date();
+    let now = moscow_today();
     let mut keyboard: Vec<Vec<InlineKeyboardButton>> = vec![];
 
     // Show current month + 3 months back (total 4 months) to fully cover 90 days

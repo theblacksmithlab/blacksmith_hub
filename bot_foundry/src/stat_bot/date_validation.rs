@@ -1,5 +1,6 @@
 use anyhow::{bail, Result};
 use chrono::NaiveDate;
+use core::utils::moscow_time::moscow_today;
 
 const MAX_PERIOD_DAYS: i64 = 90;
 
@@ -19,7 +20,7 @@ pub fn validate_date_range(start: NaiveDate, end: NaiveDate) -> Result<()> {
     }
 
     // 4. end not in future
-    let today = chrono::Utc::now().naive_utc().date();
+    let today = moscow_today();
     if end > today {
         bail!("Конечная дата не может быть в будущем");
     }

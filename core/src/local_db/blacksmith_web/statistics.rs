@@ -1,4 +1,5 @@
-use chrono::{Duration, Utc};
+use crate::utils::moscow_time::moscow_now;
+use chrono::Duration;
 use csv::WriterBuilder;
 use sqlx::{Error, SqlitePool};
 use std::fs::File;
@@ -34,11 +35,11 @@ impl StatisticsPeriod {
     fn get_date_range(&self) -> (Option<String>, Option<String>) {
         match self {
             Self::LastWeek => {
-                let start = Utc::now() - Duration::days(DAYS_IN_WEEK);
+                let start = moscow_now() - Duration::days(DAYS_IN_WEEK);
                 (Some(start.to_rfc3339()), None)
             }
             Self::LastMonth => {
-                let start = Utc::now() - Duration::days(DAYS_IN_MONTH);
+                let start = moscow_now() - Duration::days(DAYS_IN_MONTH);
                 (Some(start.to_rfc3339()), None)
             }
             Self::AllTime => (None, None),

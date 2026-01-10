@@ -1,5 +1,5 @@
 use crate::models::blacksmith_web::blacksmith_web::ChatMessage;
-use chrono::Utc;
+use crate::utils::moscow_time::moscow_now;
 use sqlx::{Error, SqlitePool};
 use tracing::info;
 
@@ -47,7 +47,7 @@ pub async fn save_message_to_db(
     message: &str,
     app_name: &str,
 ) -> Result<(), Error> {
-    let now = Utc::now().to_rfc3339();
+    let now = moscow_now().to_rfc3339();
 
     sqlx::query(
         "INSERT INTO chat_messages (user_id, sender, message, app_name, created_at)
