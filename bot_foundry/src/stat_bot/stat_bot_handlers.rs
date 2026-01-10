@@ -1,6 +1,6 @@
 use crate::stat_bot::date_selection_handlers::{
-    handle_back_to_main, handle_back_to_months, handle_custom_period_start,
-    handle_day_selection, handle_month_selection,
+    handle_back_to_main, handle_back_to_months, handle_custom_period_start, handle_day_selection,
+    handle_month_selection,
 };
 use crate::stat_bot::stat_bot_utils::{check_admin_access, send_main_menu};
 use crate::stat_bot::statistics_processing::{handle_export_requests, handle_stats_request};
@@ -75,7 +75,7 @@ pub async fn stat_bot_command_handler(
     match cmd {
         StatBotCommands::Start => {
             let welcome_message =
-                get_message(AppsSystemMessages::StatBot(StatBotMessages::StartMessage)).await?;
+                get_message(AppsSystemMessages::StatBot(StatBotMessages::Welcome)).await?;
 
             bot.send_message(chat_id, welcome_message)
                 .parse_mode(ParseMode::Html)
@@ -111,7 +111,7 @@ pub async fn stat_bot_message_handler(
                 return Ok(());
             }
         }
-        
+
         let bot_system_message = get_message(AppsSystemMessages::StatBot(
             StatBotMessages::TextMessageHandling,
         ))
@@ -176,8 +176,15 @@ pub async fn stat_bot_callback_query_handler(
                     .await?;
             }
             ["sel_month", selection_type, app_code, year_month] => {
-                handle_month_selection(&bot, &q, app_state, *selection_type, *year_month, *app_code)
-                    .await?;
+                handle_month_selection(
+                    &bot,
+                    &q,
+                    app_state,
+                    *selection_type,
+                    *year_month,
+                    *app_code,
+                )
+                .await?;
             }
             ["sel_day", selection_type, app_code, date] => {
                 handle_day_selection(&bot, &q, app_state, *selection_type, *date, *app_code)

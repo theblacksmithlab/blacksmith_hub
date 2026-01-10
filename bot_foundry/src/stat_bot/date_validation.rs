@@ -1,5 +1,5 @@
+use anyhow::{bail, Result};
 use chrono::NaiveDate;
-use anyhow::{Result, bail};
 
 const MAX_PERIOD_DAYS: i64 = 90;
 
@@ -29,5 +29,8 @@ pub fn validate_date_range(start: NaiveDate, end: NaiveDate) -> Result<()> {
 
 // Format validation error message for user
 pub fn format_validation_error(error: &str) -> String {
-    format!("❌ Ошибка: {}\n\nПожалуйста, выберите другой период.", error)
+    format!(
+        "❌ Ошибка: {}\n\nПожалуйста, выберите другой период.",
+        error
+    )
 }

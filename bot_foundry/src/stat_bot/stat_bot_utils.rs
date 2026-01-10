@@ -108,7 +108,7 @@ pub async fn send_main_menu(
         .join("\n");
 
     let welcome_message_template =
-        get_message(AppsSystemMessages::StatBot(StatBotMessages::StartMessage)).await?;
+        get_message(AppsSystemMessages::StatBot(StatBotMessages::MainMenu)).await?;
     let welcome_message = welcome_message_template.replace("{apps}", &apps);
 
     let keyboard = create_stats_keyboard(accessible_apps);

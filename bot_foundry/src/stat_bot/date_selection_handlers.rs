@@ -1,4 +1,6 @@
-use crate::stat_bot::calendar_utils::{create_day_selection_keyboard, create_month_selection_keyboard};
+use crate::stat_bot::calendar_utils::{
+    create_day_selection_keyboard, create_month_selection_keyboard,
+};
 use crate::stat_bot::date_validation::{format_validation_error, validate_date_range};
 use crate::stat_bot::stat_bot_utils::{check_admin_access, create_stats_keyboard, send_main_menu};
 use anyhow::Result;
@@ -15,7 +17,6 @@ use teloxide_core::types::CallbackQuery;
 use teloxide_core::Bot;
 use tracing::{error, info};
 
-// Handle: ["custom", app_code]
 pub async fn handle_custom_period_start(
     bot: &Bot,
     q: &CallbackQuery,
@@ -43,7 +44,6 @@ pub async fn handle_custom_period_start(
         return Ok(());
     }
 
-    // Initialize date selection state
     let mut date_selection = app_state.date_selection.lock().await;
     date_selection.insert(
         user_id,
@@ -70,7 +70,6 @@ pub async fn handle_custom_period_start(
     Ok(())
 }
 
-// Handle: ["sel_month", selection_type, year_month]
 pub async fn handle_month_selection(
     bot: &Bot,
     q: &CallbackQuery,
@@ -82,7 +81,6 @@ pub async fn handle_month_selection(
     let chat_id = q.message.as_ref().unwrap().chat().id;
     let user_id = q.from.id.0;
 
-    // Parse year-month
     let parts: Vec<&str> = year_month.split('-').collect();
     if parts.len() != 2 {
         bot.answer_callback_query(&q.id).await?;
@@ -99,7 +97,6 @@ pub async fn handle_month_selection(
         return Ok(());
     }
 
-    // Update state
     let mut date_selection = app_state.date_selection.lock().await;
     if let Some(state) = date_selection.get_mut(&user_id) {
         if selection_type == "start" {
@@ -122,7 +119,6 @@ pub async fn handle_month_selection(
 
     bot.answer_callback_query(&q.id).await?;
 
-    // Show day selection keyboard
     let for_end_date = selection_type == "end";
     let keyboard = create_day_selection_keyboard(app_code, year, month, for_end_date, start_date);
 
@@ -143,7 +139,6 @@ pub async fn handle_month_selection(
     Ok(())
 }
 
-// Handle: ["sel_day", selection_type, date]
 pub async fn handle_day_selection(
     bot: &Bot,
     q: &CallbackQuery,
@@ -155,7 +150,6 @@ pub async fn handle_day_selection(
     let chat_id = q.message.as_ref().unwrap().chat().id;
     let user_id = q.from.id.0;
 
-    // Parse date (format: YYYY-MM-DD)
     let date = match NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
         Ok(d) => d,
         Err(e) => {
@@ -167,7 +161,6 @@ pub async fn handle_day_selection(
     };
 
     if selection_type == "start" {
-        // Save start_date and proceed to end_date selection
         let mut date_selection = app_state.date_selection.lock().await;
         if let Some(state) = date_selection.get_mut(&user_id) {
             state.start_date = Some(date);
@@ -186,7 +179,6 @@ pub async fn handle_day_selection(
 
         bot.answer_callback_query(&q.id).await?;
 
-        // Show month selection for end_date
         let keyboard = create_month_selection_keyboard(app_code, true);
         bot.send_message(
             chat_id,
@@ -201,7 +193,6 @@ pub async fn handle_day_selection(
         .reply_markup(keyboard)
         .await?;
     } else {
-        // end_date selected - validate and show statistics
         let mut date_selection = app_state.date_selection.lock().await;
         let state = match date_selection.get(&user_id) {
             Some(s) => s.clone(),
@@ -231,27 +222,27 @@ pub async fn handle_day_selection(
             }
         };
 
-        // Validate date range
         if let Err(e) = validate_date_range(start_date, date) {
             drop(date_selection);
             bot.answer_callback_query(&q.id).await?;
             let error_msg = format_validation_error(&e.to_string());
             bot.send_message(chat_id, error_msg).await?;
 
-            // Clear state and show main menu
             let mut date_selection = app_state.date_selection.lock().await;
             date_selection.remove(&user_id);
             drop(date_selection);
 
             let accessible_apps = check_admin_access(user_id);
             let keyboard = create_stats_keyboard(&accessible_apps);
-            bot.send_message(chat_id, "Выберите другой период или используйте фиксированные периоды:")
-                .reply_markup(keyboard)
-                .await?;
+            bot.send_message(
+                chat_id,
+                "Выберите другой период или используйте фиксированные периоды:",
+            )
+            .reply_markup(keyboard)
+            .await?;
             return Ok(());
         }
 
-        // Clear selection state before processing stats
         date_selection.remove(&user_id);
         drop(date_selection);
 
@@ -264,20 +255,17 @@ pub async fn handle_day_selection(
             date.format("%Y-%m-%d")
         );
 
-        // Create CustomRange period and call stats handler
         let custom_period = StatisticsPeriod::CustomRange {
             start: start_date.format("%Y-%m-%d").to_string(),
             end: date.format("%Y-%m-%d").to_string(),
         };
 
-        // Reuse existing handle_stats_request but pass custom period
         handle_stats_request_with_period(bot, q, app_state, app_code, custom_period).await?;
     }
 
     Ok(())
 }
 
-// Handle: ["back_to_main"]
 pub async fn handle_back_to_main(
     bot: &Bot,
     q: &CallbackQuery,
@@ -288,14 +276,11 @@ pub async fn handle_back_to_main(
     let user_id = q.from.id.0;
 
     bot.answer_callback_query(&q.id).await?;
-
-    // Use shared function to show main menu and clear state
     send_main_menu(bot, chat_id, user_id, &app_state, accessible_apps).await?;
 
     Ok(())
 }
 
-// Handle: ["back_to_months", selection_type]
 pub async fn handle_back_to_months(
     bot: &Bot,
     q: &CallbackQuery,
@@ -305,7 +290,6 @@ pub async fn handle_back_to_months(
     let chat_id = q.message.as_ref().unwrap().chat().id;
     let user_id = q.from.id.0;
 
-    // Get app_code from state
     let date_selection = app_state.date_selection.lock().await;
     let app_code = match date_selection.get(&user_id) {
         Some(state) => state.app_name.as_str().to_string(),
@@ -322,7 +306,6 @@ pub async fn handle_back_to_months(
     };
     drop(date_selection);
 
-    // Update state back to month selection
     let mut date_selection = app_state.date_selection.lock().await;
     if let Some(state) = date_selection.get_mut(&user_id) {
         if selection_type == "start" {
@@ -335,7 +318,6 @@ pub async fn handle_back_to_months(
 
     bot.answer_callback_query(&q.id).await?;
 
-    // Show month selection keyboard
     let for_end_date = selection_type == "end";
     let keyboard = create_month_selection_keyboard(&app_code, for_end_date);
 
@@ -356,7 +338,6 @@ pub async fn handle_back_to_months(
     Ok(())
 }
 
-// Helper to call handle_stats_request with custom period
 async fn handle_stats_request_with_period(
     bot: &Bot,
     q: &CallbackQuery,
@@ -426,7 +407,10 @@ async fn handle_stats_request_with_period(
                 app_display_name, period_name, user_stats.unique_users, request_stats.requests
             );
 
-            let response = format!("{}{}{}{}", upper_divider, response_template, lower_divider, result_footer);
+            let response = format!(
+                "{}{}{}{}",
+                upper_divider, response_template, result_footer, lower_divider
+            );
 
             bot.send_message(chat_id, response)
                 .parse_mode(teloxide_core::types::ParseMode::Html)

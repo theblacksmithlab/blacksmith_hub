@@ -7,6 +7,7 @@ use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::CommonMessages;
 use core::state::tg_bot::StatBotState;
 use core::utils::common::get_message;
+use core::utils::tg_bot::tg_bot::auto_delete_message;
 use std::fs;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -63,8 +64,17 @@ pub async fn handle_stats_request(
         }
     };
 
-    bot.send_message(chat_id, "⏳ Загружаю статистику...")
+    let bot_system_message = bot
+        .send_message(chat_id, "⏳ Загружаю статистику...")
         .await?;
+
+    auto_delete_message(
+        bot.clone(),
+        chat_id,
+        bot_system_message.id,
+        Some(Duration::from_millis(1750)),
+    )
+    .await;
 
     sleep(Duration::from_secs(2)).await;
 
@@ -106,7 +116,10 @@ pub async fn handle_stats_request(
                 app_display_name, period_name, user_stats.unique_users, request_stats.requests
             );
 
-            let response = format!("{}{}{}{}", upper_divider, response_template, lower_divider, result_footer);
+            let response = format!(
+                "{}{}{}{}",
+                upper_divider, response_template, result_footer, lower_divider
+            );
 
             bot.send_message(chat_id, response).parse_mode(Html).await?;
         }
@@ -156,7 +169,15 @@ pub async fn handle_export_requests(
         return Ok(());
     }
 
-    bot.send_message(chat_id, "⏳ Формирую CSV файл...").await?;
+    let bot_system_message = bot.send_message(chat_id, "⏳ Формирую CSV файл...").await?;
+
+    auto_delete_message(
+        bot.clone(),
+        chat_id,
+        bot_system_message.id,
+        Some(Duration::from_millis(2750)),
+    )
+    .await;
 
     sleep(Duration::from_secs(3)).await;
 
@@ -200,9 +221,14 @@ pub async fn handle_export_requests(
                 Utc::now().format("%d.%m.%Y %H:%M")
             );
 
-            let description = format!("{}{}{}{}", upper_divider, description_template, lower_divider, description_footer);
+            let description = format!(
+                "{}{}{}{}",
+                upper_divider, description_template, lower_divider, description_footer
+            );
 
-            bot.send_message(chat_id, description).parse_mode(Html).await?;
+            bot.send_message(chat_id, description)
+                .parse_mode(Html)
+                .await?;
 
             match bot
                 .send_document(chat_id, InputFile::file(&file_path))
