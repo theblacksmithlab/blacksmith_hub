@@ -1,7 +1,10 @@
-use crate::stat_bot::stat_bot_utils::{check_admin_access, create_stats_keyboard};
+use crate::stat_bot::date_selection_handlers::{
+    handle_back_to_main, handle_back_to_months, handle_custom_period_start, handle_day_selection,
+    handle_month_selection,
+};
+use crate::stat_bot::stat_bot_utils::{check_admin_access, send_main_menu};
 use crate::stat_bot::statistics_processing::{handle_export_requests, handle_stats_request};
 use anyhow::Result;
-use core::models::common::app_name::AppName;
 use core::models::common::system_messages::AppsSystemMessages;
 use core::models::common::system_messages::{CommonMessages, StatBotMessages};
 use core::models::tg_bot::stat_bot::StatBotCommands;
@@ -71,32 +74,14 @@ pub async fn stat_bot_command_handler(
 
     match cmd {
         StatBotCommands::Start => {
-            let app_names: Vec<String> = accessible_apps
-                .iter()
-                .map(|app| match app {
-                    AppName::BlacksmithWeb => "Blacksmith Web".to_string(),
-                    AppName::W3AWeb => "W3A Web".to_string(),
-                    _ => String::new(),
-                })
-                .filter(|s| !s.is_empty())
-                .collect();
-
-            let apps = app_names
-                .iter()
-                .map(|name| format!("• {}", name))
-                .collect::<Vec<_>>()
-                .join("\n");
-
-            let welcome_message_template =
-                get_message(AppsSystemMessages::StatBot(StatBotMessages::StartMessage)).await?;
-            let welcome_message = welcome_message_template.replace("{apps}", &apps);
-
-            let keyboard = create_stats_keyboard(&accessible_apps);
+            let welcome_message =
+                get_message(AppsSystemMessages::StatBot(StatBotMessages::Welcome)).await?;
 
             bot.send_message(chat_id, welcome_message)
                 .parse_mode(ParseMode::Html)
-                .reply_markup(keyboard)
                 .await?;
+
+            send_main_menu(&bot, chat_id, user_id, &_app_state, &accessible_apps).await?;
         }
     }
 
@@ -106,12 +91,26 @@ pub async fn stat_bot_command_handler(
 pub async fn stat_bot_message_handler(
     bot: Bot,
     msg: Message,
-    _app_state: Arc<StatBotState>,
+    app_state: Arc<StatBotState>,
 ) -> Result<()> {
     let chat_id = msg.chat.id;
+    let user_id = msg.from.as_ref().map(|u| u.id.0);
 
     if let Some(text) = msg.text() {
         info!("Received text message from user: {}", text);
+
+        if let Some(uid) = user_id {
+            let date_selection = app_state.date_selection.lock().await;
+            if date_selection.contains_key(&uid) {
+                drop(date_selection);
+
+                let response = "⚠️ Вы находитесь в меню выбора дат для отчёта.\n\
+                                Пожалуйста, используйте кнопки для выбора периода.\n\n\
+                                Чтобы вернуться в главное меню, нажмите \"Назад в Главное меню\".";
+                bot.send_message(chat_id, response).await?;
+                return Ok(());
+            }
+        }
 
         let bot_system_message = get_message(AppsSystemMessages::StatBot(
             StatBotMessages::TextMessageHandling,
@@ -171,6 +170,34 @@ pub async fn stat_bot_callback_query_handler(
             }
             ["export", app_code, "requests"] => {
                 handle_export_requests(&bot, &q, app_state, *app_code, &accessible_apps).await?;
+            }
+            ["custom", app_code] => {
+                handle_custom_period_start(&bot, &q, app_state, *app_code, &accessible_apps)
+                    .await?;
+            }
+            ["sel_month", selection_type, app_code, year_month] => {
+                handle_month_selection(
+                    &bot,
+                    &q,
+                    app_state,
+                    *selection_type,
+                    *year_month,
+                    *app_code,
+                )
+                .await?;
+            }
+            ["sel_day", selection_type, app_code, date] => {
+                handle_day_selection(&bot, &q, app_state, *selection_type, *date, *app_code)
+                    .await?;
+            }
+            ["back_to_main"] => {
+                handle_back_to_main(&bot, &q, app_state, &accessible_apps).await?;
+            }
+            ["back_to_months", selection_type] => {
+                handle_back_to_months(&bot, &q, app_state, *selection_type).await?;
+            }
+            ["ignore"] => {
+                bot.answer_callback_query(&q.id).await?;
             }
             _ => {
                 bot.answer_callback_query(&q.id).await?;

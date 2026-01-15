@@ -12,15 +12,17 @@ pub enum AppsSystemMessages {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StatBotMessages {
-    StartMessage,
+    Welcome,
+    MainMenu,
     TextMessageHandling,
 }
 
 impl StatBotMessages {
     pub fn as_str(&self) -> &str {
         match self {
-            StatBotMessages::StartMessage => "start_message",
+            StatBotMessages::Welcome => "welcome_message",
             StatBotMessages::TextMessageHandling => "text_message_handling",
+            StatBotMessages::MainMenu => "main_menu_message",
         }
     }
 }
