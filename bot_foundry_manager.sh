@@ -58,7 +58,7 @@ redeploy_bot() {
     docker compose stop $bot
     docker compose rm -f $bot
 
-    IMAGE_ID=$(docker images -q blacksmith_lab_${bot})
+    IMAGE_ID=$(docker images -q blacksmith-core_${bot})
     if [[ -n "$IMAGE_ID" ]]; then
         print_message "${YELLOW}" "2. Removing old $bot image: $IMAGE_ID"
         docker rmi -f "$IMAGE_ID"
@@ -102,7 +102,7 @@ full_redeploy_bot() {
     docker compose stop $bot
     docker compose rm -f $bot
 
-    IMAGE_ID=$(docker images -q blacksmith_lab_${bot})
+    IMAGE_ID=$(docker images -q blacksmith-core_${bot})
     if [[ -n "$IMAGE_ID" ]]; then
         print_message "${YELLOW}" "2. Removing old $bot image: $IMAGE_ID"
         docker rmi -f "$IMAGE_ID"

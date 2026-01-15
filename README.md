@@ -133,7 +133,7 @@ HTTP-микросервис для транскрибации голосовых
 ## 📂 Структура директорий
 
 ```
-blacksmith_lab/
+blacksmith-core/
 ├── core/                    # Общая библиотека
 ├── the_forge/              # Веб-серверы
 ├── bot_foundry/            # Telegram боты
