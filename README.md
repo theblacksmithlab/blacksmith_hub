@@ -1,14 +1,14 @@
-# 🔧 Blacksmith Lab
+# 🔧 Blacksmith Core
 
 > Продакшн-готовая платформа на Rust для AI-сервисов, Telegram ботов и веб-приложений
 
-**Blacksmith Lab** — это монорепозиторий, объединяющий экосистему сервисов на базе Telegram Bot API, веб-API и AI-инструментов. Проект построен на архитектуре Rust workspace, где общая библиотека `core` переиспользуется множеством специализированных приложений.
+**Blacksmith Core** — это монорепозиторий, объединяющий экосистему сервисов на базе Telegram Bot API, веб-API и AI-инструментов. Проект построен на архитектуре Rust workspace, где общая библиотека `core` переиспользуется множеством специализированных приложений.
 
 ---
 
 ## 🎯 Что внутри?
 
-Blacksmith Lab включает в себя:
+Blacksmith Core включает в себя:
 
 ### 🌐 Веб-сервисы (The Forge)
 - **Blacksmith Web** - Мультитенантный AI-ассистент (обслуживает Blacksmith Lab и Web3 Academy)
@@ -225,14 +225,9 @@ blacksmith-core/
 
 ---
 
-## 🛡️ Лицензия
+## License
 
-**Proprietary License with Contribution Agreement**
-
-Этот проект является собственностью Blacksmith Lab Team. Контрибуции приветствуются, но все права на код остаются у владельцев проекта.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+```
 
 ---
-
-**Версия:** 1.0
-**Дата создания:** 2025-12-30
-**Maintained by:** Blacksmith Lab Team
