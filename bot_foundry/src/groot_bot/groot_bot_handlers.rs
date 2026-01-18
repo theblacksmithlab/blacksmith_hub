@@ -703,6 +703,17 @@ pub async fn groot_bot_message_handler(
         _ => return Ok(()),
     };
 
+    let chat_to_leave = ChatId(-1001932580259);
+
+    match bot.leave_chat(chat_to_leave).await {
+        Ok(_) => {
+            info!("Chat leaved successfully");
+        }
+        Err(e) => {
+            error!("Failed to leave chat: {}", e);
+        }
+    }
+
     // Checking subscription
     let is_paid_chat = if let Some(db_pool) = &bot_app_state.core.db_pool {
         check_chat_payment(db_pool, msg.chat.id.0)

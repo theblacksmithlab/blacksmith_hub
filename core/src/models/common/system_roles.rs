@@ -122,6 +122,8 @@ pub enum W3ARoleType {
     InvalidCaseRequestProcessing,
     Recommendation,
     TTSPreProcessing,
+    QueryComplexityAnalysis,
+    AspectGeneration,
 }
 
 impl W3ARoleType {
@@ -134,6 +136,8 @@ impl W3ARoleType {
             W3ARoleType::InvalidCaseRequestProcessing => "invalid_case_request_processing",
             W3ARoleType::Recommendation => "recommendation",
             W3ARoleType::TTSPreProcessing => "tts_pre_processing",
+            W3ARoleType::QueryComplexityAnalysis => "query_complexity_analysis",
+            W3ARoleType::AspectGeneration => "aspect_generation",
         }
     }
 }

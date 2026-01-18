@@ -12,6 +12,7 @@ use tracing::{info, warn};
 pub mod context_builder;
 pub mod get_results_via_rag_system;
 pub mod hybrid_search_types;
+pub mod query_decompression_types;
 pub mod retriever;
 pub mod types;
 pub mod vectorizer;
@@ -437,11 +438,18 @@ where
     }
 }
 
-pub fn get_default_rag_config() -> RAGConfig {
+pub fn get_default_rag_config_with_params(
+    max_documents: usize,
+    similarity_threshold: f32,
+) -> RAGConfig {
     RAGConfig::Default {
-        max_documents: 12,
-        similarity_threshold: 0.3,
+        max_documents,
+        similarity_threshold,
     }
+}
+
+pub fn get_default_rag_config() -> RAGConfig {
+    get_default_rag_config_with_params(10, 0.3)
 }
 
 pub fn get_advanced_rag_config() -> RAGConfig {
@@ -460,13 +468,17 @@ pub fn get_payload_key_based_rag_config() -> RAGConfig {
     }
 }
 
-pub fn get_hybrid_search_rag_config() -> RAGConfig {
+pub fn get_hybrid_search_rag_config_with_params(final_documents_count: usize) -> RAGConfig {
     RAGConfig::HybridSearch {
         top_k_chunks: 10,
         chunks_similarity_threshold: 0.5,
         top_k_descriptions: 5,
         descriptions_similarity_threshold: 0.5,
         ranking_method: RankingMethod::RRF { k: 60.0 },
-        final_documents_count: 3,
+        final_documents_count,
     }
+}
+
+pub fn get_hybrid_search_rag_config() -> RAGConfig {
+    get_hybrid_search_rag_config_with_params(3)
 }

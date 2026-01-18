@@ -1,4 +1,4 @@
-use crate::message_processing_flow::message_processing_flow::process_user_raw_request;
+use crate::message_processing_flow::message_processing_flow::process_user_query;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::{CommonMessages, ProbiotBotMessages};
@@ -83,7 +83,7 @@ where
             match transcribe_voice_message(&file_path).await {
                 Ok(Some(user_voice_transcribed)) => {
                     info!("Voice message transcribed successfully...");
-                    match process_user_raw_request(
+                    match process_user_query(
                         &chat_id_as_str,
                         &user_voice_transcribed,
                         app_state.clone(),
@@ -173,13 +173,8 @@ where
             )
             .await;
 
-            match process_user_raw_request(
-                &chat_id_as_str,
-                text,
-                app_state.clone(),
-                app_name.clone(),
-            )
-            .await
+            match process_user_query(&chat_id_as_str, text, app_state.clone(), app_name.clone())
+                .await
             {
                 Ok((llm_response, _extra_data)) => {
                     let full_response = append_footer_if_needed(

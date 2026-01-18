@@ -1,5 +1,5 @@
 use crate::local_db::blacksmith_web::chat_history_storage::save_message_to_db;
-use crate::message_processing_flow::message_processing_flow::process_user_raw_request;
+use crate::message_processing_flow::message_processing_flow::process_user_query;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::{AppsSystemMessages, CommonMessages};
 use crate::state::blacksmith_web::app_state::BlacksmithWebAppState;
@@ -33,8 +33,7 @@ pub async fn default_message_handler(
         error!("Failed to save user message to local db: {}", e);
     }
 
-    match process_user_raw_request(user_id, request_text, app_state.clone(), app_name.clone()).await
-    {
+    match process_user_query(user_id, request_text, app_state.clone(), app_name.clone()).await {
         Ok((llm_response, extra_data)) => {
             let full_response = append_footer_if_needed(
                 &llm_response,
