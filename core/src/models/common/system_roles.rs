@@ -93,6 +93,7 @@ pub enum ProbiotRoleType {
     MainProcessing,
     CommonCaseRequestProcessing,
     InvalidCaseRequestProcessing,
+    QueryComplexityAnalysis,
 }
 
 impl ProbiotRoleType {
@@ -103,6 +104,7 @@ impl ProbiotRoleType {
             ProbiotRoleType::MainProcessing => "main_processing",
             ProbiotRoleType::CommonCaseRequestProcessing => "common_case_request_processing",
             ProbiotRoleType::InvalidCaseRequestProcessing => "invalid_case_request_processing",
+            ProbiotRoleType::QueryComplexityAnalysis => "query_complexity_analysis",
         }
     }
 }
@@ -185,6 +187,7 @@ pub enum BlacksmithLabRoleType {
     InvalidCaseRequestProcessing,
     TTSPreProcessing,
     MainProcessing,
+    QueryComplexityAnalysis,
 }
 
 impl BlacksmithLabRoleType {
@@ -198,6 +201,7 @@ impl BlacksmithLabRoleType {
             }
             BlacksmithLabRoleType::TTSPreProcessing => "tts_pre_processing",
             BlacksmithLabRoleType::MainProcessing => "main_processing",
+            BlacksmithLabRoleType::QueryComplexityAnalysis => "query_complexity_analysis",
         }
     }
 }
