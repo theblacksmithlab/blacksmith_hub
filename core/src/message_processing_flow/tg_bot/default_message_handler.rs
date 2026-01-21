@@ -197,7 +197,7 @@ where
                         convert_markdown_to_telegram(&full_response);
 
                     // Testing
-                    let htmled_full_response = markdown_to_html(&converted_to_markdown_v2_full_response);
+                    let htmled_full_response = markdown_to_html(&full_response);
 
                     let message_id = Uuid::new_v4().to_string();
 
