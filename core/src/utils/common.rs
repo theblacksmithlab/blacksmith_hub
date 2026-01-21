@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
-use pulldown_cmark::{Parser, Event, Tag, TagEnd, CowStr, html};
+use pulldown_cmark::{Parser, Event, Tag, TagEnd, html};
 use std::env;
 use std::fs::{read_to_string, remove_file};
 use std::path::{Path, PathBuf};
@@ -372,6 +372,7 @@ fn escape_html(text: &str) -> String {
         .replace('"', "&quot;")
 }
 
+// legacy method
 pub fn convert_markdown_to_telegram(markdown: &str) -> String {
     markdown
         .replace("\\", "\\\\")
