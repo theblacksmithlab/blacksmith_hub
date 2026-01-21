@@ -6,8 +6,8 @@ pub enum ProbiotCollections {
     BigData2,
     Qa,
     Products,
-    IllnessAndRelief,
-    ProbioCollection,
+    // IllnessAndRelief,
+    // ProbioCollection,
 }
 
 impl ProbiotCollections {
@@ -17,8 +17,8 @@ impl ProbiotCollections {
             ProbiotCollections::BigData2 => "probiot_big_data_2",
             ProbiotCollections::Qa => "probio_qa",
             ProbiotCollections::Products => "products",
-            ProbiotCollections::IllnessAndRelief => "illness_and_relief",
-            ProbiotCollections::ProbioCollection => "probio_collection",
+            // ProbiotCollections::IllnessAndRelief => "illness_and_relief",
+            // ProbiotCollections::ProbioCollection => "probio_collection",
         }
     }
 }

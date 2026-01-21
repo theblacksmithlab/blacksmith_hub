@@ -143,7 +143,7 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
             .await
             {
                 Ok(aspects) => {
-                    info!("Aspects generated: {:?}", aspects);
+                    info!("Aspects generated for user query: {:?}", aspects);
 
                     let documents = search_by_aspects(
                         aspects.clone(),
@@ -421,7 +421,7 @@ fn build_structured_context_with_aspects(aspects: &[String], documents: &[Docume
     }
 
     if !documents.is_empty() {
-        context.push_str("Релевантная информация из базы знаний:\n");
+        context.push_str("На основе анализа вышеперечисленных аспектов найдена следующая информация в базе знаний:\n");
         for (i, doc) in documents.iter().enumerate() {
             let doc_text = match doc {
                 DocumentType::HybridSearch(d) => &d.text,
