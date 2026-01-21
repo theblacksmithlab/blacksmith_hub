@@ -6,7 +6,7 @@ use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::state::tg_bot::app_state::AppNameProvider;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
-use crate::utils::common::{convert_markdown_to_telegram, get_message, markdown_to_html, transcribe_voice_message};
+use crate::utils::common::{convert_markdown_to_telegram, get_message, markdown_to_html, markdown_to_telegram_html, transcribe_voice_message};
 use crate::utils::tg_bot::tg_bot::{add_llm_response_to_cache, download_voice, get_chat_title, get_username_from_message, start_bots_chat_action, stop_bots_chat_action};
 use crate::utils::tg_bot::tg_bot::{append_footer_if_needed, create_tts_button, save_tts_payload};
 use std::sync::Arc;
@@ -193,11 +193,11 @@ where
                     .await
                     .unwrap_or_else(|_| llm_response.clone());
 
-                    let converted_to_markdown_v2_full_response =
+                    let _converted_to_markdown_v2_full_response =
                         convert_markdown_to_telegram(&full_response);
 
                     // Testing
-                    let htmled_full_response = markdown_to_html(&full_response);
+                    let htmled_full_response = markdown_to_telegram_html(&full_response);
 
                     let message_id = Uuid::new_v4().to_string();
 
