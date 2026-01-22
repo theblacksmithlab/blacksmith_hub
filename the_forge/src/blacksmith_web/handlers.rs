@@ -89,7 +89,7 @@ pub(crate) async fn handle_blacksmith_web_chat_fetch(
         &blacksmith_web_app_state.local_db_pool,
         &user_id,
         app_name.as_str(),
-        Some(20), // Лимит в 20 последних сообщений
+        Some(20),
     )
     .await
     {
@@ -219,5 +219,3 @@ async fn prepare_text_for_tts_fn(
 
     Ok(processed_text)
 }
-
-// REMOVED: load_lesson_urls() - no longer needed, lesson URLs come directly from Qdrant metadata
