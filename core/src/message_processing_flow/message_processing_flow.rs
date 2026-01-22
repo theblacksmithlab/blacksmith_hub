@@ -424,12 +424,19 @@ fn build_structured_context_with_aspects(aspects: &[String], documents: &[Docume
         context.push_str("На основе анализа вышеперечисленных аспектов найдена следующая информация в базе знаний:\n");
         for (i, doc) in documents.iter().enumerate() {
             let doc_text = match doc {
-                DocumentType::HybridSearch(d) => &d.text,
-                DocumentType::W3A(d) => &d.text,
-                DocumentType::Default(d) => &d.text,
+                DocumentType::HybridSearch(d) => {
+                    let mut header = format!("=== {} ===", d.metadata.title);
+
+                    if let Some(hierarchy) = &d.metadata.hierarchy {
+                        header.push_str(&format!("\n{}", hierarchy));
+                    }
+                    format!("{}\n\n{}", header, &d.text)
+                },
+                DocumentType::W3A(d) => d.text.clone(),
+                DocumentType::Default(d) => d.text.clone(),
             };
 
-            context.push_str(doc_text);
+            context.push_str(&doc_text);
 
             if i < documents.len() - 1 {
                 context.push_str("\n\n");
