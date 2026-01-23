@@ -431,7 +431,7 @@ fn build_structured_context_with_aspects(aspects: &[String], documents: &[Docume
                         header.push_str(&format!("\n{}", hierarchy));
                     }
                     format!("{}\n\n{}", header, &d.text)
-                },
+                }
                 DocumentType::W3A(d) => d.text.clone(),
                 DocumentType::Default(d) => d.text.clone(),
             };

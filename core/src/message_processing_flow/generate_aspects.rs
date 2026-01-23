@@ -1,7 +1,9 @@
 use crate::ai::common::common::raw_llm_processing_json;
 use crate::models::common::ai::LlmModel;
 use crate::models::common::app_name::AppName;
-use crate::models::common::system_roles::{AppsSystemRoles, BlacksmithLabRoleType, ProbiotRoleType, W3ARoleType};
+use crate::models::common::system_roles::{
+    AppsSystemRoles, BlacksmithLabRoleType, ProbiotRoleType, W3ARoleType,
+};
 use crate::rag_system::query_decompression_types::GeneratedAspects;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use crate::utils::common::get_system_role_or_fallback;
@@ -21,7 +23,9 @@ pub async fn generate_aspects<T: OpenAIClientInit + Send + Sync>(
 
     let system_role = match app_name {
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::AspectGeneration)),
-        AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(BlacksmithLabRoleType::AspectGeneration)),
+        AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
+            BlacksmithLabRoleType::AspectGeneration,
+        )),
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::AspectGeneration)),
         _ => None,
     };

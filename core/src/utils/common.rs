@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
-use pulldown_cmark::{Parser, Event, Tag, TagEnd, html};
+use pulldown_cmark::{html, Event, Parser, Tag, TagEnd};
 use std::env;
 use std::fs::{read_to_string, remove_file};
 use std::path::{Path, PathBuf};
@@ -334,7 +334,8 @@ pub fn markdown_to_telegram_html(markdown: &str) -> String {
                     html_output.push_str("</a>");
                 }
                 TagEnd::CodeBlock => {
-                    html_output.push_str(&format!("<pre>{}</pre>", escape_html(&code_block_content)));
+                    html_output
+                        .push_str(&format!("<pre>{}</pre>", escape_html(&code_block_content)));
                     in_code_block = false;
                 }
                 TagEnd::Item => {

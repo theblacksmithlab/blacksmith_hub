@@ -7,7 +7,10 @@ use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::state::tg_bot::app_state::AppNameProvider;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
 use crate::utils::common::{get_message, markdown_to_telegram_html, transcribe_voice_message};
-use crate::utils::tg_bot::tg_bot::{add_llm_response_to_cache, download_voice, get_chat_title, get_username_from_message, start_bots_chat_action, stop_bots_chat_action};
+use crate::utils::tg_bot::tg_bot::{
+    add_llm_response_to_cache, download_voice, get_chat_title, get_username_from_message,
+    start_bots_chat_action, stop_bots_chat_action,
+};
 use crate::utils::tg_bot::tg_bot::{append_footer_if_needed, create_tts_button, save_tts_payload};
 use std::sync::Arc;
 use teloxide::payloads::SendMessageSetters;
@@ -50,8 +53,7 @@ where
     if msg.chat.is_private() {
         info!(
             "Got message: {} from user: {} [{}]",
-            user_raw_request,
-            user_id, username
+            user_raw_request, user_id, username
         );
 
         if let Some(voice) = msg.voice() {
@@ -116,7 +118,7 @@ where
                                 &message_id,
                                 &llm_response,
                             )
-                                .await;
+                            .await;
 
                             stop_bots_chat_action(typing_flag).await;
 
@@ -200,13 +202,7 @@ where
 
                     let message_id = Uuid::new_v4().to_string();
 
-                    save_tts_payload(
-                        app_state.clone(),
-                        chat_id,
-                        &message_id,
-                        &llm_response
-                    )
-                        .await;
+                    save_tts_payload(app_state.clone(), chat_id, &message_id, &llm_response).await;
 
                     stop_bots_chat_action(typing_flag).await;
 
