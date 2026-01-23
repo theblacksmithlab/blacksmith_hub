@@ -93,6 +93,8 @@ pub enum ProbiotRoleType {
     MainProcessing,
     CommonCaseRequestProcessing,
     InvalidCaseRequestProcessing,
+    QueryComplexityAnalysis,
+    AspectGeneration,
 }
 
 impl ProbiotRoleType {
@@ -103,6 +105,8 @@ impl ProbiotRoleType {
             ProbiotRoleType::MainProcessing => "main_processing",
             ProbiotRoleType::CommonCaseRequestProcessing => "common_case_request_processing",
             ProbiotRoleType::InvalidCaseRequestProcessing => "invalid_case_request_processing",
+            ProbiotRoleType::QueryComplexityAnalysis => "query_complexity_analysis",
+            ProbiotRoleType::AspectGeneration => "aspect_generation",
         }
     }
 }
@@ -122,6 +126,8 @@ pub enum W3ARoleType {
     InvalidCaseRequestProcessing,
     Recommendation,
     TTSPreProcessing,
+    QueryComplexityAnalysis,
+    AspectGeneration,
 }
 
 impl W3ARoleType {
@@ -134,6 +140,8 @@ impl W3ARoleType {
             W3ARoleType::InvalidCaseRequestProcessing => "invalid_case_request_processing",
             W3ARoleType::Recommendation => "recommendation",
             W3ARoleType::TTSPreProcessing => "tts_pre_processing",
+            W3ARoleType::QueryComplexityAnalysis => "query_complexity_analysis",
+            W3ARoleType::AspectGeneration => "aspect_generation",
         }
     }
 }
@@ -181,6 +189,8 @@ pub enum BlacksmithLabRoleType {
     InvalidCaseRequestProcessing,
     TTSPreProcessing,
     MainProcessing,
+    QueryComplexityAnalysis,
+    AspectGeneration,
 }
 
 impl BlacksmithLabRoleType {
@@ -194,6 +204,8 @@ impl BlacksmithLabRoleType {
             }
             BlacksmithLabRoleType::TTSPreProcessing => "tts_pre_processing",
             BlacksmithLabRoleType::MainProcessing => "main_processing",
+            BlacksmithLabRoleType::QueryComplexityAnalysis => "query_complexity_analysis",
+            BlacksmithLabRoleType::AspectGeneration => "aspect_generation",
         }
     }
 }

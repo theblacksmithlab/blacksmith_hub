@@ -7,7 +7,7 @@ use anyhow::{anyhow, Result};
 use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
-use pulldown_cmark::{html, Parser};
+use pulldown_cmark::{html, Event, Parser, Tag, TagEnd};
 use std::env;
 use std::fs::{read_to_string, remove_file};
 use std::path::{Path, PathBuf};
@@ -275,6 +275,105 @@ pub fn markdown_to_html(markdown: &str) -> String {
     html_output
 }
 
+pub fn markdown_to_telegram_html(markdown: &str) -> String {
+    let parser = Parser::new(markdown);
+    let mut html_output = String::new();
+    let mut in_code_block = false;
+    let mut code_block_content = String::new();
+
+    for event in parser {
+        match event {
+            Event::Start(tag) => match tag {
+                Tag::Paragraph => {
+                    // ignore
+                }
+                Tag::Heading { .. } => {
+                    html_output.push_str("<b>");
+                }
+                Tag::Strong => {
+                    html_output.push_str("<b>");
+                }
+                Tag::Emphasis => {
+                    html_output.push_str("<i>");
+                }
+                Tag::Strikethrough => {
+                    html_output.push_str("<s>");
+                }
+                Tag::Link { dest_url, .. } => {
+                    html_output.push_str(&format!("<a href=\"{}\">", escape_html(&dest_url)));
+                }
+                Tag::CodeBlock(_) => {
+                    in_code_block = true;
+                    code_block_content.clear();
+                }
+                Tag::List(_) => {
+                    // ignore
+                }
+                Tag::Item => {
+                    html_output.push_str("• ");
+                }
+                _ => {}
+            },
+            Event::End(tag_end) => match tag_end {
+                TagEnd::Paragraph => {
+                    html_output.push_str("\n\n");
+                }
+                TagEnd::Heading { .. } => {
+                    html_output.push_str("</b>\n\n");
+                }
+                TagEnd::Strong => {
+                    html_output.push_str("</b>");
+                }
+                TagEnd::Emphasis => {
+                    html_output.push_str("</i>");
+                }
+                TagEnd::Strikethrough => {
+                    html_output.push_str("</s>");
+                }
+                TagEnd::Link => {
+                    html_output.push_str("</a>");
+                }
+                TagEnd::CodeBlock => {
+                    html_output
+                        .push_str(&format!("<pre>{}</pre>", escape_html(&code_block_content)));
+                    in_code_block = false;
+                }
+                TagEnd::Item => {
+                    html_output.push_str("\n");
+                }
+                _ => {}
+            },
+            Event::Text(text) => {
+                if in_code_block {
+                    code_block_content.push_str(&text);
+                } else {
+                    html_output.push_str(&escape_html(&text));
+                }
+            }
+            Event::Code(code) => {
+                html_output.push_str(&format!("<code>{}</code>", escape_html(&code)));
+            }
+            Event::SoftBreak => {
+                html_output.push(' ');
+            }
+            Event::HardBreak => {
+                html_output.push('\n');
+            }
+            _ => {}
+        }
+    }
+
+    html_output.trim().to_string()
+}
+
+fn escape_html(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+// legacy method
 pub fn convert_markdown_to_telegram(markdown: &str) -> String {
     markdown
         .replace("\\", "\\\\")
