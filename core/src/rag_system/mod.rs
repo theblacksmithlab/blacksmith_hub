@@ -455,9 +455,9 @@ pub fn get_default_rag_config() -> RAGConfig {
 pub fn get_advanced_rag_config() -> RAGConfig {
     RAGConfig::Advanced {
         base_max_documents: 5,
-        base_similarity_threshold: 0.4,
+        base_similarity_threshold: 0.25,
         related_max_documents: 4,
-        related_similarity_threshold: 0.4,
+        related_similarity_threshold: 0.3,
     }
 }
 
@@ -471,9 +471,9 @@ pub fn get_payload_key_based_rag_config() -> RAGConfig {
 pub fn get_hybrid_search_rag_config_with_params(final_documents_count: usize) -> RAGConfig {
     RAGConfig::HybridSearch {
         top_k_chunks: 10,
-        chunks_similarity_threshold: 0.5,
+        chunks_similarity_threshold: 0.3,
         top_k_descriptions: 5,
-        descriptions_similarity_threshold: 0.5,
+        descriptions_similarity_threshold: 0.3,
         ranking_method: RankingMethod::RRF { k: 60.0 },
         final_documents_count,
     }

@@ -373,8 +373,8 @@ async fn search_by_aspects<T: OpenAIClientInit + QdrantClientInit + Send + Sync>
     for aspect in aspects {
         let rag_config = match app_name {
             AppName::W3AWeb => get_hybrid_search_rag_config_with_params(1),
-            AppName::BlacksmithWeb => get_default_rag_config_with_params(1, 0.5),
-            _ => get_default_rag_config_with_params(1, 0.5),
+            AppName::BlacksmithWeb => get_default_rag_config_with_params(1, 0.25),
+            _ => get_default_rag_config_with_params(1, 0.25),
         };
 
         let rag_result =
