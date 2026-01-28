@@ -124,7 +124,6 @@ pub enum W3ARoleType {
     MainProcessing,
     CommonCaseRequestProcessing,
     InvalidCaseRequestProcessing,
-    Recommendation,
     TTSPreProcessing,
     QueryComplexityAnalysis,
     AspectGeneration,
@@ -133,15 +132,14 @@ pub enum W3ARoleType {
 impl W3ARoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            W3ARoleType::RequestTypeDetection => "request_type_detection",
-            W3ARoleType::ClarifyRequest => "clarify_request",
-            W3ARoleType::MainProcessing => "main_processing",
-            W3ARoleType::CommonCaseRequestProcessing => "common_case_request_processing",
-            W3ARoleType::InvalidCaseRequestProcessing => "invalid_case_request_processing",
-            W3ARoleType::Recommendation => "recommendation",
+            W3ARoleType::RequestTypeDetection => "request_type_detection_xml",
+            W3ARoleType::ClarifyRequest => "clarify_request_xml",
+            W3ARoleType::MainProcessing => "main_processing_xml",
+            W3ARoleType::CommonCaseRequestProcessing => "common_case_request_processing_xml",
+            W3ARoleType::InvalidCaseRequestProcessing => "invalid_case_request_processing_xml",
             W3ARoleType::TTSPreProcessing => "tts_pre_processing",
-            W3ARoleType::QueryComplexityAnalysis => "query_complexity_analysis",
-            W3ARoleType::AspectGeneration => "aspect_generation",
+            W3ARoleType::QueryComplexityAnalysis => "query_complexity_analysis_xml",
+            W3ARoleType::AspectGeneration => "aspect_generation_xml",
         }
     }
 }

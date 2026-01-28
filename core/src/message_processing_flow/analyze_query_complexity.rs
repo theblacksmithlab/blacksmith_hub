@@ -38,9 +38,15 @@ pub async fn analyze_query_complexity<T: OpenAIClientInit + Send + Sync>(
         }
     };
 
+    let chat_history_section = if current_cache.trim().is_empty() {
+        "<chat_history>Нет предыдущих сообщений</chat_history>".to_string()
+    } else {
+        format!("<chat_history>\n{}\n</chat_history>", current_cache)
+    };
+
     let llm_message = format!(
-        "<user_request>{}</user_request>\n\n<chat_history>{}</chat_history>",
-        clarified_request, current_cache
+        "{}\n\n<current_query>\n{}\n</current_query>",
+        chat_history_section, clarified_request
     );
 
     let query_complexity_result =

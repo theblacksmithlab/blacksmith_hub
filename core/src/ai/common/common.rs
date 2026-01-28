@@ -26,7 +26,7 @@ pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
             builder.reasoning_effort(effort);
         }
     } else {
-        builder.temperature(0.2);
+        builder.temperature(0.0);
     }
 
     builder

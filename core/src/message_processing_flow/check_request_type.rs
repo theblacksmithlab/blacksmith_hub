@@ -38,9 +38,15 @@ pub async fn check_request_type<T: OpenAIClientInit + Send + Sync>(
         }
     };
 
+    let chat_history_section = if current_cache.trim().is_empty() {
+        "<chat_history>Нет предыдущих сообщений</chat_history>".to_string()
+    } else {
+        format!("<chat_history>{}</chat_history>", current_cache)
+    };
+
     let llm_message = format!(
-        "<user_request>{}</user_request>\n\n<chat_history>{}</chat_history>",
-        user_raw_request, current_cache
+        "{}\n\n<current_query>{}</current_query>",
+        chat_history_section, user_raw_request
     );
 
     let request_type_detection_result =
@@ -52,21 +58,21 @@ pub async fn check_request_type<T: OpenAIClientInit + Send + Sync>(
                 let type_str = json
                     .get("request_type")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("common");
+                    .unwrap_or("special");
 
                 match type_str {
                     "common" => RequestType::Common,
                     "special" => RequestType::Special,
                     "invalid" => RequestType::Invalid,
                     _ => {
-                        error!("Unknown request_type '{}', defaulting to Common", type_str);
-                        RequestType::Common
+                        error!("Unknown request_type '{}', defaulting to Special", type_str);
+                        RequestType::Special
                     }
                 }
             }
             Err(err) => {
                 error!("Failed to parse JSON: {}", err);
-                RequestType::Common
+                RequestType::Special
             }
         };
 

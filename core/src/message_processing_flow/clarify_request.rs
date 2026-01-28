@@ -15,9 +15,15 @@ pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
     app_state: Arc<T>,
     app_name: AppName,
 ) -> anyhow::Result<String> {
+    let chat_history_section = if current_cache.trim().is_empty() {
+        "<chat_history>Нет предыдущих сообщений</chat_history>".to_string()
+    } else {
+        format!("<chat_history>\n{}\n</chat_history>", current_cache)
+    };
+
     let llm_message = format!(
-        "<user_request>\n{}\n</user_request>\n\n<chat_history>\n{}\n</chat_history>",
-        user_raw_request, current_cache
+        "{}\n\n<current_query>\n{}\n</current_query>",
+        chat_history_section, user_raw_request
     );
 
     let system_role = match app_name {
