@@ -72,6 +72,7 @@ pub async fn get_query_type<T: OpenAIClientInit + GoogleClientInit + Send + Sync
                     "common" => QueryType::Common,
                     "special" => QueryType::Special,
                     "invalid" => QueryType::Invalid,
+                    "support" => QueryType::Support,
                     _ => {
                         error!("Unknown request_type '{}', defaulting to Special", type_str);
                         QueryType::Special
