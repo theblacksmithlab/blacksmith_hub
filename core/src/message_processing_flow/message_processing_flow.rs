@@ -95,6 +95,18 @@ pub async fn process_user_query<
 
             Ok((response_for_invalid_request, HashMap::new()))
         }
+        QueryType::Support => {
+            info!("Support case request detected");
+            let response_for_support_request = handle_support_request(
+                user_raw_request,
+                app_state.clone(),
+                &current_cache,
+                app_name.clone(),
+            )
+                .await?;
+
+            Ok((response_for_support_request, HashMap::new()))
+        }
     }
 }
 
@@ -318,6 +330,53 @@ pub async fn handle_invalid_request<T: OpenAIClientInit + Send + Sync>(
         None => {
             error!(
                 "InvalidCaseRequestProcessing role is not defined for app '{}'. Using fallback.",
+                app_name.as_str()
+            );
+            "You are a helpful assistant".to_string()
+        }
+    };
+
+    let llm_response =
+        raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT4o).await?;
+
+    Ok(llm_response)
+}
+
+pub async fn handle_support_request<T: OpenAIClientInit + Send + Sync>(
+    user_raw_request: &str,
+    app_state: Arc<T>,
+    current_cache: &str,
+    app_name: AppName,
+) -> Result<String> {
+    let chat_history_section = if current_cache.trim().is_empty() {
+        "<chat_history>Нет предыдущих сообщений</chat_history>".to_string()
+    } else {
+        format!("<chat_history>\n{}\n</chat_history>", current_cache)
+    };
+
+    let llm_message = format!(
+        "{}\n\n<current_query>\n{}\n</current_query>",
+        chat_history_section, user_raw_request
+    );
+
+    let system_role = match app_name {
+        AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(
+            ProbiotRoleType::InvalidCaseRequestProcessing,
+        )),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(
+            W3ARoleType::SupportCaseRequestProcessing,
+        )),
+        AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
+            BlacksmithLabRoleType::InvalidCaseRequestProcessing,
+        )),
+        _ => None,
+    };
+
+    let system_role = match system_role {
+        Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
+        None => {
+            error!(
+                "SupportCaseRequestProcessing role is not defined for app '{}'. Using fallback.",
                 app_name.as_str()
             );
             "You are a helpful assistant".to_string()

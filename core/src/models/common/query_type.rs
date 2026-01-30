@@ -7,6 +7,7 @@ pub enum QueryType {
     Common,
     Special,
     Invalid,
+    Support,
 }
 
 impl QueryType {
@@ -15,6 +16,7 @@ impl QueryType {
             QueryType::Common => "common",
             QueryType::Special => "special",
             QueryType::Invalid => "invalid",
+            QueryType::Support => "support",
         }
     }
 }

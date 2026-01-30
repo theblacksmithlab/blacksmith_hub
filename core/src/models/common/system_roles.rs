@@ -124,6 +124,7 @@ pub enum W3ARoleType {
     MainProcessing,
     CommonCaseRequestProcessing,
     InvalidCaseRequestProcessing,
+    SupportCaseRequestProcessing,
     TTSPreProcessing,
     QueryComplexityAnalysis,
     AspectGeneration,
@@ -140,6 +141,7 @@ impl W3ARoleType {
             W3ARoleType::TTSPreProcessing => "tts_pre_processing",
             W3ARoleType::QueryComplexityAnalysis => "query_complexity_analysis_xml",
             W3ARoleType::AspectGeneration => "aspect_generation_xml",
+            W3ARoleType::SupportCaseRequestProcessing => "support_case_request_processing_xml",
         }
     }
 }
