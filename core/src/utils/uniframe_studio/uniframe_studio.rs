@@ -1,5 +1,5 @@
-use crate::ai::common::common::raw_llm_processing_json;
-use crate::models::common::ai::LlmModel;
+use crate::ai::common::openai::raw_openai_processing_json;
+use crate::models::common::ai::OpenAIModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::{AppsSystemRoles, UniframeStudioRoleType};
 use crate::state::uniframe_studio::app_state::UniframeStudioAppState;
@@ -32,7 +32,7 @@ pub async fn validate_transcription_keywords(
     let llm_message = format!("Raw transcription keywords: {}", raw_transcription_keywords);
 
     let validated_keywords =
-        match raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light).await
+        match raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT4o).await
         {
             Ok(response) => response,
             Err(e) => {

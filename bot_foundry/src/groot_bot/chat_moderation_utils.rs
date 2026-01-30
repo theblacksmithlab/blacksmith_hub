@@ -1,6 +1,6 @@
 use anyhow::Result;
-use core::ai::common::common::raw_llm_processing_json;
-use core::models::common::ai::LlmModel;
+use core::ai::common::openai::raw_openai_processing_json;
+use core::models::common::ai::OpenAIModel;
 use core::models::common::app_name::AppName;
 use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
 use core::models::common::system_roles::GrootRoleType;
@@ -588,7 +588,7 @@ pub async fn ai_check(
         get_system_role_or_fallback(&AppName::GrootBot, GrootRoleType::MessageCheck, None);
 
     let scam_detection_result =
-        raw_llm_processing_json(&system_role, message_to_check, app_state, LlmModel::Light).await?;
+        raw_openai_processing_json(&system_role, message_to_check, app_state, OpenAIModel::GPT4o).await?;
 
     let is_scam: bool = match serde_json::from_str::<serde_json::Value>(&scam_detection_result) {
         Ok(json) => match json.get("is_scam") {

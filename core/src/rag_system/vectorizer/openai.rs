@@ -1,4 +1,4 @@
-use crate::models::common::ai::LlmModel;
+use crate::models::common::ai::OpenAIModel;
 use crate::rag_system::Vectorizer;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use anyhow::Result;
@@ -19,15 +19,15 @@ impl<T: OpenAIClientInit> OpenAIVectorizer<T> {
 #[async_trait]
 impl<T: OpenAIClientInit + Send + Sync> Vectorizer for OpenAIVectorizer<T> {
     async fn vectorize(&self, text: &str) -> Result<Vec<f32>> {
-        let llm_client = self.app_state.get_llm_client();
-        let llm_model = LlmModel::TextEmbedding3Large;
+        let openai_client = self.app_state.get_openai_client();
+        let llm_model = OpenAIModel::Embedding3Large;
 
         let request = CreateEmbeddingRequestArgs::default()
             .model(llm_model.as_str())
             .input(text)
             .build()?;
 
-        let response: CreateEmbeddingResponse = llm_client.embeddings().create(request).await?;
+        let response: CreateEmbeddingResponse = openai_client.embeddings().create(request).await?;
         let embedding = response.data.into_iter().next().unwrap().embedding;
 
         Ok(embedding)

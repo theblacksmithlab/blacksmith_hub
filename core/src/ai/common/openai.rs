@@ -1,4 +1,4 @@
-use crate::models::common::ai::LlmModel;
+use crate::models::common::ai::OpenAIModel;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use anyhow::Result;
 use async_openai::types::ResponseFormat::JsonObject;
@@ -10,13 +10,13 @@ use std::sync::Arc;
 use tiktoken_rs::cl100k_base;
 use tracing::info;
 
-pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
+pub async fn raw_openai_processing_json<T: OpenAIClientInit + Send + Sync>(
     system_role: &str,
     request: &str,
     app_state: Arc<T>,
-    model: LlmModel,
+    model: OpenAIModel,
 ) -> Result<String> {
-    let llm_client = app_state.get_llm_client().clone();
+    let openai_client = app_state.get_openai_client().clone();
 
     let mut builder = CreateChatCompletionRequestArgs::default();
     builder.model(model.as_str());
@@ -44,7 +44,7 @@ pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
 
     let llm_request = builder.build()?;
 
-    let response = llm_client.chat().create(llm_request).await?;
+    let response = openai_client.chat().create(llm_request).await?;
 
     if let Some(choice) = response.choices.get(0) {
         let content = choice
@@ -58,13 +58,13 @@ pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
     }
 }
 
-pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
+pub async fn raw_openai_processing<T: OpenAIClientInit + Send + Sync>(
     system_role: &str,
     request: &str,
     app_state: Arc<T>,
-    model: LlmModel,
+    model: OpenAIModel,
 ) -> Result<String> {
-    let llm_client = app_state.get_llm_client().clone();
+    let openai_client = app_state.get_openai_client().clone();
 
     let mut builder = CreateChatCompletionRequestArgs::default();
     builder.model(model.as_str());
@@ -90,7 +90,7 @@ pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
 
     let llm_request = builder.build()?;
 
-    let response = llm_client.chat().create(llm_request).await?;
+    let response = openai_client.chat().create(llm_request).await?;
 
     if let Some(choice) = response.choices.get(0) {
         let content = choice

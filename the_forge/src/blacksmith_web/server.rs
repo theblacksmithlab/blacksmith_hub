@@ -3,9 +3,11 @@ use crate::blacksmith_web::handlers::{
     handle_blacksmith_web_user_request,
 };
 use anyhow::Result;
-use async_openai::Client as LLM_Client;
+use async_openai::Client as OpenAIClient;
 use axum::routing::{get, post};
 use axum::Router;
+use core::ai::anthropic_client::AnthropicClient;
+use core::ai::google_client::GoogleClient;
 use core::local_db::local_db::setup_app_db_pool;
 use core::models::common::app_name::AppName;
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
@@ -20,12 +22,16 @@ use tracing::info;
 pub async fn start_blacksmith_web_server(server_app_state: Arc<ServerAppState>) -> Result<()> {
     let qdrant_client = Arc::new(Qdrant::from_url(&env::var("QDRANT_LOCAL_URL")?).build()?);
 
-    let llm_client = LLM_Client::new();
+    let openai_client = OpenAIClient::new();
+    let anthropic_client = AnthropicClient::new()?;
+    let google_client = GoogleClient::new()?;
 
     let blacksmith_lab_db_pool = setup_app_db_pool(&AppName::BlacksmithWeb).await?;
 
     let blacksmith_web_app_state = Arc::new(BlacksmithWebAppState::new(
-        llm_client,
+        openai_client,
+        anthropic_client,
+        google_client,
         qdrant_client,
         blacksmith_lab_db_pool,
     ));

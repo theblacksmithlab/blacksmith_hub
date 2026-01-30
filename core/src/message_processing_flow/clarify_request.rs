@@ -1,5 +1,5 @@
-use crate::ai::common::common::raw_llm_processing;
-use crate::models::common::ai::LlmModel;
+use crate::ai::common::openai::raw_openai_processing;
+use crate::models::common::ai::OpenAIModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::{
     AppsSystemRoles, BlacksmithLabRoleType, ProbiotRoleType, W3ARoleType,
@@ -46,7 +46,7 @@ pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
         }
     };
 
-    match raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Light).await {
+    match raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT4o).await {
         Ok(clarified_request) => {
             info!("User's raw request clarified successfully");
             Ok(clarified_request)

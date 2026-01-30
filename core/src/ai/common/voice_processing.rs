@@ -83,7 +83,7 @@ pub async fn openai_base_tts<T: OpenAIClientInit + Send + Sync>(
     app_state: Arc<T>,
     speed: f32,
 ) -> anyhow::Result<CreateSpeechResponse> {
-    let llm_client = app_state.get_llm_client().clone();
+    let openai_client = app_state.get_openai_client().clone();
 
     let request = CreateSpeechRequestArgs::default()
         .input(text)
@@ -92,7 +92,7 @@ pub async fn openai_base_tts<T: OpenAIClientInit + Send + Sync>(
         .speed(speed)
         .build()?;
 
-    let response = llm_client.audio().speech(request).await?;
+    let response = openai_client.audio().speech(request).await?;
 
     Ok(response)
 }
@@ -260,7 +260,7 @@ pub async fn generate_single_part_via_openai<T: OpenAIClientInit + Send + Sync>(
         text.chars().count()
     );
 
-    let llm_client = app_state.get_llm_client().clone();
+    let openai_client = app_state.get_openai_client().clone();
 
     let request = CreateSpeechRequestArgs::default()
         .input(text)
@@ -269,7 +269,7 @@ pub async fn generate_single_part_via_openai<T: OpenAIClientInit + Send + Sync>(
         .speed(1.3)
         .build()?;
 
-    let response = llm_client.audio().speech(request).await?;
+    let response = openai_client.audio().speech(request).await?;
     let part_path = format!("{}/part_{}.mp3", user_tmp_dir, part_index);
     response.save(&part_path).await?;
 

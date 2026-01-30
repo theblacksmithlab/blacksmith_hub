@@ -1,9 +1,9 @@
-use crate::ai::common::common::raw_llm_processing;
+use crate::ai::common::openai::raw_openai_processing;
 use crate::ai::common::voice_processing::{
     generate_single_part_via_elevenlabs, generate_single_part_via_openai,
 };
 use crate::local_db::the_viper_room::user_management::get_user_nickname;
-use crate::models::common::ai::LlmModel;
+use crate::models::common::ai::OpenAIModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::TheViperRoomRoleType;
 use crate::models::the_viper_room::common::TTSProvider;
@@ -251,14 +251,15 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
             addressee, full_podcast_text
         );
 
-        let caption = raw_llm_processing(
+        let caption = raw_openai_processing(
             &system_role,
             &data_for_caption,
             app_state.clone(),
-            LlmModel::Tiny,
+            OpenAIModel::GPT4o,
         )
         .await?;
 
+        // // Donation footer disabled for now
         // caption.push_str(
         //     &get_message(AppsSystemMessages::TheViperRoomBot(
         //         TheViperRoomBotMessages::DonationFooter,

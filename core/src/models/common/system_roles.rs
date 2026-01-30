@@ -88,7 +88,7 @@ impl AsRef<str> for UniframeStudioRoleType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProbiotRoleType {
-    RequestTypeDetection,
+    QueryTypeDefinition,
     ClarifyRequest,
     MainProcessing,
     CommonCaseRequestProcessing,
@@ -100,7 +100,7 @@ pub enum ProbiotRoleType {
 impl ProbiotRoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            ProbiotRoleType::RequestTypeDetection => "request_type_detection",
+            ProbiotRoleType::QueryTypeDefinition => "query_type_definition",
             ProbiotRoleType::ClarifyRequest => "clarify_request",
             ProbiotRoleType::MainProcessing => "main_processing",
             ProbiotRoleType::CommonCaseRequestProcessing => "common_case_request_processing",
@@ -119,7 +119,7 @@ impl AsRef<str> for ProbiotRoleType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum W3ARoleType {
-    RequestTypeDetection,
+    QueryTypeDefinition,
     ClarifyRequest,
     MainProcessing,
     CommonCaseRequestProcessing,
@@ -132,7 +132,7 @@ pub enum W3ARoleType {
 impl W3ARoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            W3ARoleType::RequestTypeDetection => "request_type_detection_xml",
+            W3ARoleType::QueryTypeDefinition => "query_type_definition_xml",
             W3ARoleType::ClarifyRequest => "clarify_request_xml",
             W3ARoleType::MainProcessing => "main_processing_xml",
             W3ARoleType::CommonCaseRequestProcessing => "common_case_request_processing_xml",
@@ -182,7 +182,7 @@ impl AsRef<str> for TheViperRoomRoleType {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlacksmithLabRoleType {
     ClarifyRequest,
-    RequestTypeDetection,
+    QueryTypeDefinition,
     CommonCaseRequestProcessing,
     InvalidCaseRequestProcessing,
     TTSPreProcessing,
@@ -195,7 +195,7 @@ impl BlacksmithLabRoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
             BlacksmithLabRoleType::ClarifyRequest => "clarify_request",
-            BlacksmithLabRoleType::RequestTypeDetection => "request_type_detection",
+            BlacksmithLabRoleType::QueryTypeDefinition => "query_type_definition",
             BlacksmithLabRoleType::CommonCaseRequestProcessing => "common_case_request_processing",
             BlacksmithLabRoleType::InvalidCaseRequestProcessing => {
                 "invalid_case_request_processing"

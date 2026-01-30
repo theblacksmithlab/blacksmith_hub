@@ -1,5 +1,5 @@
 pub mod ai;
-pub mod config;
+pub mod server_config;
 pub mod gpu_instance_client;
 pub mod local_db;
 pub mod message_processing_flow;

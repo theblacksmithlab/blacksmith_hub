@@ -1,5 +1,7 @@
 use anyhow::Result;
-use async_openai::Client as LLM_Client;
+use async_openai::Client as OpenAIClient;
+use core::ai::anthropic_client::AnthropicClient;
+use core::ai::google_client::GoogleClient;
 use core::models::common::app_name::AppName;
 use core::models::tg_agent::bot_alias::GrootBotAlias;
 use core::state::tg_agent::app_state::AgentAppState;
@@ -46,9 +48,13 @@ async fn main() -> Result<()> {
         error!("Failed to create app tmp directory: {}", e);
     }
 
-    let llm_client = LLM_Client::new();
+    let openai_client = OpenAIClient::new();
+    let anthropic_client = AnthropicClient::new()?;
+    let google_client = GoogleClient::new()?;
 
-    let app_state = Arc::new(AgentAppState::new(llm_client, app_name.clone()).await?);
+    let app_state = Arc::new(
+        AgentAppState::new(openai_client, anthropic_client, google_client, app_name.clone()).await?,
+    );
 
     let telegram_agent = TelegramAgent::new(&app_name, "current.session").await?;
 

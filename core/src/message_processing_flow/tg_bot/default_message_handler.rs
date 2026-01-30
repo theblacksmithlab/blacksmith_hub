@@ -2,7 +2,7 @@ use crate::message_processing_flow::message_processing_flow::process_user_query;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::{CommonMessages, ProbiotBotMessages};
-use crate::state::llm_client_init_trait::OpenAIClientInit;
+use crate::state::llm_client_init_trait::{GoogleClientInit, OpenAIClientInit};
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::state::tg_bot::app_state::AppNameProvider;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
@@ -31,6 +31,7 @@ where
     T: AppNameProvider
         + OpenAIClientInit
         + QdrantClientInit
+        + GoogleClientInit
         + TempCacheInit
         + Send
         + Sync

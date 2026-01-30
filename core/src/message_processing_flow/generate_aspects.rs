@@ -1,5 +1,5 @@
-use crate::ai::common::common::raw_llm_processing_json;
-use crate::models::common::ai::LlmModel;
+use crate::ai::common::openai::raw_openai_processing_json;
+use crate::models::common::ai::OpenAIModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::{
     AppsSystemRoles, BlacksmithLabRoleType, ProbiotRoleType, W3ARoleType,
@@ -48,7 +48,7 @@ pub async fn generate_aspects<T: OpenAIClientInit + Send + Sync>(
     };
 
     let aspects_json =
-        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light).await?;
+        raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT4o).await?;
 
     match serde_json::from_str::<GeneratedAspects>(&aspects_json) {
         Ok(generated_aspects) => {

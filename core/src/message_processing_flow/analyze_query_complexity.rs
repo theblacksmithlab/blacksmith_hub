@@ -1,5 +1,5 @@
-use crate::ai::common::common::raw_llm_processing_json;
-use crate::models::common::ai::LlmModel;
+use crate::ai::common::openai::raw_openai_processing_json;
+use crate::models::common::ai::OpenAIModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::{
     AppsSystemRoles, BlacksmithLabRoleType, ProbiotRoleType, W3ARoleType,
@@ -50,7 +50,7 @@ pub async fn analyze_query_complexity<T: OpenAIClientInit + Send + Sync>(
     );
 
     let query_complexity_result =
-        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light).await?;
+        raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT4o).await?;
 
     let query_complexity: QueryComplexity =
         match serde_json::from_str::<serde_json::Value>(&query_complexity_result) {

@@ -9,9 +9,11 @@ use crate::uniframe_studio::handlers::{
 use crate::uniframe_studio::local_db::setup_uniframe_studio_db;
 use crate::uniframe_studio::payment_handlers::handle_payment_webhook;
 use anyhow::{Context, Result};
-use async_openai::Client as LLM_Client;
+use async_openai::Client as OpenAIClient;
 use axum::routing::{get, post};
 use axum::Router;
+use core::ai::anthropic_client::AnthropicClient;
+use core::ai::google_client::GoogleClient;
 use core::state::server_common::app_state::ServerAppState;
 use core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use core::utils::server::server::start_server;
@@ -26,14 +28,18 @@ pub async fn start_uniframe_studio_server(server_app_state: Arc<ServerAppState>)
 
     let s3_client = aws_sdk_s3::Client::new(&aws_config);
 
-    let llm_client = LLM_Client::new();
+    let openai_client = OpenAIClient::new();
+    let anthropic_client = AnthropicClient::new()?;
+    let google_client = GoogleClient::new()?;
 
     let uniframe_studio_db_pool = setup_uniframe_studio_db().await?;
 
     let uniframe_studio_app_state = Arc::new(UniframeStudioAppState::new(
         s3_client,
         uniframe_studio_db_pool,
-        llm_client,
+        openai_client,
+        anthropic_client,
+        google_client,
     )?);
 
     info!("Initializing GPU instances...");

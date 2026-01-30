@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use axum::routing::post;
 use axum::Router;
 use config::{Config, File};
-use core::config::server_config::AppConfig;
+use core::server_config::server_config::AppConfig;
 use core::utils::server::server::start_server;
 use dotenv::dotenv;
 use std::sync::Arc;

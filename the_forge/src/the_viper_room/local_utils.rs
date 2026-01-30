@@ -1,5 +1,5 @@
-use core::ai::common::common::raw_llm_processing;
-use core::models::common::ai::LlmModel;
+use core::ai::common::openai::raw_openai_processing;
+use core::models::common::ai::OpenAIModel;
 use core::models::common::app_name::AppName;
 use core::models::common::system_roles::TheViperRoomRoleType;
 use core::state::the_viper_room::app_state::TheViperRoomAppState;
@@ -23,11 +23,11 @@ pub async fn generate_user_system_nickname(
         username, first_name, last_name
     );
 
-    raw_llm_processing(
+    raw_openai_processing(
         &system_role,
         &user_data,
         the_viper_room_app_state,
-        LlmModel::Light,
+        OpenAIModel::GPT4o,
     )
     .await
     .map_err(|e| format!("Failed to generate nickname: {}", e))

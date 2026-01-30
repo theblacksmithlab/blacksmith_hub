@@ -1,13 +1,13 @@
-use crate::ai::common::common::raw_llm_processing;
-use crate::ai::common::common::tokenize_and_truncate;
+use crate::ai::common::openai::raw_openai_processing;
+use crate::ai::common::openai::tokenize_and_truncate;
 use crate::message_processing_flow::analyze_query_complexity::analyze_query_complexity;
-use crate::message_processing_flow::check_request_type::check_request_type;
+use crate::message_processing_flow::check_request_type::get_query_type;
 use crate::message_processing_flow::clarify_request::clarify_request;
 use crate::message_processing_flow::generate_aspects::generate_aspects;
-use crate::models::common::ai::LlmModel;
+use crate::models::common::ai::OpenAIModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::qdrant_collection_manager::AppsCollections;
-use crate::models::common::request_type::RequestType;
+use crate::models::common::query_type::QueryType;
 use crate::models::common::system_roles::{AppsSystemRoles, W3ARoleType};
 use crate::models::common::system_roles::{BlacksmithLabRoleType, ProbiotRoleType};
 use crate::rag_system::get_results_via_rag_system::get_results_via_rag_system::get_results_via_rag_system;
@@ -17,7 +17,7 @@ use crate::rag_system::{
     get_advanced_rag_config, get_default_rag_config_with_params, get_hybrid_search_rag_config,
     get_hybrid_search_rag_config_with_params,
 };
-use crate::state::llm_client_init_trait::OpenAIClientInit;
+use crate::state::llm_client_init_trait::{GoogleClientInit, OpenAIClientInit};
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
 use crate::utils::common::get_system_role_or_fallback;
@@ -28,7 +28,7 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 pub async fn process_user_query<
-    T: OpenAIClientInit + QdrantClientInit + TempCacheInit + Send + Sync,
+    T: OpenAIClientInit + GoogleClientInit + QdrantClientInit + TempCacheInit + Send + Sync,
 >(
     user_id: &str,
     user_raw_request: &str,
@@ -39,18 +39,20 @@ pub async fn process_user_query<
 
     let current_cache = get_cache_as_string(app_state.clone(), user_id).await;
 
-    let request_type = check_request_type(
+    let query_type = get_query_type(
         user_raw_request,
         &current_cache,
         app_state.clone(),
         app_name.clone(),
     )
     .await?;
-
-    match request_type {
-        RequestType::Common => {
-            info!("Common case request detected");
-            let response_for_common_case_request = handle_common_case_request(
+    
+    info!("query_type: {}", query_type);
+    
+    match query_type {
+        QueryType::Common => {
+            info!("Common case query detected");
+            let response_for_common_case_query = handle_common_case_query(
                 user_raw_request,
                 app_state.clone(),
                 &current_cache,
@@ -58,9 +60,9 @@ pub async fn process_user_query<
             )
             .await?;
 
-            Ok((response_for_common_case_request, HashMap::new()))
+            Ok((response_for_common_case_query, HashMap::new()))
         }
-        RequestType::Special => {
+        QueryType::Special => {
             info!("Special case request detected");
             let clarified_request = clarify_request(
                 user_raw_request,
@@ -81,7 +83,7 @@ pub async fn process_user_query<
 
             Ok((response_for_special_case_request, extra_data))
         }
-        RequestType::Invalid => {
+        QueryType::Invalid => {
             info!("Invalid case request detected");
             let response_for_invalid_request = handle_invalid_request(
                 user_raw_request,
@@ -229,13 +231,13 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
     };
 
     let llm_response =
-        raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::ComplexFast).await?;
+        raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5Fast).await?;
 
     Ok((llm_response, extra_data))
 }
 
-pub async fn handle_common_case_request<T: OpenAIClientInit + Send + Sync>(
-    user_raw_request: &str,
+pub async fn handle_common_case_query<T: OpenAIClientInit + Send + Sync>(
+    user_raw_query: &str,
     app_state: Arc<T>,
     current_cache: &str,
     app_name: AppName,
@@ -248,7 +250,7 @@ pub async fn handle_common_case_request<T: OpenAIClientInit + Send + Sync>(
 
     let llm_message = format!(
         "{}\n\n<current_query>\n{}\n</current_query>",
-        chat_history_section, user_raw_request
+        chat_history_section, user_raw_query
     );
 
     let system_role = match app_name {
@@ -276,7 +278,7 @@ pub async fn handle_common_case_request<T: OpenAIClientInit + Send + Sync>(
     };
 
     let llm_response =
-        raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Light).await?;
+        raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT4o).await?;
 
     Ok(llm_response)
 }
@@ -323,7 +325,7 @@ pub async fn handle_invalid_request<T: OpenAIClientInit + Send + Sync>(
     };
 
     let llm_response =
-        raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Light).await?;
+        raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT4o).await?;
 
     Ok(llm_response)
 }

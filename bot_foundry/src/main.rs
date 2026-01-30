@@ -10,7 +10,9 @@ use crate::the_viper_room_bot::the_viper_room_bot_callback_query_handler::the_vi
 use crate::the_viper_room_bot::the_viper_room_bot_command_handler::the_viper_room_command_handler;
 use crate::the_viper_room_bot::the_viper_room_bot_message_handler::the_viper_room_message_handler;
 use anyhow::{anyhow, Result};
-use async_openai::Client as LLM_Client;
+use async_openai::Client as OpenAIClient;
+use core::ai::anthropic_client::AnthropicClient;
+use core::ai::google_client::GoogleClient;
 use core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;
 use core::models::common::app_name::AppName;
 use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
@@ -97,9 +99,20 @@ async fn main() -> Result<()> {
             .build()?,
     );
 
-    let llm_client = LLM_Client::new();
+    let openai_client = OpenAIClient::new();
+    let anthropic_client = AnthropicClient::new()?;
+    let google_client = GoogleClient::new()?;
 
-    let core = Arc::new(CoreBotState::new(llm_client, qdrant_client, app_name.clone()).await?);
+    let core = Arc::new(
+        CoreBotState::new(
+            openai_client,
+            anthropic_client,
+            google_client,
+            qdrant_client,
+            app_name.clone(),
+        )
+        .await?,
+    );
 
     let bot_state = match app_name {
         AppName::ProbiotBot => BotState::Probiot(Arc::new(ProbiotBotState::new(core).await?)),

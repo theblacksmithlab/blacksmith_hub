@@ -2,7 +2,7 @@ use anyhow::Result;
 use axum::extract::{Query, State};
 use axum::Json;
 use base64::{engine::general_purpose::STANDARD, Engine};
-use core::ai::common::common::raw_llm_processing;
+use core::ai::common::openai::raw_openai_processing;
 use core::ai::common::voice_processing::openai_base_tts;
 use core::local_db::blacksmith_web::chat_history_storage::fetch_chat_history_from_db;
 use core::message_processing_flow::web::default_message_handler::default_message_handler;
@@ -11,7 +11,7 @@ use core::models::blacksmith_web::blacksmith_web::{
     BlacksmithWebServerResponse, BlacksmithWebTTSRequest, BlacksmithWebTTSResponse,
     BlacksmithWebUserRequest,
 };
-use core::models::common::ai::LlmModel;
+use core::models::common::ai::OpenAIModel;
 use core::models::common::app_name::AppName;
 use core::models::common::system_roles::{AppsSystemRoles, BlacksmithLabRoleType, W3ARoleType};
 use core::state::blacksmith_web::app_state::BlacksmithWebAppState;
@@ -209,11 +209,11 @@ async fn prepare_text_for_tts_fn(
 
     let llm_message = format!("Text to process: {}", text_to_process);
 
-    let processed_text = raw_llm_processing(
+    let processed_text = raw_openai_processing(
         &system_role,
         &llm_message,
         blacksmith_web_app_state,
-        LlmModel::Light,
+        OpenAIModel::GPT4o,
     )
     .await?;
 
