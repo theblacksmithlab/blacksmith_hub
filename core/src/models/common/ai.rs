@@ -16,7 +16,7 @@ impl OpenAIModel {
     pub fn as_str(&self) -> &'static str {
         match self {
             OpenAIModel::GPT4o => "gpt-4o",
-            OpenAIModel::GPT5 | OpenAIModel::GPT5Fast => "gpt-5.2-chat",
+            OpenAIModel::GPT5 | OpenAIModel::GPT5Fast => "gpt-5.2",
             OpenAIModel::Embedding3Large => "text-embedding-3-large",
             OpenAIModel::TTS => "gpt-4o-mini-tts",
         }
