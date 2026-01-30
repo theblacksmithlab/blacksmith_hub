@@ -62,8 +62,8 @@ pub enum GoogleModel {
 impl GoogleModel {
     pub fn as_str(&self) -> &'static str {
         match self {
-            GoogleModel::Flash => "gemini-3.0-flash-latest",
-            GoogleModel::Pro => "gemini-3.0-pro-latest",
+            GoogleModel::Flash => "gemini-3-flash-preview",
+            GoogleModel::Pro => "gemini-3-pro-preview",
         }
     }
 }
