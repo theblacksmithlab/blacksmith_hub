@@ -1,10 +1,11 @@
+use crate::ai::common::google::raw_google_processing;
 use crate::ai::common::openai::raw_openai_processing;
 use crate::ai::common::openai::tokenize_and_truncate;
 use crate::message_processing_flow::analyze_query_complexity::analyze_query_complexity;
 use crate::message_processing_flow::check_request_type::get_query_type;
-use crate::message_processing_flow::clarify_request::clarify_request;
+use crate::message_processing_flow::clarify_request::clarify_query;
 use crate::message_processing_flow::generate_aspects::generate_aspects;
-use crate::models::common::ai::OpenAIModel;
+use crate::models::common::ai::{GoogleModel, OpenAIModel};
 use crate::models::common::app_name::AppName;
 use crate::models::common::qdrant_collection_manager::AppsCollections;
 use crate::models::common::query_type::QueryType;
@@ -20,40 +21,38 @@ use crate::rag_system::{
 use crate::state::llm_client_init_trait::{GoogleClientInit, OpenAIClientInit};
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
-use crate::utils::common::get_system_role_or_fallback;
+use crate::utils::common::get_system_role;
 use crate::utils::tg_bot::tg_bot::{add_user_message_to_cache, get_cache_as_string};
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub async fn process_user_query<
     T: OpenAIClientInit + GoogleClientInit + QdrantClientInit + TempCacheInit + Send + Sync,
 >(
     user_id: &str,
-    user_raw_request: &str,
+    user_raw_query: &str,
     app_state: Arc<T>,
     app_name: AppName,
 ) -> Result<(String, HashMap<String, String>)> {
-    add_user_message_to_cache(app_state.clone(), user_id, user_raw_request).await;
+    add_user_message_to_cache(app_state.clone(), user_id, user_raw_query).await;
 
     let current_cache = get_cache_as_string(app_state.clone(), user_id).await;
 
     let query_type = get_query_type(
-        user_raw_request,
+        user_raw_query,
         &current_cache,
         app_state.clone(),
         app_name.clone(),
     )
     .await?;
-    
-    info!("query_type: {}", query_type);
-    
+
     match query_type {
         QueryType::Common => {
-            info!("Common case query detected");
+            info!("Processing common case user query...");
             let response_for_common_case_query = handle_common_case_query(
-                user_raw_request,
+                user_raw_query,
                 app_state.clone(),
                 &current_cache,
                 app_name.clone(),
@@ -63,56 +62,58 @@ pub async fn process_user_query<
             Ok((response_for_common_case_query, HashMap::new()))
         }
         QueryType::Special => {
-            info!("Special case request detected");
-            let clarified_request = clarify_request(
-                user_raw_request,
+            info!("Processing special case user query...");
+            let clarified_query = clarify_query(
+                user_raw_query,
                 &current_cache,
                 app_state.clone(),
                 app_name.clone(),
             )
             .await?;
 
-            let (response_for_special_case_request, extra_data) = handle_special_case_request(
-                user_raw_request,
-                &clarified_request,
+            let (response_for_special_case_query, extra_data) = handle_special_case_query(
+                user_raw_query,
+                &clarified_query,
                 app_state,
                 &current_cache,
                 app_name.clone(),
             )
             .await?;
 
-            Ok((response_for_special_case_request, extra_data))
+            Ok((response_for_special_case_query, extra_data))
         }
         QueryType::Invalid => {
-            info!("Invalid case request detected");
-            let response_for_invalid_request = handle_invalid_request(
-                user_raw_request,
+            info!("Processing invalid case user query...");
+            let response_for_invalid_query = handle_invalid_query(
+                user_raw_query,
                 app_state.clone(),
                 &current_cache,
                 app_name.clone(),
             )
             .await?;
 
-            Ok((response_for_invalid_request, HashMap::new()))
+            Ok((response_for_invalid_query, HashMap::new()))
         }
         QueryType::Support => {
-            info!("Support case request detected");
-            let response_for_support_request = handle_support_request(
-                user_raw_request,
+            info!("Processing support case user query...");
+            let response_for_support_query = handle_support_query(
+                user_raw_query,
                 app_state.clone(),
                 &current_cache,
                 app_name.clone(),
             )
-                .await?;
+            .await?;
 
-            Ok((response_for_support_request, HashMap::new()))
+            Ok((response_for_support_query, HashMap::new()))
         }
     }
 }
 
-pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit + Send + Sync>(
-    user_raw_request: &str,
-    clarified_request: &str,
+pub async fn handle_special_case_query<
+    T: OpenAIClientInit + QdrantClientInit + GoogleClientInit + Send + Sync,
+>(
+    user_raw_query: &str,
+    clarified_query: &str,
     app_state: Arc<T>,
     current_cache: &str,
     app_name: AppName,
@@ -125,7 +126,7 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
     let max_tokens = 10240;
 
     let query_complexity = analyze_query_complexity(
-        clarified_request,
+        clarified_query,
         current_cache,
         app_state.clone(),
         app_name.clone(),
@@ -137,7 +138,7 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
     let (final_context, extra_data) = match query_complexity {
         QueryComplexity::Base => {
             process_base_hybrid_search(
-                clarified_request,
+                clarified_query,
                 &collection_names,
                 app_state.clone(),
                 max_tokens,
@@ -149,7 +150,7 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
             info!("Complex query detected. Generating aspects...");
 
             let (final_context, extra_data_map) = match generate_aspects(
-                clarified_request,
+                clarified_query,
                 current_cache,
                 app_state.clone(),
                 app_name.clone(),
@@ -195,7 +196,7 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
                     );
 
                     process_base_hybrid_search(
-                        clarified_request,
+                        clarified_query,
                         &collection_names,
                         app_state.clone(),
                         max_tokens,
@@ -210,15 +211,15 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
     };
 
     let llm_message = format!(
-        "<knowledge_base>\n{}\n</knowledge_base>\n\n<chat_history>\n{}\n</chat_history>\n\n<clarified_request>\n{}\n</clarified_request>\n\n<user_request>\n{}\n</user_request>",
+        "<knowledge_base>\n{}\n</knowledge_base>\n\n<chat_history>\n{}\n</chat_history>\n\n<clarified_query>\n{}\n</clarified_query>\n\n<user_query>\n{}\n</user_query>",
         final_context,
         current_cache,
-        clarified_request,
-        user_raw_request,
+        clarified_query,
+        user_raw_query,
     );
 
     info!(
-        "LLM message for user's request main processing:\n{}",
+        "LLM message for user's query main processing:\n{}",
         llm_message
     );
 
@@ -232,23 +233,40 @@ pub async fn handle_special_case_request<T: OpenAIClientInit + QdrantClientInit 
     };
 
     let system_role = match system_role {
-        Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
+        Some(role) => get_system_role(&app_name, role.as_str())?,
         None => {
-            error!(
-                "MainProcessing role is not defined for app '{}'. Using fallback.",
+            return Err(anyhow::anyhow!(
+                "MainProcessing system role is not defined for app '{}'",
                 app_name.as_str()
-            );
-            "You are a helpful assistant".to_string()
+            ));
         }
     };
 
-    let llm_response =
-        raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5Fast).await?;
+    let llm_response = match raw_google_processing(
+        &system_role,
+        &llm_message,
+        app_state.clone(),
+        GoogleModel::Pro,
+    )
+    .await
+    {
+        Ok(result) => {
+            info!("Google main processing succeeded");
+            result
+        }
+        Err(e) => {
+            warn!(
+                "Google main processing failed: {}. Falling back to OpenAI.",
+                e
+            );
+            raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5).await?
+        }
+    };
 
     Ok((llm_response, extra_data))
 }
 
-pub async fn handle_common_case_query<T: OpenAIClientInit + Send + Sync>(
+pub async fn handle_common_case_query<T: OpenAIClientInit + GoogleClientInit + Send + Sync>(
     user_raw_query: &str,
     app_state: Arc<T>,
     current_cache: &str,
@@ -267,36 +285,49 @@ pub async fn handle_common_case_query<T: OpenAIClientInit + Send + Sync>(
 
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(
-            ProbiotRoleType::CommonCaseRequestProcessing,
+            ProbiotRoleType::CommonCaseQueryProcessing,
         )),
-        AppName::W3AWeb => Some(AppsSystemRoles::W3A(
-            W3ARoleType::CommonCaseRequestProcessing,
-        )),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::CommonCaseQueryProcessing)),
         AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
-            BlacksmithLabRoleType::CommonCaseRequestProcessing,
+            BlacksmithLabRoleType::CommonCaseQueryProcessing,
         )),
         _ => None,
     };
 
     let system_role = match system_role {
-        Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
+        Some(role) => get_system_role(&app_name, role.as_str())?,
         None => {
-            error!(
-                "CommonCaseRequestProcessing role is not defined for app '{}'. Using fallback.",
+            return Err(anyhow::anyhow!(
+                "CommonCaseQueryProcessing system role is not defined for app '{}'",
                 app_name.as_str()
-            );
-            "You are a helpful assistant".to_string()
+            ));
         }
     };
 
-    let llm_response =
-        raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT4o).await?;
+    let llm_response = match raw_google_processing(
+        &system_role,
+        &llm_message,
+        app_state.clone(),
+        GoogleModel::Flash,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            warn!(
+                "Google common case processing failed: {}. Falling back to OpenAI.",
+                e
+            );
+            raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5lr)
+                .await?
+        }
+    };
 
     Ok(llm_response)
 }
 
-pub async fn handle_invalid_request<T: OpenAIClientInit + Send + Sync>(
-    user_raw_request: &str,
+pub async fn handle_invalid_query<T: OpenAIClientInit + GoogleClientInit + Send + Sync>(
+    user_raw_query: &str,
     app_state: Arc<T>,
     current_cache: &str,
     app_name: AppName,
@@ -309,41 +340,56 @@ pub async fn handle_invalid_request<T: OpenAIClientInit + Send + Sync>(
 
     let llm_message = format!(
         "{}\n\n<current_query>\n{}\n</current_query>",
-        chat_history_section, user_raw_request
+        chat_history_section, user_raw_query
     );
 
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(
-            ProbiotRoleType::InvalidCaseRequestProcessing,
+            ProbiotRoleType::InvalidCaseQueryProcessing,
         )),
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(
-            W3ARoleType::InvalidCaseRequestProcessing,
+            W3ARoleType::InvalidCaseQueryProcessing,
         )),
         AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
-            BlacksmithLabRoleType::InvalidCaseRequestProcessing,
+            BlacksmithLabRoleType::InvalidCaseQueryProcessing,
         )),
         _ => None,
     };
 
     let system_role = match system_role {
-        Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
+        Some(role) => get_system_role(&app_name, role.as_str())?,
         None => {
-            error!(
-                "InvalidCaseRequestProcessing role is not defined for app '{}'. Using fallback.",
+            return Err(anyhow::anyhow!(
+                "InvalidCaseQueryProcessing system role is not defined for app '{}'",
                 app_name.as_str()
-            );
-            "You are a helpful assistant".to_string()
+            ));
         }
     };
 
-    let llm_response =
-        raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT4o).await?;
+    let llm_response = match raw_google_processing(
+        &system_role,
+        &llm_message,
+        app_state.clone(),
+        GoogleModel::Flash,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            warn!(
+                "Google invalid case processing failed: {}. Falling back to OpenAI.",
+                e
+            );
+            raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5lr)
+                .await?
+        }
+    };
 
     Ok(llm_response)
 }
 
-pub async fn handle_support_request<T: OpenAIClientInit + Send + Sync>(
-    user_raw_request: &str,
+pub async fn handle_support_query<T: OpenAIClientInit + GoogleClientInit + Send + Sync>(
+    user_raw_query: &str,
     app_state: Arc<T>,
     current_cache: &str,
     app_name: AppName,
@@ -356,41 +402,56 @@ pub async fn handle_support_request<T: OpenAIClientInit + Send + Sync>(
 
     let llm_message = format!(
         "{}\n\n<current_query>\n{}\n</current_query>",
-        chat_history_section, user_raw_request
+        chat_history_section, user_raw_query
     );
 
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(
-            ProbiotRoleType::InvalidCaseRequestProcessing,
+            ProbiotRoleType::InvalidCaseQueryProcessing,
         )),
         AppName::W3AWeb => Some(AppsSystemRoles::W3A(
-            W3ARoleType::SupportCaseRequestProcessing,
+            W3ARoleType::SupportCaseQueryProcessing,
         )),
         AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
-            BlacksmithLabRoleType::InvalidCaseRequestProcessing,
+            BlacksmithLabRoleType::InvalidCaseQueryProcessing,
         )),
         _ => None,
     };
 
     let system_role = match system_role {
-        Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
+        Some(role) => get_system_role(&app_name, role.as_str())?,
         None => {
-            error!(
-                "SupportCaseRequestProcessing role is not defined for app '{}'. Using fallback.",
+            return Err(anyhow::anyhow!(
+                "SupportCaseQueryProcessing system role is not defined for app '{}'",
                 app_name.as_str()
-            );
-            "You are a helpful assistant".to_string()
+            ));
         }
     };
 
-    let llm_response =
-        raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT4o).await?;
+    let llm_response = match raw_google_processing(
+        &system_role,
+        &llm_message,
+        app_state.clone(),
+        GoogleModel::Flash,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            warn!(
+                "Google support case processing failed: {}. Falling back to OpenAI.",
+                e
+            );
+            raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5lr)
+                .await?
+        }
+    };
 
     Ok(llm_response)
 }
 
 async fn process_base_hybrid_search<T: OpenAIClientInit + QdrantClientInit + Send + Sync>(
-    clarified_request: &str,
+    clarified_query: &str,
     collection_names: &Vec<String>,
     app_state: Arc<T>,
     max_tokens: usize,
@@ -403,7 +464,7 @@ async fn process_base_hybrid_search<T: OpenAIClientInit + QdrantClientInit + Sen
     };
 
     let rag_system_search_result = get_results_via_rag_system(
-        clarified_request,
+        clarified_query,
         collection_names,
         rag_config.clone(),
         app_state.clone(),

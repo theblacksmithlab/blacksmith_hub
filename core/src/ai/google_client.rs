@@ -161,7 +161,11 @@ impl GoogleClient {
         self.send_request(request_body, model).await
     }
 
-    async fn send_request(&self, request_body: GoogleRequest, model: &GoogleModel) -> Result<String> {
+    async fn send_request(
+        &self,
+        request_body: GoogleRequest,
+        model: &GoogleModel,
+    ) -> Result<String> {
         let url = format!(
             "{}{}:generateContent?key={}",
             GOOGLE_API_BASE_URL,
@@ -169,7 +173,10 @@ impl GoogleClient {
             self.api_key
         );
 
-        info!("Sending request to Google Gemini API, model: {}", model.as_str());
+        info!(
+            "Sending request to Google Gemini API, model: {}",
+            model.as_str()
+        );
 
         let response = self
             .client
@@ -183,7 +190,11 @@ impl GoogleClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            return Err(anyhow!("Google Gemini API error ({}): {}", status, error_text));
+            return Err(anyhow!(
+                "Google Gemini API error ({}): {}",
+                status,
+                error_text
+            ));
         }
 
         let response_body: GoogleResponse = response

@@ -213,7 +213,7 @@ async fn prepare_text_for_tts_fn(
         &system_role,
         &llm_message,
         blacksmith_web_app_state,
-        OpenAIModel::GPT4o,
+        OpenAIModel::GPT5lr,
     )
     .await?;
 

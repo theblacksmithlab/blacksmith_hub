@@ -275,7 +275,7 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
                 &system_role,
                 &llm_input,
                 app_state.clone(),
-                OpenAIModel::GPT5Fast,
+                OpenAIModel::GPT5lr,
             )
             .await?;
 
@@ -332,7 +332,7 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
         &system_role,
         &updates_with_nickname_provided,
         app_state.clone(),
-        OpenAIModel::GPT5Fast,
+        OpenAIModel::GPT5lr,
     )
     .await?;
 
@@ -407,7 +407,8 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
             let text = message.text();
 
             let llm_response =
-                raw_openai_processing(&system_role, text, app_state.clone(), OpenAIModel::GPT4o).await?;
+                raw_openai_processing(&system_role, text, app_state.clone(), OpenAIModel::GPT4o)
+                    .await?;
 
             let decision = llm_response.trim().to_lowercase();
 

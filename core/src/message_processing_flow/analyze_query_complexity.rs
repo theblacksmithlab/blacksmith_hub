@@ -1,17 +1,18 @@
+use crate::ai::common::google::raw_google_processing_json;
 use crate::ai::common::openai::raw_openai_processing_json;
-use crate::models::common::ai::OpenAIModel;
+use crate::models::common::ai::{GoogleModel, OpenAIModel};
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::{
     AppsSystemRoles, BlacksmithLabRoleType, ProbiotRoleType, W3ARoleType,
 };
 use crate::rag_system::query_decompression_types::QueryComplexity;
-use crate::state::llm_client_init_trait::OpenAIClientInit;
-use crate::utils::common::get_system_role_or_fallback;
+use crate::state::llm_client_init_trait::{GoogleClientInit, OpenAIClientInit};
+use crate::utils::common::get_system_role;
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, info, warn};
 
-pub async fn analyze_query_complexity<T: OpenAIClientInit + Send + Sync>(
-    clarified_request: &str,
+pub async fn analyze_query_complexity<T: OpenAIClientInit + GoogleClientInit + Send + Sync>(
+    clarified_query: &str,
     current_cache: &str,
     app_state: Arc<T>,
     app_name: AppName,
@@ -28,13 +29,12 @@ pub async fn analyze_query_complexity<T: OpenAIClientInit + Send + Sync>(
     };
 
     let system_role = match system_role {
-        Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
+        Some(role) => get_system_role(&app_name, role.as_str())?,
         None => {
-            error!(
-                "QueryComplexityAnalysis role is not defined for app '{}'. Using fallback.",
+            return Err(anyhow::anyhow!(
+                "QueryComplexityAnalysis system role is not defined for app '{}'",
                 app_name.as_str()
-            );
-            "You are a helpful assistant".to_string()
+            ));
         }
     };
 
@@ -46,11 +46,30 @@ pub async fn analyze_query_complexity<T: OpenAIClientInit + Send + Sync>(
 
     let llm_message = format!(
         "{}\n\n<current_query>\n{}\n</current_query>",
-        chat_history_section, clarified_request
+        chat_history_section, clarified_query
     );
 
-    let query_complexity_result =
-        raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT4o).await?;
+    let query_complexity_result = match raw_google_processing_json(
+        &system_role,
+        &llm_message,
+        app_state.clone(),
+        GoogleModel::Flash,
+    )
+    .await
+    {
+        Ok(result) => {
+            info!("Google query complexity analysis succeeded");
+            result
+        }
+        Err(e) => {
+            warn!(
+                "Google query complexity analysis failed: {}. Falling back to OpenAI.",
+                e
+            );
+            raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT5mini)
+                .await?
+        }
+    };
 
     let query_complexity: QueryComplexity =
         match serde_json::from_str::<serde_json::Value>(&query_complexity_result) {

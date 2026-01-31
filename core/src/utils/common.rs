@@ -38,6 +38,24 @@ pub fn get_system_role_path(app_name: &AppName, role_type: &str) -> PathBuf {
         .join(format!("{}.txt", role_type))
 }
 
+pub fn get_system_role<T>(app_name: &AppName, role_type: T) -> Result<String>
+where
+    T: AsRef<str>,
+{
+    let role_str = role_type.as_ref();
+    let file_path = get_system_role_path(app_name, role_str);
+
+    read_to_string(&file_path).map_err(|err| {
+        anyhow!(
+            "System role '{}' not found for app '{}': {}",
+            role_str,
+            app_name.as_str(),
+            err
+        )
+    })
+}
+
+/// Deprecated: use `get_system_role` instead
 pub fn get_system_role_or_fallback<T>(
     app_name: &AppName,
     role_type: T,

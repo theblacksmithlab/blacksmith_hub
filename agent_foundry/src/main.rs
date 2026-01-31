@@ -53,7 +53,13 @@ async fn main() -> Result<()> {
     let google_client = GoogleClient::new()?;
 
     let app_state = Arc::new(
-        AgentAppState::new(openai_client, anthropic_client, google_client, app_name.clone()).await?,
+        AgentAppState::new(
+            openai_client,
+            anthropic_client,
+            google_client,
+            app_name.clone(),
+        )
+        .await?,
     );
 
     let telegram_agent = TelegramAgent::new(&app_name, "current.session").await?;

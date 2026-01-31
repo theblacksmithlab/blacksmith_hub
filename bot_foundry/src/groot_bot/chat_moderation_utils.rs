@@ -587,8 +587,13 @@ pub async fn ai_check(
     let system_role =
         get_system_role_or_fallback(&AppName::GrootBot, GrootRoleType::MessageCheck, None);
 
-    let scam_detection_result =
-        raw_openai_processing_json(&system_role, message_to_check, app_state, OpenAIModel::GPT4o).await?;
+    let scam_detection_result = raw_openai_processing_json(
+        &system_role,
+        message_to_check,
+        app_state,
+        OpenAIModel::GPT4o,
+    )
+    .await?;
 
     let is_scam: bool = match serde_json::from_str::<serde_json::Value>(&scam_detection_result) {
         Ok(json) => match json.get("is_scam") {
