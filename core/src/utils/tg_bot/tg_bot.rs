@@ -163,7 +163,7 @@ pub async fn add_user_message_to_cache<T: TempCacheInit + Send + Sync>(
     let mut cache = app_state.get_temp_cache().lock().await;
     let chat_cache = cache
         .entry(user_id.to_string())
-        .or_insert_with(|| DialogueCache::new(20));
+        .or_insert_with(|| DialogueCache::new(10));
     chat_cache.add_user_message(message.to_string());
 }
 
@@ -175,7 +175,7 @@ pub async fn add_llm_response_to_cache<T: TempCacheInit + Send + Sync>(
     let mut cache = app_state.get_temp_cache().lock().await;
     let chat_cache = cache
         .entry(user_id.to_string())
-        .or_insert_with(|| DialogueCache::new(20));
+        .or_insert_with(|| DialogueCache::new(10));
     chat_cache.add_llm_response_to_cache(llm_response.to_string());
 }
 

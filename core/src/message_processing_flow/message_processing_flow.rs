@@ -26,7 +26,7 @@ use crate::utils::tg_bot::tg_bot::{add_user_message_to_cache, get_cache_as_strin
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 pub async fn process_user_query<
     T: OpenAIClientInit + GoogleClientInit + QdrantClientInit + TempCacheInit + Send + Sync,
@@ -40,9 +40,12 @@ pub async fn process_user_query<
 
     let current_cache = get_cache_as_string(app_state.clone(), user_id).await;
 
+    let post_processed_temp_cache =
+        tokenize_and_truncate(current_cache.as_str(), 5000, true).await?;
+
     let query_type = get_query_type(
         user_raw_query,
-        &current_cache,
+        &post_processed_temp_cache,
         app_state.clone(),
         app_name.clone(),
     )
@@ -54,7 +57,7 @@ pub async fn process_user_query<
             let response_for_common_case_query = handle_common_case_query(
                 user_raw_query,
                 app_state.clone(),
-                &current_cache,
+                &post_processed_temp_cache,
                 app_name.clone(),
             )
             .await?;
@@ -65,7 +68,7 @@ pub async fn process_user_query<
             info!("Processing special case user query...");
             let clarified_query = clarify_query(
                 user_raw_query,
-                &current_cache,
+                &post_processed_temp_cache,
                 app_state.clone(),
                 app_name.clone(),
             )
@@ -75,7 +78,7 @@ pub async fn process_user_query<
                 user_raw_query,
                 &clarified_query,
                 app_state,
-                &current_cache,
+                &post_processed_temp_cache,
                 app_name.clone(),
             )
             .await?;
@@ -87,7 +90,7 @@ pub async fn process_user_query<
             let response_for_invalid_query = handle_invalid_query(
                 user_raw_query,
                 app_state.clone(),
-                &current_cache,
+                &post_processed_temp_cache,
                 app_name.clone(),
             )
             .await?;
@@ -99,7 +102,7 @@ pub async fn process_user_query<
             let response_for_support_query = handle_support_query(
                 user_raw_query,
                 app_state.clone(),
-                &current_cache,
+                &post_processed_temp_cache,
                 app_name.clone(),
             )
             .await?;
@@ -133,7 +136,7 @@ pub async fn handle_special_case_query<
     )
     .await?;
 
-    info!("Query complexity: {:?}", query_complexity);
+    debug!("Query complexity: {:?}", query_complexity);
 
     let (final_context, extra_data) = match query_complexity {
         QueryComplexity::Base => {
@@ -171,9 +174,10 @@ pub async fn handle_special_case_query<
                     let structured_context =
                         build_structured_context_with_aspects(&aspects, &documents);
 
-                    let final_context = tokenize_and_truncate(&structured_context, max_tokens)
-                        .await
-                        .unwrap_or_else(|_| structured_context.clone());
+                    let final_context =
+                        tokenize_and_truncate(&structured_context, max_tokens, false)
+                            .await
+                            .unwrap_or_else(|_| structured_context.clone());
 
                     let extra_data_map: HashMap<String, String> = documents
                         .iter()
@@ -218,10 +222,10 @@ pub async fn handle_special_case_query<
         user_raw_query,
     );
 
-    info!(
-        "LLM message for user's query main processing:\n{}",
-        llm_message
-    );
+    // info!(
+    //     "LLM message for user's query main processing:\n{}",
+    //     llm_message
+    // );
 
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::MainProcessing)),
@@ -473,7 +477,7 @@ async fn process_base_hybrid_search<T: OpenAIClientInit + QdrantClientInit + Sen
 
     let search_result_content = rag_system_search_result.context;
 
-    let post_processed_content = tokenize_and_truncate(&search_result_content, max_tokens)
+    let post_processed_content = tokenize_and_truncate(&search_result_content, max_tokens, false)
         .await
         .unwrap_or_else(|_| search_result_content.clone());
 

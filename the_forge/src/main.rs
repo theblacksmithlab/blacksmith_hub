@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     dotenv().ok();
 
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::new("info"))
+        .with_env_filter(EnvFilter::new("info,core=debug,the_forge=debug"))
         .init();
 
     info!("Determining AppName of the service being launched...");

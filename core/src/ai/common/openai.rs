@@ -104,22 +104,39 @@ pub async fn raw_openai_processing<T: OpenAIClientInit + Send + Sync>(
     }
 }
 
-pub async fn tokenize_and_truncate(data: &str, max_tokens: usize) -> Result<String> {
+pub async fn tokenize_and_truncate(
+    data: &str,
+    max_tokens: usize,
+    keep_end: bool,
+) -> Result<String> {
     let bpe = cl100k_base()?;
     let tokens = bpe.encode_ordinary(&*data);
     let token_count = tokens.len();
 
-    info!("Tokenize_and_truncate fn | Input tokens: {:?}", token_count);
+    info!("Input tokens: {:?}", token_count);
 
     if token_count > max_tokens {
-        let truncated_tokens = tokens[..max_tokens].to_vec();
+        let truncated_tokens = if keep_end {
+            tokens[token_count - max_tokens..].to_vec()
+        } else {
+            tokens[..max_tokens].to_vec()
+        };
+
         let truncated_data = bpe.decode(truncated_tokens)?;
-        let truncated_text_tokens = bpe.encode_ordinary(&*truncated_data);
-        let truncated_count = truncated_text_tokens.len();
+        let truncated_count = bpe.encode_ordinary(&truncated_data).len();
 
-        info!("Truncated input tokens: {:?}", truncated_count);
+        info!(
+            "Truncated input tokens: {} -> {} (keep_end: {})",
+            token_count, truncated_count, keep_end
+        );
 
-        Ok(truncated_data)
+        let result = if keep_end {
+            format!("...[начало обрезано]\n{}", truncated_data)
+        } else {
+            format!("{}\n[конец обрезан]...", truncated_data)
+        };
+
+        Ok(result)
     } else {
         info!(
             "Input tokens {} < max_tokens, no need to truncate",

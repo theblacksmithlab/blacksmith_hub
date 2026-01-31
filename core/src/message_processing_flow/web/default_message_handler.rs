@@ -16,10 +16,7 @@ pub async fn default_message_handler(
     user_id: &str,
     app_name: &AppName,
 ) -> (String, HashMap<String, String>) {
-    info!(
-        "Message received from user: {} is a text message. Processing it...",
-        user_id
-    );
+    info!("Got text message from user: {}. Processing it...", user_id);
 
     if let Err(e) = save_message_to_db(
         app_state.get_db_pool(),
@@ -60,12 +57,12 @@ pub async fn default_message_handler(
 
             add_llm_response_to_cache(app_state.clone(), user_id, &full_response).await;
 
-            info!("Successfully processed text message from user: {}", user_id);
+            info!("Successfully processed message from user: {}", user_id);
 
             (htmled_full_response, extra_data)
         }
         Err(err) => {
-            error!("Error processing text request from user: {}", err);
+            error!("Error processing request from user: {}", err);
 
             let error_msg_for_user = get_message(AppsSystemMessages::Common(
                 CommonMessages::ServiceUnavailable,
