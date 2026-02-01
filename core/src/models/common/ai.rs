@@ -5,7 +5,6 @@ use strum_macros::Display;
 
 #[derive(Debug, Display, Clone, Copy)]
 pub enum OpenAIModel {
-    GPT4o,           // gpt-4o
     GPT5,            // gpt-5.2
     GPT5mini,        // gpt-5-mini
     GPT5lr,          // gpt-5.2 (low reasoning)
@@ -16,7 +15,6 @@ pub enum OpenAIModel {
 impl OpenAIModel {
     pub fn as_str(&self) -> &'static str {
         match self {
-            OpenAIModel::GPT4o => "gpt-4o",
             OpenAIModel::GPT5mini => "gpt-5-mini",
             OpenAIModel::GPT5 | OpenAIModel::GPT5lr => "gpt-5.2",
             OpenAIModel::Embedding3Large => "text-embedding-3-large",

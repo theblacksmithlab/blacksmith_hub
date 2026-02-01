@@ -27,7 +27,7 @@ pub async fn generate_user_system_nickname(
         &system_role,
         &user_data,
         the_viper_room_app_state,
-        OpenAIModel::GPT4o,
+        OpenAIModel::GPT5mini,
     )
     .await
     .map_err(|e| format!("Failed to generate nickname: {}", e))

@@ -32,7 +32,7 @@ pub async fn validate_transcription_keywords(
     let llm_message = format!("Raw transcription keywords: {}", raw_transcription_keywords);
 
     let validated_keywords =
-        match raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT4o)
+        match raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT5lr)
             .await
         {
             Ok(response) => response,

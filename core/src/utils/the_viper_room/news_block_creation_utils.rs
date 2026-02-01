@@ -407,7 +407,7 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
             let text = message.text();
 
             let llm_response =
-                raw_openai_processing(&system_role, text, app_state.clone(), OpenAIModel::GPT4o)
+                raw_openai_processing(&system_role, text, app_state.clone(), OpenAIModel::GPT5lr)
                     .await?;
 
             let decision = llm_response.trim().to_lowercase();
