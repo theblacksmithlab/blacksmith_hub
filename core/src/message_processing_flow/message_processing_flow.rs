@@ -126,7 +126,7 @@ pub async fn handle_special_case_query<
         .map(|collection| collection.as_str().to_string())
         .collect();
 
-    let max_tokens = 10240;
+    let max_tokens = 10000;
 
     let query_complexity = analyze_query_complexity(
         clarified_query,
@@ -136,7 +136,7 @@ pub async fn handle_special_case_query<
     )
     .await?;
 
-    debug!("Query complexity: {:?}", query_complexity);
+    debug!("Query complexity determined: {:?}", query_complexity);
 
     let (final_context, extra_data) = match query_complexity {
         QueryComplexity::Base => {
@@ -161,7 +161,7 @@ pub async fn handle_special_case_query<
             .await
             {
                 Ok(aspects) => {
-                    info!("Aspects generated for user query: {:?}", aspects);
+                    debug!("Aspects generated for user query: {:?}", aspects);
 
                     let documents = search_by_aspects(
                         aspects.clone(),
@@ -195,7 +195,7 @@ pub async fn handle_special_case_query<
                 }
                 Err(err) => {
                     error!(
-                        "Failed to generate aspects: {}. Falling back to Base mode.",
+                        "Failed to generate aspects: {}, falling back to Base mode",
                         err
                     );
 
@@ -222,10 +222,17 @@ pub async fn handle_special_case_query<
         user_raw_query,
     );
 
-    // info!(
-    //     "LLM message for user's query main processing:\n{}",
-    //     llm_message
-    // );
+    let llm_message_for_debug = format!(
+        "=============================================================================\n\
+        {}\n\
+        =============================================================================",
+        llm_message
+    );
+
+    debug!(
+        "LLM message for user query main processing:\n{}",
+        llm_message_for_debug
+    );
 
     let system_role = match app_name {
         AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::MainProcessing)),
@@ -319,7 +326,7 @@ pub async fn handle_common_case_query<T: OpenAIClientInit + GoogleClientInit + S
         Ok(result) => result,
         Err(e) => {
             warn!(
-                "Google common case processing failed: {}. Falling back to OpenAI.",
+                "Google common case processing failed: {}, falling back to OpenAI",
                 e
             );
             raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5lr)

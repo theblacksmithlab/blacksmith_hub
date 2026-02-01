@@ -113,7 +113,13 @@ pub async fn tokenize_and_truncate(
     let tokens = bpe.encode_ordinary(&*data);
     let token_count = tokens.len();
 
-    info!("Input tokens: {:?}", token_count);
+    let input_data_source = if keep_end == true {
+        "chat history".to_string()
+    } else {
+        "vector db retriever".to_string()
+    };
+
+    info!("Input tokens: {} from: {}", token_count, input_data_source);
 
     if token_count > max_tokens {
         let truncated_tokens = if keep_end {
@@ -126,20 +132,26 @@ pub async fn tokenize_and_truncate(
         let truncated_count = bpe.encode_ordinary(&truncated_data).len();
 
         info!(
-            "Truncated input tokens: {} -> {} (keep_end: {})",
+            "Truncated input data: {} -> {} (keep_end: {})",
             token_count, truncated_count, keep_end
         );
 
         let result = if keep_end {
-            format!("...[начало обрезано]\n{}", truncated_data)
+            format!(
+                "...[начало обрезано в целях экономии контекстного окна]\n{}",
+                truncated_data
+            )
         } else {
-            format!("{}\n[конец обрезан]...", truncated_data)
+            format!(
+                "{}\n[конец обрезан в целях экономии контекстного окна]...",
+                truncated_data
+            )
         };
 
         Ok(result)
     } else {
         info!(
-            "Input tokens {} < max_tokens, no need to truncate",
+            "Input data tokens quantity ({}) < max_tokens, no need to truncate it",
             token_count
         );
         Ok(data.to_string())

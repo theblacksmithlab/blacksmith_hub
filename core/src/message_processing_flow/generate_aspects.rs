@@ -61,7 +61,7 @@ pub async fn generate_aspects<T: OpenAIClientInit + GoogleClientInit + Send + Sy
         }
         Err(e) => {
             warn!(
-                "Google aspect generation failed: {}. Falling back to OpenAI.",
+                "Google aspect generation failed: {}, falling back to OpenAI",
                 e
             );
             raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT5)
@@ -75,7 +75,7 @@ pub async fn generate_aspects<T: OpenAIClientInit + GoogleClientInit + Send + Sy
 
             if aspects.len() < 3 {
                 warn!(
-                    "Generated aspects count is less than 3 (got {}). This should trigger fallback to Base mode.",
+                    "Generated aspects count is less than 3 (got {}), falling back to Base mode",
                     aspects.len()
                 );
                 return Err(anyhow::anyhow!(

@@ -63,7 +63,7 @@ pub async fn get_query_type<T: OpenAIClientInit + GoogleClientInit + Send + Sync
         }
         Err(e) => {
             warn!(
-                "Google query type processing failed: {}. Falling back to OpenAI.",
+                "Google query type processing failed: {}, falling back to OpenAI",
                 e
             );
             let openai_query_type_processing_result = raw_openai_processing_json(

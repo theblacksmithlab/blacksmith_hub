@@ -9,6 +9,7 @@ use crate::utils::tg_bot::tg_bot::append_footer_if_needed;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info};
+use uuid::Uuid;
 
 pub async fn default_message_handler(
     request_text: &str,
@@ -16,7 +17,8 @@ pub async fn default_message_handler(
     user_id: &str,
     app_name: &AppName,
 ) -> (String, HashMap<String, String>) {
-    info!("Got text message from user: {}. Processing it...", user_id);
+    let request_id = Uuid::new_v4();
+    info!(request_id = %request_id, user_id = %user_id, "Request processing started");
 
     if let Err(e) = save_message_to_db(
         app_state.get_db_pool(),
@@ -57,12 +59,12 @@ pub async fn default_message_handler(
 
             add_llm_response_to_cache(app_state.clone(), user_id, &full_response).await;
 
-            info!("Successfully processed message from user: {}", user_id);
+            info!(request_id = %request_id, user_id = %user_id, "User request processed successfully");
 
             (htmled_full_response, extra_data)
         }
         Err(err) => {
-            error!("Error processing request from user: {}", err);
+            error!(request_id = %request_id, user_id = %user_id, "User request processing failed with error: {}", err);
 
             let error_msg_for_user = get_message(AppsSystemMessages::Common(
                 CommonMessages::ServiceUnavailable,

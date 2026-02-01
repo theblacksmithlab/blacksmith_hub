@@ -63,7 +63,7 @@ pub async fn analyze_query_complexity<T: OpenAIClientInit + GoogleClientInit + S
         }
         Err(e) => {
             warn!(
-                "Google query complexity analysis failed: {}. Falling back to OpenAI.",
+                "Google query complexity analysis failed: {}, falling back to OpenAI",
                 e
             );
             raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT5mini)
@@ -84,7 +84,7 @@ pub async fn analyze_query_complexity<T: OpenAIClientInit + GoogleClientInit + S
                     "complex" => QueryComplexity::Complex,
                     _ => {
                         error!(
-                            "Unknown query_complexity '{}', defaulting to Base",
+                            "Got unknown query_complexity from llm: '{}', defaulting to 'base'",
                             complexity_str
                         );
                         QueryComplexity::Base
@@ -92,7 +92,10 @@ pub async fn analyze_query_complexity<T: OpenAIClientInit + GoogleClientInit + S
                 }
             }
             Err(err) => {
-                error!("Failed to parse JSON: {}", err);
+                error!(
+                    "Failed to parse query complexity determination JSON: {}",
+                    err
+                );
                 QueryComplexity::Base
             }
         };
