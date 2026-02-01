@@ -8,10 +8,10 @@ use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
 use pulldown_cmark::{html, Event, Parser, Tag, TagEnd};
-use std::env;
 use std::fs::{read_to_string, remove_file};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::{env, fs};
 use tracing::{error, info};
 
 pub fn build_resource_file_path(app_name: &AppName, file_name: &str) -> PathBuf {
@@ -270,22 +270,6 @@ pub fn split_text_into_chunks(text: &str, max_chars: usize) -> Vec<String> {
     chunks
 }
 
-pub async fn transcribe_voice_message(file_path: &Path) -> Result<Option<String>> {
-    let transcription = speech_to_text(file_path).await?;
-
-    remove_file(file_path).ok();
-    info!("Successfully removed temp file: {:?}", file_path);
-
-    if transcription.trim().is_empty() {
-        info!(
-            "Voice message transcription is empty, looks like user sent empty message by mistake"
-        );
-        Ok(None)
-    } else {
-        Ok(Some(transcription))
-    }
-}
-
 pub fn markdown_to_html(markdown: &str) -> String {
     let parser = Parser::new(markdown);
     let mut html_output = String::new();
@@ -391,24 +375,18 @@ fn escape_html(text: &str) -> String {
         .replace('"', "&quot;")
 }
 
-// legacy method
-pub fn convert_markdown_to_telegram(markdown: &str) -> String {
-    markdown
-        .replace("\\", "\\\\")
-        .replace("[", "\\[")
-        .replace("]", "\\]")
-        .replace("(", "\\(")
-        .replace(")", "\\)")
-        .replace("~", "\\~")
-        .replace("`", "\\`")
-        .replace(">", "\\>")
-        .replace("#", "\\#")
-        .replace("+", "\\+")
-        .replace("-", "\\-")
-        .replace("=", "\\=")
-        .replace("|", "\\|")
-        .replace("{", "\\{")
-        .replace("}", "\\}")
-        .replace(".", "\\.")
-        .replace("!", "\\!")
+pub fn create_app_tmp_dir(app_name: &AppName) -> std::io::Result<()> {
+    let base_tmp = PathBuf::from("tmp");
+
+    if !base_tmp.exists() {
+        fs::create_dir_all(&base_tmp)?;
+    }
+
+    let app_tmp_dir = app_name.temp_dir();
+
+    if !app_tmp_dir.exists() {
+        fs::create_dir_all(&app_tmp_dir)?;
+    }
+
+    Ok(())
 }

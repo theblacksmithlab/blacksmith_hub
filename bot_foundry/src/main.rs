@@ -22,7 +22,7 @@ use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheVi
 use core::state::tg_bot::{
     CoreBotState, GrootBotState, ProbiotBotState, StatBotState, TheViperRoomBotState,
 };
-use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
+use core::utils::common::create_app_tmp_dir;
 use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;

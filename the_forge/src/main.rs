@@ -7,7 +7,7 @@ use core::models::common::app_name::AppName;
 use core::server_config::server_config::get_config_path;
 use core::server_config::server_config::AppConfig;
 use core::state::server_common::app_state::ServerAppState;
-use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
+use core::utils::common::create_app_tmp_dir;
 use dotenv::dotenv;
 use rustls::crypto::{aws_lc_rs, CryptoProvider};
 use std::env;

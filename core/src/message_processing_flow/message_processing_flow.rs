@@ -21,8 +21,9 @@ use crate::rag_system::{
 use crate::state::llm_client_init_trait::{GoogleClientInit, OpenAIClientInit};
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
+use crate::temp_cache::temp_cache_utils::add_user_message_to_cache;
+use crate::temp_cache::temp_cache_utils::get_cache_as_string;
 use crate::utils::common::get_system_role;
-use crate::utils::tg_bot::tg_bot::{add_user_message_to_cache, get_cache_as_string};
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;

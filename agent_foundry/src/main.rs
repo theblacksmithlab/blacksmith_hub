@@ -6,7 +6,7 @@ use core::models::common::app_name::AppName;
 use core::models::tg_agent::bot_alias::GrootBotAlias;
 use core::state::tg_agent::app_state::AgentAppState;
 use core::telegram_client::telegram_client::TelegramAgent;
-use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
+use core::utils::common::create_app_tmp_dir;
 use dotenv::dotenv;
 use rustls::crypto::{aws_lc_rs, CryptoProvider};
 use std::env;
