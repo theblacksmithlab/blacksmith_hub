@@ -591,7 +591,7 @@ pub async fn ai_check(
         &system_role,
         message_to_check,
         app_state,
-        OpenAIModel::GPT5lr,
+        OpenAIModel::GPT5mr,
     )
     .await?;
 

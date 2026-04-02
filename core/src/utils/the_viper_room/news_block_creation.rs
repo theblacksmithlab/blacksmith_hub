@@ -255,7 +255,7 @@ pub async fn news_block_creation<T: OpenAIClientInit + Send + Sync>(
             &system_role,
             &data_for_caption,
             app_state.clone(),
-            OpenAIModel::GPT5mini,
+            OpenAIModel::GPT5lr,
         )
         .await?;
 

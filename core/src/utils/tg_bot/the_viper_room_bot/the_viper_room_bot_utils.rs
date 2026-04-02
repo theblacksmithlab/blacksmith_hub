@@ -29,7 +29,7 @@ where
 
     info!("Generating a nickname from user's data: {}", user_data);
 
-    raw_openai_processing(&system_role, &user_data, app_state, OpenAIModel::GPT5mini)
+    raw_openai_processing(&system_role, &user_data, app_state, OpenAIModel::GPT5lr)
         .await
         .map_err(|e| format!("Failed to generate nickname: {}", e))
 }

@@ -63,7 +63,7 @@ pub async fn clarify_query<T: OpenAIClientInit + GoogleClientInit + Send + Sync>
                 "Google raw query clarify processing failed: {}, falling back to OpenAI",
                 e
             );
-            match raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5lr)
+            match raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5mr)
                 .await
             {
                 Ok(result) => {

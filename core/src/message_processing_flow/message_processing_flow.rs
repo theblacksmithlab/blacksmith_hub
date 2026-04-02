@@ -271,7 +271,7 @@ pub async fn handle_special_case_query<
                 "Google main processing failed: {}. Falling back to OpenAI.",
                 e
             );
-            raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5).await?
+            raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5hr).await?
         }
     };
 
@@ -330,7 +330,7 @@ pub async fn handle_common_case_query<T: OpenAIClientInit + GoogleClientInit + S
                 "Google common case processing failed: {}, falling back to OpenAI",
                 e
             );
-            raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5lr)
+            raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5mr)
                 .await?
         }
     };

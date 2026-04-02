@@ -66,7 +66,7 @@ pub async fn analyze_query_complexity<T: OpenAIClientInit + GoogleClientInit + S
                 "Google query complexity analysis failed: {}, falling back to OpenAI",
                 e
             );
-            raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT5mini)
+            raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT5mr)
                 .await?
         }
     };

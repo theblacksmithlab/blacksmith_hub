@@ -422,7 +422,7 @@ impl TelegramAgent {
         );
 
         let scam_detection_result =
-            raw_openai_processing_json(&system_role, text, app_state, OpenAIModel::GPT5lr).await?;
+            raw_openai_processing_json(&system_role, text, app_state, OpenAIModel::GPT5mr).await?;
 
         let is_scam: bool = match serde_json::from_str::<serde_json::Value>(&scam_detection_result)
         {

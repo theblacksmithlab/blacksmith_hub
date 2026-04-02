@@ -70,7 +70,7 @@ pub async fn get_query_type<T: OpenAIClientInit + GoogleClientInit + Send + Sync
                 &system_role,
                 &llm_message,
                 app_state,
-                OpenAIModel::GPT5mini,
+                OpenAIModel::GPT5mr,
             )
             .await?;
             info!(

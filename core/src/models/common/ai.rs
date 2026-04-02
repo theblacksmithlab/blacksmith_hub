@@ -5,9 +5,9 @@ use strum_macros::Display;
 
 #[derive(Debug, Display, Clone, Copy)]
 pub enum OpenAIModel {
-    GPT5,            // gpt-5.2
-    GPT5mini,        // gpt-5-mini
-    GPT5lr,          // gpt-5.2 (low reasoning)
+    GPT5hr,           // gpt-5.4 (high reasoning)
+    GPT5mr,            // gpt-5.4 (medium reasoning)
+    GPT5lr,          // gpt-5.4 (low reasoning)
     Embedding3Large, // OpenAI embedding generative model
     TTS,             // TTS model
 }
@@ -15,8 +15,7 @@ pub enum OpenAIModel {
 impl OpenAIModel {
     pub fn as_str(&self) -> &'static str {
         match self {
-            OpenAIModel::GPT5mini => "gpt-5-mini",
-            OpenAIModel::GPT5 | OpenAIModel::GPT5lr => "gpt-5.2",
+            OpenAIModel::GPT5hr | OpenAIModel::GPT5mr |OpenAIModel::GPT5lr => "gpt-5.4",
             OpenAIModel::Embedding3Large => "text-embedding-3-large",
             OpenAIModel::TTS => "gpt-4o-mini-tts",
         }
@@ -25,13 +24,15 @@ impl OpenAIModel {
     pub fn is_gpt5_model(&self) -> bool {
         matches!(
             self,
-            OpenAIModel::GPT5 | OpenAIModel::GPT5lr | OpenAIModel::GPT5mini
+            OpenAIModel::GPT5mr | OpenAIModel::GPT5lr | OpenAIModel::GPT5hr
         )
     }
 
     pub fn reasoning_effort(&self) -> Option<ReasoningEffort> {
         match self {
-            OpenAIModel::GPT5lr | OpenAIModel::GPT5mini => Some(ReasoningEffort::Low),
+            OpenAIModel::GPT5lr  => Some(ReasoningEffort::Low),
+            OpenAIModel::GPT5mr => Some(ReasoningEffort::Medium),
+            OpenAIModel::GPT5hr => Some(ReasoningEffort::High),
             _ => None,
         }
     }

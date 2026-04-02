@@ -64,7 +64,7 @@ pub async fn generate_aspects<T: OpenAIClientInit + GoogleClientInit + Send + Sy
                 "Google aspect generation failed: {}, falling back to OpenAI",
                 e
             );
-            raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT5)
+            raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT5mr)
                 .await?
         }
     };
