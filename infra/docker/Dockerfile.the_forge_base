@@ -41,6 +41,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /usr/src/app
 COPY --from=planner /usr/src/app/recipe.json recipe.json
+COPY Cargo.lock ./
 
 # Build dependencies - this layer is heavily cached!
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
