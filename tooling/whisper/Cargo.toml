@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-core = { path = "../../core" }
+blacksmith_core = { package = "core", path = "../../core" }
 
 anyhow.workspace = true
 config.workspace = true

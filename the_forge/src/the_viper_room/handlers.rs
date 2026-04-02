@@ -1,20 +1,20 @@
 use crate::the_viper_room::local_utils::{generate_user_system_nickname, get_user_system_nickname};
 use axum::extract::State;
 use axum::Json;
-use core::models::the_viper_room::db_models::Recipient;
-use core::models::the_viper_room::the_viper_room_web_ui::AuthStage::MiniAppInitConfirmed;
-use core::models::the_viper_room::the_viper_room_web_ui::{
+use blacksmith_core::models::the_viper_room::db_models::Recipient;
+use blacksmith_core::models::the_viper_room::the_viper_room_web_ui::AuthStage::MiniAppInitConfirmed;
+use blacksmith_core::models::the_viper_room::the_viper_room_web_ui::{
     ActionStep, AuthStage, TheViperRoomServerResponse, TheViperRoomUserAction,
 };
-use core::state::the_viper_room::app_state::TheViperRoomAppState;
-use core::state::the_viper_room::app_state_operation::{
+use blacksmith_core::state::the_viper_room::app_state::TheViperRoomAppState;
+use blacksmith_core::state::the_viper_room::app_state_operation::{
     reset_user_state, reset_user_state_with_message,
 };
-use core::telegram_client::grammers_functionality::{
+use blacksmith_core::telegram_client::grammers_functionality::{
     initialize_grammers_client, session_file_creation,
 };
-use core::utils::common::{update_the_viper_room_user_data, update_the_viper_room_user_state};
-use core::utils::the_viper_room::news_block_creation::news_block_creation;
+use blacksmith_core::utils::common::{update_the_viper_room_user_data, update_the_viper_room_user_state};
+use blacksmith_core::utils::the_viper_room::news_block_creation::news_block_creation;
 use std::env;
 use std::fs::{read, remove_file};
 use std::sync::Arc;

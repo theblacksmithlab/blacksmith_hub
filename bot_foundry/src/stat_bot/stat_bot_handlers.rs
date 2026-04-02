@@ -5,12 +5,12 @@ use crate::stat_bot::date_selection_handlers::{
 use crate::stat_bot::stat_bot_utils::{check_admin_access, send_main_menu};
 use crate::stat_bot::statistics_processing::{handle_export_requests, handle_stats_request};
 use anyhow::Result;
-use core::models::common::system_messages::AppsSystemMessages;
-use core::models::common::system_messages::{CommonMessages, StatBotMessages};
-use core::models::tg_bot::stat_bot::StatBotCommands;
-use core::state::tg_bot::StatBotState;
-use core::utils::common::get_message;
-use core::utils::tg_bot::tg_bot::{
+use blacksmith_core::models::common::system_messages::AppsSystemMessages;
+use blacksmith_core::models::common::system_messages::{CommonMessages, StatBotMessages};
+use blacksmith_core::models::tg_bot::stat_bot::StatBotCommands;
+use blacksmith_core::state::tg_bot::StatBotState;
+use blacksmith_core::utils::common::get_message;
+use blacksmith_core::utils::tg_bot::tg_bot::{
     check_username_from_user, get_chat_title, get_username_from_user,
 };
 use std::sync::Arc;

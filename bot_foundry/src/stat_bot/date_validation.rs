@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use chrono::NaiveDate;
-use core::utils::moscow_time::moscow_today;
+use blacksmith_core::utils::moscow_time::moscow_today;
 
 const MAX_PERIOD_DAYS: i64 = 90;
 

@@ -2,13 +2,13 @@ use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     send_add_channel_prompt, send_channels_menu, send_delete_channel_prompt, send_main_menu,
     send_settings_menu, show_user_channels,
 };
-use core::models::common::system_messages::AppsSystemMessages;
-use core::models::common::system_messages::TheViperRoomBotMessages;
-use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
-use core::models::the_viper_room::the_viper_room_bot::MainMenuMessageType;
-use core::state::tg_bot::TheViperRoomBotState;
-use core::utils::common::get_message;
-use core::utils::tg_bot::tg_bot::{check_username_from_user, get_username_from_user};
+use blacksmith_core::models::common::system_messages::AppsSystemMessages;
+use blacksmith_core::models::common::system_messages::TheViperRoomBotMessages;
+use blacksmith_core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
+use blacksmith_core::models::the_viper_room::the_viper_room_bot::MainMenuMessageType;
+use blacksmith_core::state::tg_bot::TheViperRoomBotState;
+use blacksmith_core::utils::common::get_message;
+use blacksmith_core::utils::tg_bot::tg_bot::{check_username_from_user, get_username_from_user};
 use std::sync::Arc;
 use teloxide::prelude::Requester;
 use teloxide::Bot;

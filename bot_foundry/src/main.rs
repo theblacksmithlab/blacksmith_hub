@@ -11,19 +11,19 @@ use crate::the_viper_room_bot::the_viper_room_bot_command_handler::the_viper_roo
 use crate::the_viper_room_bot::the_viper_room_bot_message_handler::the_viper_room_message_handler;
 use anyhow::{anyhow, Result};
 use async_openai::Client as OpenAIClient;
-use core::ai::anthropic_client::AnthropicClient;
-use core::ai::google_client::GoogleClient;
-use core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;
-use core::models::common::app_name::AppName;
-use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
-use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
-use core::models::tg_bot::stat_bot::StatBotCommands;
-use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
-use core::state::tg_bot::{
+use blacksmith_core::ai::anthropic_client::AnthropicClient;
+use blacksmith_core::ai::google_client::GoogleClient;
+use blacksmith_core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;
+use blacksmith_core::models::common::app_name::AppName;
+use blacksmith_core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
+use blacksmith_core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
+use blacksmith_core::models::tg_bot::stat_bot::StatBotCommands;
+use blacksmith_core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
+use blacksmith_core::state::tg_bot::{
     CoreBotState, GrootBotState, ProbiotBotState, StatBotState, TheViperRoomBotState,
 };
-use core::utils::common::create_app_tmp_dir;
-use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
+use blacksmith_core::utils::common::create_app_tmp_dir;
+use blacksmith_core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;
 use rustls::crypto::{aws_lc_rs, CryptoProvider};

@@ -2,15 +2,15 @@ use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     generate_podcast, schedule_podcast, send_generated_podcast_via_telegram_agent, send_main_menu,
     stop_daily_podcasts,
 };
-use core::local_db::the_viper_room::user_management;
-use core::models::common::system_messages::AppsSystemMessages;
-use core::models::common::system_messages::{CommonMessages, TheViperRoomBotMessages};
-use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
-use core::models::the_viper_room::db_models::Recipient;
-use core::models::the_viper_room::the_viper_room_bot::MainMenuMessageType;
-use core::state::tg_bot::TheViperRoomBotState;
-use core::utils::common::get_message;
-use core::utils::tg_bot::tg_bot::{
+use blacksmith_core::local_db::the_viper_room::user_management;
+use blacksmith_core::models::common::system_messages::AppsSystemMessages;
+use blacksmith_core::models::common::system_messages::{CommonMessages, TheViperRoomBotMessages};
+use blacksmith_core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
+use blacksmith_core::models::the_viper_room::db_models::Recipient;
+use blacksmith_core::models::the_viper_room::the_viper_room_bot::MainMenuMessageType;
+use blacksmith_core::state::tg_bot::TheViperRoomBotState;
+use blacksmith_core::utils::common::get_message;
+use blacksmith_core::utils::tg_bot::tg_bot::{
     check_username_from_user, get_chat_title, get_username_from_user,
 };
 use std::env;

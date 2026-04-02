@@ -1,4 +1,4 @@
-use core::models::uniframe_studio::uniframe_studio::TurnstileVerifyResponse;
+use blacksmith_core::models::uniframe_studio::uniframe_studio::TurnstileVerifyResponse;
 use tracing::{error, info};
 
 pub async fn verify_turnstile_token(

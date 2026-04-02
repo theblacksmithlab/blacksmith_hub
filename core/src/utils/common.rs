@@ -1,4 +1,3 @@
-use crate::ai::common::voice_processing::speech_to_text;
 use crate::models::common::app_name::AppName;
 use crate::models::common::avatar_request_response::{AvatarRequest, AvatarResponse};
 use crate::models::common::system_messages::AppsSystemMessages;
@@ -8,11 +7,11 @@ use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
 use pulldown_cmark::{html, Event, Parser, Tag, TagEnd};
-use std::fs::{read_to_string, remove_file};
+use std::fs::{read_to_string};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{env, fs};
-use tracing::{error, info};
+use tracing::error;
 
 pub fn build_resource_file_path(app_name: &AppName, file_name: &str) -> PathBuf {
     PathBuf::from("common_res")

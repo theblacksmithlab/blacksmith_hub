@@ -3,21 +3,21 @@ use crate::the_viper_room_bot::the_viper_room_bot_utils::{
     send_settings_menu, ChannelInput,
 };
 use anyhow::Result;
-use core::local_db::the_viper_room::channel_management;
-use core::local_db::the_viper_room::channel_management::{
+use blacksmith_core::local_db::the_viper_room::channel_management;
+use blacksmith_core::local_db::the_viper_room::channel_management::{
     clear_user_channels, get_channel, get_user_channels, remove_channel,
 };
-use core::models::common::system_messages::AppsSystemMessages;
-use core::models::common::system_messages::TheViperRoomBotMessages;
-use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
-use core::models::the_viper_room::db_models::PendingChannel;
-use core::models::the_viper_room::db_models::Recipient;
-use core::models::the_viper_room::the_viper_room_bot::{normalize_channel_id, MainMenuMessageType};
-use core::state::tg_bot::TheViperRoomBotState;
-use core::telegram_client::grammers_functionality::initialize_grammers_client;
-use core::utils::common::get_message;
-use core::utils::tg_bot::tg_bot::auto_delete_messages_batch;
-use core::utils::tg_bot::tg_bot::{
+use blacksmith_core::models::common::system_messages::AppsSystemMessages;
+use blacksmith_core::models::common::system_messages::TheViperRoomBotMessages;
+use blacksmith_core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
+use blacksmith_core::models::the_viper_room::db_models::PendingChannel;
+use blacksmith_core::models::the_viper_room::db_models::Recipient;
+use blacksmith_core::models::the_viper_room::the_viper_room_bot::{normalize_channel_id, MainMenuMessageType};
+use blacksmith_core::state::tg_bot::TheViperRoomBotState;
+use blacksmith_core::telegram_client::grammers_functionality::initialize_grammers_client;
+use blacksmith_core::utils::common::get_message;
+use blacksmith_core::utils::tg_bot::tg_bot::auto_delete_messages_batch;
+use blacksmith_core::utils::tg_bot::tg_bot::{
     check_username_from_user, get_chat_title, get_username_from_message, is_bot_addressed,
 };
 use grammers_client::types::Chat;

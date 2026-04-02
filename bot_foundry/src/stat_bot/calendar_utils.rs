@@ -1,5 +1,5 @@
 use chrono::{Datelike, Months, NaiveDate};
-use core::utils::moscow_time::moscow_today;
+use blacksmith_core::utils::moscow_time::moscow_today;
 use teloxide_core::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
 const MAX_DATA_AGE_DAYS: i64 = 90;

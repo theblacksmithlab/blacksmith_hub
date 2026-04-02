@@ -1,8 +1,8 @@
-use core::models::tg_bot::groot_bot::groot_bot::ResourcesDialogState;
-use core::models::tg_bot::groot_bot::groot_bot::{EditType, ShowType};
-use core::state::tg_bot::GrootBotState;
-use core::utils::tg_bot::groot_bot::groot_bot_utils::build_resource_file_path;
-use core::utils::tg_bot::groot_bot::groot_bot_utils::{
+use blacksmith_core::models::tg_bot::groot_bot::groot_bot::ResourcesDialogState;
+use blacksmith_core::models::tg_bot::groot_bot::groot_bot::{EditType, ShowType};
+use blacksmith_core::state::tg_bot::GrootBotState;
+use blacksmith_core::utils::tg_bot::groot_bot::groot_bot_utils::build_resource_file_path;
+use blacksmith_core::utils::tg_bot::groot_bot::groot_bot_utils::{
     load_black_listed_users, load_restricted_words, load_white_listed_users,
 };
 use serde_json::Value;

@@ -12,4 +12,4 @@ tracing.workspace = true
 rustls.workspace = true
 async-openai.workspace = true
 
-core = { path = "../core" }
+blacksmith_core = { package = "core", path = "../core" }

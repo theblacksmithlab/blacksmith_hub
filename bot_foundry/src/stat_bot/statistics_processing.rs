@@ -1,13 +1,13 @@
 use chrono::Utc;
-use core::local_db::blacksmith_web::statistics::{
+use blacksmith_core::local_db::blacksmith_web::statistics::{
     export_user_requests_to_csv, get_statistics_for_period, StatisticsPeriod,
 };
-use core::models::common::app_name::AppName;
-use core::models::common::system_messages::AppsSystemMessages;
-use core::models::common::system_messages::CommonMessages;
-use core::state::tg_bot::StatBotState;
-use core::utils::common::get_message;
-use core::utils::tg_bot::tg_bot::auto_delete_message;
+use blacksmith_core::models::common::app_name::AppName;
+use blacksmith_core::models::common::system_messages::AppsSystemMessages;
+use blacksmith_core::models::common::system_messages::CommonMessages;
+use blacksmith_core::state::tg_bot::StatBotState;
+use blacksmith_core::utils::common::get_message;
+use blacksmith_core::utils::tg_bot::tg_bot::auto_delete_message;
 use std::fs;
 use std::str::FromStr;
 use std::sync::Arc;
