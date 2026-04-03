@@ -58,7 +58,7 @@ redeploy_service() {
     docker compose stop $service
     docker compose rm -f $service
 
-    IMAGE_ID=$(docker images -q blacksmith-core_${service})
+    IMAGE_ID=$(docker images -q blacksmith_hub-${service})
     if [[ -n "$IMAGE_ID" ]]; then
         print_message "${YELLOW}" "2. Removing old $service image: $IMAGE_ID"
         docker rmi -f "$IMAGE_ID"
@@ -102,7 +102,7 @@ full_redeploy_service() {
     docker compose stop $service
     docker compose rm -f $service
 
-    IMAGE_ID=$(docker images -q blacksmith-core_${service})
+    IMAGE_ID=$(docker images -q blacksmith_hub-${service})
     if [[ -n "$IMAGE_ID" ]]; then
         print_message "${YELLOW}" "2. Removing old $service image: $IMAGE_ID"
         docker rmi -f "$IMAGE_ID"
