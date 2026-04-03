@@ -3,11 +3,11 @@ use crate::the_viper_room::server::start_the_viper_room_server;
 use crate::uniframe_studio::server::start_uniframe_studio_server;
 use anyhow::{anyhow, Result};
 use config::{Config, File};
-use core::config::server_config::get_config_path;
-use core::config::server_config::AppConfig;
-use core::models::common::app_name::AppName;
-use core::state::server_common::app_state::ServerAppState;
-use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
+use blacksmith_core::models::common::app_name::AppName;
+use blacksmith_core::server_config::server_config::get_config_path;
+use blacksmith_core::server_config::server_config::AppConfig;
+use blacksmith_core::state::server_common::app_state::ServerAppState;
+use blacksmith_core::utils::common::create_app_tmp_dir;
 use dotenv::dotenv;
 use rustls::crypto::{aws_lc_rs, CryptoProvider};
 use std::env;
@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     dotenv().ok();
 
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::new("info"))
+        .with_env_filter(EnvFilter::new("info,core=debug,the_forge=debug"))
         .init();
 
     info!("Determining AppName of the service being launched...");

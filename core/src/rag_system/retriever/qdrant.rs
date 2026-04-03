@@ -13,7 +13,7 @@ use qdrant_client::qdrant::{
 };
 use qdrant_client::Qdrant;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 pub struct QdrantRetriever<T: QdrantClientInit> {
     app_state: Arc<T>,
@@ -454,14 +454,14 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
                             .map(String::from)
                             .unwrap_or_else(|| String::new());
 
-                        info!("found chunk text: {}", &chunk_text);
-
                         let document_title = point
                             .payload
                             .get("document_title")
                             .and_then(|v| v.as_str())
                             .map(String::from)
                             .unwrap_or_else(|| String::new());
+
+                        debug!("Found chunk text from document: {}", &document_title);
 
                         let extra = point
                             .payload
@@ -559,14 +559,14 @@ impl<T: QdrantClientInit + Send + Sync> HybridSearchRetriever for QdrantHybridSe
                             .map(String::from)
                             .unwrap_or_else(|| String::new());
 
-                        info!("found description text: {}", &description_text);
-
                         let document_title = point
                             .payload
                             .get("document_title")
                             .and_then(|v| v.as_str())
                             .map(String::from)
                             .unwrap_or_else(|| String::new());
+
+                        info!("Found description text from document: {}", &document_title);
 
                         let extra = point
                             .payload

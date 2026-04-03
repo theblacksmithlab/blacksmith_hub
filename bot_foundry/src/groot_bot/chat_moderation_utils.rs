@@ -1,17 +1,17 @@
 use anyhow::Result;
-use core::ai::common::common::raw_llm_processing_json;
-use core::models::common::ai::LlmModel;
-use core::models::common::app_name::AppName;
-use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
-use core::models::common::system_roles::GrootRoleType;
-use core::state::tg_bot::GrootBotState;
-use core::utils::common::get_message;
-use core::utils::common::get_system_role_or_fallback;
-use core::utils::tg_bot::groot_bot::groot_bot_utils::{
+use blacksmith_core::ai::common::openai::raw_openai_processing_json;
+use blacksmith_core::models::common::ai::OpenAIModel;
+use blacksmith_core::models::common::app_name::AppName;
+use blacksmith_core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
+use blacksmith_core::models::common::system_roles::GrootRoleType;
+use blacksmith_core::state::tg_bot::GrootBotState;
+use blacksmith_core::utils::common::get_message;
+use blacksmith_core::utils::common::get_system_role_or_fallback;
+use blacksmith_core::utils::tg_bot::groot_bot::groot_bot_utils::{
     count_emojis, load_black_listed_users, load_scam_domains, load_white_listed_users,
     paid_chat_spam_warning, parsing_restricted_words, unpaid_chat_spam_warning,
 };
-use core::utils::tg_bot::tg_bot::auto_delete_message;
+use blacksmith_core::utils::tg_bot::tg_bot::auto_delete_message;
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -587,8 +587,13 @@ pub async fn ai_check(
     let system_role =
         get_system_role_or_fallback(&AppName::GrootBot, GrootRoleType::MessageCheck, None);
 
-    let scam_detection_result =
-        raw_llm_processing_json(&system_role, message_to_check, app_state, LlmModel::Light).await?;
+    let scam_detection_result = raw_openai_processing_json(
+        &system_role,
+        message_to_check,
+        app_state,
+        OpenAIModel::GPT5mr,
+    )
+    .await?;
 
     let is_scam: bool = match serde_json::from_str::<serde_json::Value>(&scam_detection_result) {
         Ok(json) => match json.get("is_scam") {

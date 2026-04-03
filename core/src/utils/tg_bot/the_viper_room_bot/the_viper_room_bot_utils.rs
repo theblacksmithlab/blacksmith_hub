@@ -1,5 +1,5 @@
-use crate::ai::common::common::raw_llm_processing;
-use crate::models::common::ai::LlmModel;
+use crate::ai::common::openai::raw_openai_processing;
+use crate::models::common::ai::OpenAIModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::TheViperRoomRoleType;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
@@ -29,7 +29,7 @@ where
 
     info!("Generating a nickname from user's data: {}", user_data);
 
-    raw_llm_processing(&system_role, &user_data, app_state, LlmModel::Light)
+    raw_openai_processing(&system_role, &user_data, app_state, OpenAIModel::GPT5lr)
         .await
         .map_err(|e| format!("Failed to generate nickname: {}", e))
 }

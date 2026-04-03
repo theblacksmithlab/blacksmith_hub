@@ -1,17 +1,19 @@
+use crate::ai::common::voice_processing::transcribe_voice_message;
 use crate::message_processing_flow::message_processing_flow::process_user_query;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::{CommonMessages, ProbiotBotMessages};
-use crate::state::llm_client_init_trait::OpenAIClientInit;
+use crate::state::llm_client_init_trait::{GoogleClientInit, OpenAIClientInit};
 use crate::state::qdrant_client_init_trait::QdrantClientInit;
 use crate::state::tg_bot::app_state::AppNameProvider;
 use crate::temp_cache::temp_cache_traits::TempCacheInit;
-use crate::utils::common::{get_message, markdown_to_telegram_html, transcribe_voice_message};
+use crate::temp_cache::temp_cache_utils::{add_llm_response_to_cache, append_footer_if_needed};
+use crate::utils::common::{get_message, markdown_to_telegram_html};
+use crate::utils::tg_bot::tg_bot::{create_tts_button, save_tts_payload};
 use crate::utils::tg_bot::tg_bot::{
-    add_llm_response_to_cache, download_voice, get_chat_title, get_username_from_message,
-    start_bots_chat_action, stop_bots_chat_action,
+    download_voice, get_chat_title, get_username_from_message, start_bots_chat_action,
+    stop_bots_chat_action,
 };
-use crate::utils::tg_bot::tg_bot::{append_footer_if_needed, create_tts_button, save_tts_payload};
 use std::sync::Arc;
 use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::{Message, Requester};
@@ -31,6 +33,7 @@ where
     T: AppNameProvider
         + OpenAIClientInit
         + QdrantClientInit
+        + GoogleClientInit
         + TempCacheInit
         + Send
         + Sync

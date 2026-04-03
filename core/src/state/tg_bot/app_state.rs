@@ -1,3 +1,5 @@
+use crate::ai::anthropic_client::AnthropicClient;
+use crate::ai::google_client::GoogleClient;
 use crate::local_db::local_db::setup_app_db_pool;
 use crate::models::common::app_name::AppName;
 use crate::models::common::dialogue_cache::DialogueCache;
@@ -14,7 +16,7 @@ use crate::utils::tg_bot::tg_bot::is_localdb_implemented;
 use crate::utils::uniframe_studio::heleket_client::{HeleketClient, HeleketConfig};
 use anyhow::Result;
 use async_openai::config::OpenAIConfig;
-use async_openai::Client as LLM_Client;
+use async_openai::Client as OpenAIClient;
 use qdrant_client::Qdrant;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
@@ -30,7 +32,9 @@ pub trait AppNameProvider {
 }
 
 pub struct CoreBotState {
-    pub llm_client: LLM_Client<OpenAIConfig>,
+    pub openai_client: OpenAIClient<OpenAIConfig>,
+    pub anthropic_client: AnthropicClient,
+    pub google_client: GoogleClient,
     pub temp_cache: Mutex<HashMap<String, DialogueCache>>,
     pub qdrant_client: Arc<Qdrant>,
     pub app_name: AppName,
@@ -39,7 +43,9 @@ pub struct CoreBotState {
 
 impl CoreBotState {
     pub async fn new(
-        llm_client: LLM_Client<OpenAIConfig>,
+        openai_client: OpenAIClient<OpenAIConfig>,
+        anthropic_client: AnthropicClient,
+        google_client: GoogleClient,
         qdrant_client: Arc<Qdrant>,
         app_name: AppName,
     ) -> Result<Self> {
@@ -51,7 +57,9 @@ impl CoreBotState {
         };
 
         Ok(Self {
-            llm_client,
+            openai_client,
+            anthropic_client,
+            google_client,
             temp_cache,
             qdrant_client,
             app_name,

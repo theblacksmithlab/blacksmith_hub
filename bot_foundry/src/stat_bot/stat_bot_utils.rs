@@ -1,8 +1,8 @@
 use anyhow::Result;
-use core::models::common::app_name::AppName;
-use core::models::common::system_messages::{AppsSystemMessages, StatBotMessages};
-use core::state::tg_bot::StatBotState;
-use core::utils::common::get_message;
+use blacksmith_core::models::common::app_name::AppName;
+use blacksmith_core::models::common::system_messages::{AppsSystemMessages, StatBotMessages};
+use blacksmith_core::state::tg_bot::StatBotState;
+use blacksmith_core::utils::common::get_message;
 use std::env;
 use std::sync::Arc;
 use teloxide::prelude::Requester;

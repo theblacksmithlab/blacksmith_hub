@@ -10,18 +10,20 @@ use crate::the_viper_room_bot::the_viper_room_bot_callback_query_handler::the_vi
 use crate::the_viper_room_bot::the_viper_room_bot_command_handler::the_viper_room_command_handler;
 use crate::the_viper_room_bot::the_viper_room_bot_message_handler::the_viper_room_message_handler;
 use anyhow::{anyhow, Result};
-use async_openai::Client as LLM_Client;
-use core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;
-use core::models::common::app_name::AppName;
-use core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
-use core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
-use core::models::tg_bot::stat_bot::StatBotCommands;
-use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
-use core::state::tg_bot::{
+use async_openai::Client as OpenAIClient;
+use blacksmith_core::ai::anthropic_client::AnthropicClient;
+use blacksmith_core::ai::google_client::GoogleClient;
+use blacksmith_core::message_processing_flow::tg_bot::default_message_handler::default_message_handler;
+use blacksmith_core::models::common::app_name::AppName;
+use blacksmith_core::models::tg_bot::groot_bot::groot_bot::GrootBotCommands;
+use blacksmith_core::models::tg_bot::probiot_bot::probiot_bot_commands::ProbiotBotCommands;
+use blacksmith_core::models::tg_bot::stat_bot::StatBotCommands;
+use blacksmith_core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_commands::TheViperRoomBotCommands;
+use blacksmith_core::state::tg_bot::{
     CoreBotState, GrootBotState, ProbiotBotState, StatBotState, TheViperRoomBotState,
 };
-use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
-use core::utils::tg_bot::tg_bot::run_bot_dispatcher;
+use blacksmith_core::utils::common::create_app_tmp_dir;
+use blacksmith_core::utils::tg_bot::tg_bot::run_bot_dispatcher;
 use dotenv::dotenv;
 use qdrant_client::Qdrant;
 use rustls::crypto::{aws_lc_rs, CryptoProvider};
@@ -66,7 +68,8 @@ async fn main() -> Result<()> {
 
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::new("info").add_directive("grammers_session::message_box=warn".parse()?),
+            EnvFilter::new("info,core=debug,bot_foundry=debug")
+                .add_directive("grammers_session::message_box=warn".parse()?),
         )
         .init();
 
@@ -97,9 +100,20 @@ async fn main() -> Result<()> {
             .build()?,
     );
 
-    let llm_client = LLM_Client::new();
+    let openai_client = OpenAIClient::new();
+    let anthropic_client = AnthropicClient::new()?;
+    let google_client = GoogleClient::new()?;
 
-    let core = Arc::new(CoreBotState::new(llm_client, qdrant_client, app_name.clone()).await?);
+    let core = Arc::new(
+        CoreBotState::new(
+            openai_client,
+            anthropic_client,
+            google_client,
+            qdrant_client,
+            app_name.clone(),
+        )
+        .await?,
+    );
 
     let bot_state = match app_name {
         AppName::ProbiotBot => BotState::Probiot(Arc::new(ProbiotBotState::new(core).await?)),

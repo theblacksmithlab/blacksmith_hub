@@ -3,12 +3,13 @@ use crate::message_processing_flow::message_processing_flow::process_user_query;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_messages::{AppsSystemMessages, CommonMessages};
 use crate::state::blacksmith_web::app_state::BlacksmithWebAppState;
+use crate::temp_cache::temp_cache_utils::add_llm_response_to_cache;
+use crate::temp_cache::temp_cache_utils::append_footer_if_needed;
 use crate::utils::common::{get_message, markdown_to_html};
-use crate::utils::tg_bot::tg_bot::add_llm_response_to_cache;
-use crate::utils::tg_bot::tg_bot::append_footer_if_needed;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info};
+use uuid::Uuid;
 
 pub async fn default_message_handler(
     request_text: &str,
@@ -16,10 +17,8 @@ pub async fn default_message_handler(
     user_id: &str,
     app_name: &AppName,
 ) -> (String, HashMap<String, String>) {
-    info!(
-        "Message received from user: {} is a text message. Processing it...",
-        user_id
-    );
+    let request_id = Uuid::new_v4();
+    info!(request_id = %request_id, user_id = %user_id, "Request processing started");
 
     if let Err(e) = save_message_to_db(
         app_state.get_db_pool(),
@@ -60,12 +59,12 @@ pub async fn default_message_handler(
 
             add_llm_response_to_cache(app_state.clone(), user_id, &full_response).await;
 
-            info!("Successfully processed text message from user: {}", user_id);
+            info!(request_id = %request_id, user_id = %user_id, "User request processed successfully");
 
             (htmled_full_response, extra_data)
         }
         Err(err) => {
-            error!("Error processing text request from user: {}", err);
+            error!(request_id = %request_id, user_id = %user_id, "User request processing failed with error: {}", err);
 
             let error_msg_for_user = get_message(AppsSystemMessages::Common(
                 CommonMessages::ServiceUnavailable,

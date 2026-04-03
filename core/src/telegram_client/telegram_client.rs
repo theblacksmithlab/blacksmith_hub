@@ -1,5 +1,5 @@
-use crate::ai::common::common::raw_llm_processing_json;
-use crate::models::common::ai::LlmModel;
+use crate::ai::common::openai::raw_openai_processing_json;
+use crate::models::common::ai::OpenAIModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::AgentDavonRoleType;
 use crate::models::tg_agent::agent_davon::{ChatMember, MemberRole};
@@ -422,7 +422,7 @@ impl TelegramAgent {
         );
 
         let scam_detection_result =
-            raw_llm_processing_json(&system_role, text, app_state, LlmModel::Light).await?;
+            raw_openai_processing_json(&system_role, text, app_state, OpenAIModel::GPT5mr).await?;
 
         let is_scam: bool = match serde_json::from_str::<serde_json::Value>(&scam_detection_result)
         {

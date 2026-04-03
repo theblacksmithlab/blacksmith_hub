@@ -1,7 +1,7 @@
 # =============================================================================
 # Stage 1: cargo-chef planner - analyze dependencies
 # =============================================================================
-FROM rust:bookworm AS planner
+FROM rust:1.94-bookworm AS planner
 
 RUN cargo install cargo-chef --locked
 WORKDIR /usr/src/app
@@ -28,7 +28,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 # =============================================================================
 # Stage 2: Build whisper.cpp (INDEPENDENT - cached separately!)
 # =============================================================================
-FROM rust:bookworm AS whisper-builder
+FROM rust:1.94-bookworm AS whisper-builder
 
 RUN apt-get update && apt-get install -y \
     git \
@@ -45,7 +45,7 @@ RUN git clone https://github.com/ggerganov/whisper.cpp.git && \
 # =============================================================================
 # Stage 3: Build Rust dependencies (CACHED!)
 # =============================================================================
-FROM rust:bookworm AS cacher
+FROM rust:1.94-bookworm AS cacher
 
 RUN cargo install cargo-chef --locked
 
@@ -57,6 +57,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /usr/src/app
 COPY --from=planner /usr/src/app/recipe.json recipe.json
+COPY Cargo.lock ./
 
 # Build dependencies - this layer is heavily cached!
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
@@ -66,7 +67,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # =============================================================================
 # Stage 4: Build Rust application ONLY (whisper is cached separately!)
 # =============================================================================
-FROM rust:bookworm AS builder
+FROM rust:1.94-bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config \

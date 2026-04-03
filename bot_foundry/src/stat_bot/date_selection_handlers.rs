@@ -5,11 +5,11 @@ use crate::stat_bot::date_validation::{format_validation_error, validate_date_ra
 use crate::stat_bot::stat_bot_utils::{check_admin_access, create_stats_keyboard, send_main_menu};
 use anyhow::Result;
 use chrono::NaiveDate;
-use core::local_db::blacksmith_web::statistics::StatisticsPeriod;
-use core::models::common::app_name::AppName;
-use core::models::tg_bot::stat_bot::{DateSelectionState, SelectionStep};
-use core::state::tg_bot::StatBotState;
-use core::utils::moscow_time::{moscow_date_to_rfc3339_end, moscow_date_to_rfc3339_start};
+use blacksmith_core::local_db::blacksmith_web::statistics::StatisticsPeriod;
+use blacksmith_core::models::common::app_name::AppName;
+use blacksmith_core::models::tg_bot::stat_bot::{DateSelectionState, SelectionStep};
+use blacksmith_core::state::tg_bot::StatBotState;
+use blacksmith_core::utils::moscow_time::{moscow_date_to_rfc3339_end, moscow_date_to_rfc3339_start};
 use std::str::FromStr;
 use std::sync::Arc;
 use teloxide::payloads::SendMessageSetters;
@@ -374,7 +374,7 @@ async fn handle_stats_request_with_period(
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("Database pool not initialized"))?;
 
-    match core::local_db::blacksmith_web::statistics::get_statistics_for_period(
+    match blacksmith_core::local_db::blacksmith_web::statistics::get_statistics_for_period(
         db_pool,
         app_name.as_str(),
         &period,

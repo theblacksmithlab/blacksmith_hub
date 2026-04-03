@@ -1,4 +1,3 @@
-use crate::ai::common::voice_processing::speech_to_text;
 use crate::models::common::app_name::AppName;
 use crate::models::common::avatar_request_response::{AvatarRequest, AvatarResponse};
 use crate::models::common::system_messages::AppsSystemMessages;
@@ -8,11 +7,11 @@ use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::Json;
 use pulldown_cmark::{html, Event, Parser, Tag, TagEnd};
-use std::env;
-use std::fs::{read_to_string, remove_file};
+use std::fs::{read_to_string};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{error, info};
+use std::{env, fs};
+use tracing::error;
 
 pub fn build_resource_file_path(app_name: &AppName, file_name: &str) -> PathBuf {
     PathBuf::from("common_res")
@@ -38,6 +37,24 @@ pub fn get_system_role_path(app_name: &AppName, role_type: &str) -> PathBuf {
         .join(format!("{}.txt", role_type))
 }
 
+pub fn get_system_role<T>(app_name: &AppName, role_type: T) -> Result<String>
+where
+    T: AsRef<str>,
+{
+    let role_str = role_type.as_ref();
+    let file_path = get_system_role_path(app_name, role_str);
+
+    read_to_string(&file_path).map_err(|err| {
+        anyhow!(
+            "System role '{}' not found for app '{}': {}",
+            role_str,
+            app_name.as_str(),
+            err
+        )
+    })
+}
+
+/// Deprecated: use `get_system_role` instead
 pub fn get_system_role_or_fallback<T>(
     app_name: &AppName,
     role_type: T,
@@ -252,22 +269,6 @@ pub fn split_text_into_chunks(text: &str, max_chars: usize) -> Vec<String> {
     chunks
 }
 
-pub async fn transcribe_voice_message(file_path: &Path) -> Result<Option<String>> {
-    let transcription = speech_to_text(file_path).await?;
-
-    remove_file(file_path).ok();
-    info!("Successfully removed temp file: {:?}", file_path);
-
-    if transcription.trim().is_empty() {
-        info!(
-            "Voice message transcription is empty, looks like user sent empty message by mistake"
-        );
-        Ok(None)
-    } else {
-        Ok(Some(transcription))
-    }
-}
-
 pub fn markdown_to_html(markdown: &str) -> String {
     let parser = Parser::new(markdown);
     let mut html_output = String::new();
@@ -373,24 +374,18 @@ fn escape_html(text: &str) -> String {
         .replace('"', "&quot;")
 }
 
-// legacy method
-pub fn convert_markdown_to_telegram(markdown: &str) -> String {
-    markdown
-        .replace("\\", "\\\\")
-        .replace("[", "\\[")
-        .replace("]", "\\]")
-        .replace("(", "\\(")
-        .replace(")", "\\)")
-        .replace("~", "\\~")
-        .replace("`", "\\`")
-        .replace(">", "\\>")
-        .replace("#", "\\#")
-        .replace("+", "\\+")
-        .replace("-", "\\-")
-        .replace("=", "\\=")
-        .replace("|", "\\|")
-        .replace("{", "\\{")
-        .replace("}", "\\}")
-        .replace(".", "\\.")
-        .replace("!", "\\!")
+pub fn create_app_tmp_dir(app_name: &AppName) -> std::io::Result<()> {
+    let base_tmp = PathBuf::from("tmp");
+
+    if !base_tmp.exists() {
+        fs::create_dir_all(&base_tmp)?;
+    }
+
+    let app_tmp_dir = app_name.temp_dir();
+
+    if !app_tmp_dir.exists() {
+        fs::create_dir_all(&app_tmp_dir)?;
+    }
+
+    Ok(())
 }

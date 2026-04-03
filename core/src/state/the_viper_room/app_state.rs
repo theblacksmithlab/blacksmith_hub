@@ -1,5 +1,7 @@
+use crate::ai::anthropic_client::AnthropicClient;
+use crate::ai::google_client::GoogleClient;
 use async_openai::config::OpenAIConfig;
-use async_openai::Client as LLM_Client;
+use async_openai::Client as OpenAIClient;
 use grammers_client::types::{LoginToken, PasswordToken};
 use grammers_client::Client;
 use std::collections::HashMap;
@@ -8,15 +10,23 @@ use tokio::sync::Mutex;
 
 pub struct TheViperRoomAppState {
     pub user_state: Mutex<HashMap<u64, AuthStages>>,
-    pub llm_client: LLM_Client<OpenAIConfig>,
+    pub openai_client: OpenAIClient<OpenAIConfig>,
+    pub anthropic_client: AnthropicClient,
+    pub google_client: GoogleClient,
     pub user_data: Mutex<HashMap<u64, UserData>>,
 }
 
 impl TheViperRoomAppState {
-    pub fn new(llm_client: LLM_Client<OpenAIConfig>) -> Self {
+    pub fn new(
+        openai_client: OpenAIClient<OpenAIConfig>,
+        anthropic_client: AnthropicClient,
+        google_client: GoogleClient,
+    ) -> Self {
         Self {
             user_state: Mutex::new(HashMap::new()),
-            llm_client,
+            openai_client,
+            anthropic_client,
+            google_client,
             user_data: Mutex::new(HashMap::new()),
         }
     }

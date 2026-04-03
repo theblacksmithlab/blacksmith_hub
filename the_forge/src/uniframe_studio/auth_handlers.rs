@@ -5,10 +5,10 @@ use axum::extract::State;
 use axum::Json;
 use axum::{http::Request, middleware::Next, response::Response};
 use chrono::{DateTime, Duration, Utc};
-use core::models::uniframe_studio::auth_models::{
+use blacksmith_core::models::uniframe_studio::auth_models::{
     AuthError, AuthResponse, SendMagicLinkRequest, SessionCheckResponse, VerifyTokenRequest,
 };
-use core::state::uniframe_studio::app_state::UniframeStudioAppState;
+use blacksmith_core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::{HeaderMap, StatusCode};
 use sqlx::{Pool, Row, Sqlite};
 use std::sync::Arc;

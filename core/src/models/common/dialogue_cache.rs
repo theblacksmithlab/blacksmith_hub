@@ -19,13 +19,13 @@ impl DialogueCache {
         }
     }
 
-    pub(crate) fn add_user_message(&mut self, user_question: String) {
-        let timestamp = Utc::now().to_rfc3339();
+    pub(crate) fn add_user_message(&mut self, user_query: String) {
+        let timestamp = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
 
         let entry = UserInteraction {
             timestamp,
             role: "user".to_string(),
-            content: user_question,
+            content: user_query,
         };
 
         self.messages.push_back(entry);

@@ -1,6 +1,6 @@
-use crate::ai::common::common::{raw_llm_processing, raw_llm_processing_json};
+use crate::ai::common::openai::{raw_openai_processing, raw_openai_processing_json};
 use crate::local_db::the_viper_room::channel_management::get_user_channels;
-use crate::models::common::ai::LlmModel;
+use crate::models::common::ai::OpenAIModel;
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::TheViperRoomRoleType;
 use crate::models::the_viper_room::common::PodcastStructure;
@@ -271,11 +271,11 @@ pub(crate) async fn updates_file_creation<T: OpenAIClientInit + Send + Sync>(
                 source, message_text
             );
 
-            let response = raw_llm_processing(
+            let response = raw_openai_processing(
                 &system_role,
                 &llm_input,
                 app_state.clone(),
-                LlmModel::ComplexFast,
+                OpenAIModel::GPT5lr,
             )
             .await?;
 
@@ -328,11 +328,11 @@ pub(crate) async fn summarize_updates<T: OpenAIClientInit + Send + Sync>(
         addressee, updates
     );
 
-    let updates_summarized_json = raw_llm_processing_json(
+    let updates_summarized_json = raw_openai_processing_json(
         &system_role,
         &updates_with_nickname_provided,
         app_state.clone(),
-        LlmModel::ComplexFast,
+        OpenAIModel::GPT5lr,
     )
     .await?;
 
@@ -407,7 +407,8 @@ pub(crate) async fn get_latest_messages<T: OpenAIClientInit + Send + Sync>(
             let text = message.text();
 
             let llm_response =
-                raw_llm_processing(&system_role, text, app_state.clone(), LlmModel::Light).await?;
+                raw_openai_processing(&system_role, text, app_state.clone(), OpenAIModel::GPT5lr)
+                    .await?;
 
             let decision = llm_response.trim().to_lowercase();
 

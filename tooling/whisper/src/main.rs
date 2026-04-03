@@ -2,8 +2,8 @@ use anyhow::{Context, Result};
 use axum::routing::post;
 use axum::Router;
 use config::{Config, File};
-use core::config::server_config::AppConfig;
-use core::utils::server::server::start_server;
+use blacksmith_core::server_config::server_config::AppConfig;
+use blacksmith_core::utils::server::server::start_server;
 use dotenv::dotenv;
 use std::sync::Arc;
 use tracing::info;
@@ -12,7 +12,7 @@ use tracing_subscriber::EnvFilter;
 mod handlers;
 
 use crate::handlers::handle_transcribe;
-use core::state::server_common::app_state::ServerAppState;
+use blacksmith_core::state::server_common::app_state::ServerAppState;
 
 #[tokio::main]
 async fn main() -> Result<()> {

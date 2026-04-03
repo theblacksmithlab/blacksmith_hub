@@ -1,4 +1,4 @@
-use crate::config::server_config::AppConfig;
+use crate::server_config::server_config::AppConfig;
 use std::sync::Arc;
 
 pub struct ServerAppState {

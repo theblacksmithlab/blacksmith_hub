@@ -6,13 +6,13 @@ use crate::groot_bot::chat_moderation_utils::{
 };
 use crate::groot_bot::resources_cmd_handler::resources_cmd_handler;
 use anyhow::Result;
-use core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
-use core::state::tg_bot::GrootBotState;
-use core::utils::common::get_message;
-use core::utils::tg_bot::groot_bot::groot_bot_utils::{
+use blacksmith_core::models::common::system_messages::{AppsSystemMessages, GrootBotMessages};
+use blacksmith_core::state::tg_bot::GrootBotState;
+use blacksmith_core::utils::common::get_message;
+use blacksmith_core::utils::tg_bot::groot_bot::groot_bot_utils::{
     is_message_from_linked_channel, load_black_listed_users, load_white_listed_users,
 };
-use core::utils::tg_bot::tg_bot::{get_chat_title, get_username_from_message};
+use blacksmith_core::utils::tg_bot::tg_bot::{get_chat_title, get_username_from_message};
 use std::sync::Arc;
 use teloxide::prelude::Message;
 use teloxide::Bot;

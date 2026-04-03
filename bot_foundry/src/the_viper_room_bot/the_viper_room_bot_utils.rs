@@ -1,18 +1,18 @@
 use anyhow::anyhow;
 use anyhow::Result;
 use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Utc};
-use core::local_db::the_viper_room::channel_management;
-use core::models::common::system_messages::AppsSystemMessages;
-use core::models::common::system_messages::TheViperRoomBotMessages;
-use core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
-use core::models::the_viper_room::db_models::Recipient;
-use core::models::the_viper_room::the_viper_room_bot;
-use core::models::the_viper_room::the_viper_room_bot::MainMenuMessageType;
-use core::state::tg_bot::TheViperRoomBotState;
-use core::utils::common::get_message;
-use core::utils::tg_bot::tg_bot::{start_bots_chat_action, stop_bots_chat_action};
-use core::utils::the_viper_room::news_block_creation::news_block_creation;
-use core::utils::the_viper_room::news_block_creation_utils::{
+use blacksmith_core::local_db::the_viper_room::channel_management;
+use blacksmith_core::models::common::system_messages::AppsSystemMessages;
+use blacksmith_core::models::common::system_messages::TheViperRoomBotMessages;
+use blacksmith_core::models::tg_bot::the_viper_room_bot::the_viper_room_bot_user_state::TheViperRoomBotUserState;
+use blacksmith_core::models::the_viper_room::db_models::Recipient;
+use blacksmith_core::models::the_viper_room::the_viper_room_bot;
+use blacksmith_core::models::the_viper_room::the_viper_room_bot::MainMenuMessageType;
+use blacksmith_core::state::tg_bot::TheViperRoomBotState;
+use blacksmith_core::utils::common::get_message;
+use blacksmith_core::utils::tg_bot::tg_bot::{start_bots_chat_action, stop_bots_chat_action};
+use blacksmith_core::utils::the_viper_room::news_block_creation::news_block_creation;
+use blacksmith_core::utils::the_viper_room::news_block_creation_utils::{
     generate_waveform, save_daily_podcast,
 };
 use grammers_client::types::{attributes::Attribute, InputMessage};

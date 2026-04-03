@@ -1,10 +1,12 @@
 use anyhow::Result;
-use async_openai::Client as LLM_Client;
-use core::models::common::app_name::AppName;
-use core::models::tg_agent::bot_alias::GrootBotAlias;
-use core::state::tg_agent::app_state::AgentAppState;
-use core::telegram_client::telegram_client::TelegramAgent;
-use core::utils::tg_bot::tg_bot::create_app_tmp_dir;
+use async_openai::Client as OpenAIClient;
+use blacksmith_core::ai::anthropic_client::AnthropicClient;
+use blacksmith_core::ai::google_client::GoogleClient;
+use blacksmith_core::models::common::app_name::AppName;
+use blacksmith_core::models::tg_agent::bot_alias::GrootBotAlias;
+use blacksmith_core::state::tg_agent::app_state::AgentAppState;
+use blacksmith_core::telegram_client::telegram_client::TelegramAgent;
+use blacksmith_core::utils::common::create_app_tmp_dir;
 use dotenv::dotenv;
 use rustls::crypto::{aws_lc_rs, CryptoProvider};
 use std::env;
@@ -46,9 +48,19 @@ async fn main() -> Result<()> {
         error!("Failed to create app tmp directory: {}", e);
     }
 
-    let llm_client = LLM_Client::new();
+    let openai_client = OpenAIClient::new();
+    let anthropic_client = AnthropicClient::new()?;
+    let google_client = GoogleClient::new()?;
 
-    let app_state = Arc::new(AgentAppState::new(llm_client, app_name.clone()).await?);
+    let app_state = Arc::new(
+        AgentAppState::new(
+            openai_client,
+            anthropic_client,
+            google_client,
+            app_name.clone(),
+        )
+        .await?,
+    );
 
     let telegram_agent = TelegramAgent::new(&app_name, "current.session").await?;
 

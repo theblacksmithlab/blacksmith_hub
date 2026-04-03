@@ -1,17 +1,18 @@
-use crate::ai::common::common::raw_llm_processing_json;
-use crate::models::common::ai::LlmModel;
+use crate::ai::common::google::raw_google_processing_json;
+use crate::ai::common::openai::raw_openai_processing_json;
+use crate::models::common::ai::{GoogleModel, OpenAIModel};
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::{
     AppsSystemRoles, BlacksmithLabRoleType, ProbiotRoleType, W3ARoleType,
 };
 use crate::rag_system::query_decompression_types::GeneratedAspects;
-use crate::state::llm_client_init_trait::OpenAIClientInit;
-use crate::utils::common::get_system_role_or_fallback;
+use crate::state::llm_client_init_trait::{GoogleClientInit, OpenAIClientInit};
+use crate::utils::common::get_system_role;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
-pub async fn generate_aspects<T: OpenAIClientInit + Send + Sync>(
-    clarified_request: &str,
+pub async fn generate_aspects<T: OpenAIClientInit + GoogleClientInit + Send + Sync>(
+    clarified_query: &str,
     current_cache: &str,
     app_state: Arc<T>,
     app_name: AppName,
@@ -24,7 +25,7 @@ pub async fn generate_aspects<T: OpenAIClientInit + Send + Sync>(
 
     let llm_message = format!(
         "{}\n\n<current_query>\n{}\n</current_query>",
-        chat_history_section, clarified_request
+        chat_history_section, clarified_query
     );
 
     let system_role = match app_name {
@@ -37,18 +38,36 @@ pub async fn generate_aspects<T: OpenAIClientInit + Send + Sync>(
     };
 
     let system_role = match system_role {
-        Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
+        Some(role) => get_system_role(&app_name, role.as_str())?,
         None => {
-            error!(
-                "AspectGeneration role is not defined for app '{}'. Using fallback.",
+            return Err(anyhow::anyhow!(
+                "AspectGeneration system role is not defined for app '{}'",
                 app_name.as_str()
-            );
-            "You are a helpful assistant".to_string()
+            ));
         }
     };
 
-    let aspects_json =
-        raw_llm_processing_json(&system_role, &llm_message, app_state, LlmModel::Light).await?;
+    let aspects_json = match raw_google_processing_json(
+        &system_role,
+        &llm_message,
+        app_state.clone(),
+        GoogleModel::Flash,
+    )
+    .await
+    {
+        Ok(result) => {
+            info!("Google aspect generation succeeded");
+            result
+        }
+        Err(e) => {
+            warn!(
+                "Google aspect generation failed: {}, falling back to OpenAI",
+                e
+            );
+            raw_openai_processing_json(&system_role, &llm_message, app_state, OpenAIModel::GPT5mr)
+                .await?
+        }
+    };
 
     match serde_json::from_str::<GeneratedAspects>(&aspects_json) {
         Ok(generated_aspects) => {
@@ -56,7 +75,7 @@ pub async fn generate_aspects<T: OpenAIClientInit + Send + Sync>(
 
             if aspects.len() < 3 {
                 warn!(
-                    "Generated aspects count is less than 3 (got {}). This should trigger fallback to Base mode.",
+                    "Generated aspects count is less than 3 (got {}), falling back to Base mode",
                     aspects.len()
                 );
                 return Err(anyhow::anyhow!(

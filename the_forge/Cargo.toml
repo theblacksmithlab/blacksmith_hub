@@ -26,4 +26,4 @@ reqwest.workspace = true
 md-5.workspace = true
 serde.workspace = true
 
-core = { path = "../core" }
+blacksmith_core = { package = "core", path = "../core" }

@@ -1,9 +1,9 @@
-use core::ai::common::common::raw_llm_processing;
-use core::models::common::ai::LlmModel;
-use core::models::common::app_name::AppName;
-use core::models::common::system_roles::TheViperRoomRoleType;
-use core::state::the_viper_room::app_state::TheViperRoomAppState;
-use core::utils::common::get_system_role_or_fallback;
+use blacksmith_core::ai::common::openai::raw_openai_processing;
+use blacksmith_core::models::common::ai::OpenAIModel;
+use blacksmith_core::models::common::app_name::AppName;
+use blacksmith_core::models::common::system_roles::TheViperRoomRoleType;
+use blacksmith_core::state::the_viper_room::app_state::TheViperRoomAppState;
+use blacksmith_core::utils::common::get_system_role_or_fallback;
 use std::sync::Arc;
 
 pub async fn generate_user_system_nickname(
@@ -23,11 +23,11 @@ pub async fn generate_user_system_nickname(
         username, first_name, last_name
     );
 
-    raw_llm_processing(
+    raw_openai_processing(
         &system_role,
         &user_data,
         the_viper_room_app_state,
-        LlmModel::Light,
+        OpenAIModel::GPT5lr,
     )
     .await
     .map_err(|e| format!("Failed to generate nickname: {}", e))

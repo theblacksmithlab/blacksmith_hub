@@ -1,16 +1,17 @@
-use crate::ai::common::common::raw_llm_processing;
-use crate::models::common::ai::LlmModel;
+use crate::ai::common::google::raw_google_processing;
+use crate::ai::common::openai::raw_openai_processing;
+use crate::models::common::ai::{GoogleModel, OpenAIModel};
 use crate::models::common::app_name::AppName;
 use crate::models::common::system_roles::{
     AppsSystemRoles, BlacksmithLabRoleType, ProbiotRoleType, W3ARoleType,
 };
-use crate::state::llm_client_init_trait::OpenAIClientInit;
-use crate::utils::common::get_system_role_or_fallback;
+use crate::state::llm_client_init_trait::{GoogleClientInit, OpenAIClientInit};
+use crate::utils::common::get_system_role;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
-pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
-    user_raw_request: &str,
+pub async fn clarify_query<T: OpenAIClientInit + GoogleClientInit + Send + Sync>(
+    user_raw_query: &str,
     current_cache: &str,
     app_state: Arc<T>,
     app_name: AppName,
@@ -23,37 +24,59 @@ pub async fn clarify_request<T: OpenAIClientInit + Send + Sync>(
 
     let llm_message = format!(
         "{}\n\n<current_query>\n{}\n</current_query>",
-        chat_history_section, user_raw_request
+        chat_history_section, user_raw_query
     );
 
     let system_role = match app_name {
-        AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::ClarifyRequest)),
-        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::ClarifyRequest)),
+        AppName::ProbiotBot => Some(AppsSystemRoles::Probiot(ProbiotRoleType::ClarifyQuery)),
+        AppName::W3AWeb => Some(AppsSystemRoles::W3A(W3ARoleType::ClarifyQuery)),
         AppName::BlacksmithWeb => Some(AppsSystemRoles::BlacksmithLab(
-            BlacksmithLabRoleType::ClarifyRequest,
+            BlacksmithLabRoleType::ClarifyQuery,
         )),
         _ => None,
     };
 
     let system_role = match system_role {
-        Some(role) => get_system_role_or_fallback(&app_name, role.as_str(), None),
+        Some(role) => get_system_role(&app_name, role.as_str())?,
         None => {
-            error!(
-                "ClarifyRequest role is not defined for app '{}'. Using fallback.",
+            return Err(anyhow::anyhow!(
+                "ClarifyQuery system role is not defined for app '{}'",
                 app_name.as_str()
-            );
-            "You are a helpful assistant".to_string()
+            ));
         }
     };
 
-    match raw_llm_processing(&system_role, &llm_message, app_state, LlmModel::Light).await {
-        Ok(clarified_request) => {
-            info!("User's raw request clarified successfully");
-            Ok(clarified_request)
+    let clarified_query = match raw_google_processing(
+        &system_role,
+        &llm_message,
+        app_state.clone(),
+        GoogleModel::Flash,
+    )
+    .await
+    {
+        Ok(result) => {
+            info!("User raw query clarified successfully via Google API");
+            result
         }
-        Err(err) => {
-            error!("Error while clarifying user's raw request: {}", err);
-            Ok(user_raw_request.to_string())
+        Err(e) => {
+            warn!(
+                "Google raw query clarify processing failed: {}, falling back to OpenAI",
+                e
+            );
+            match raw_openai_processing(&system_role, &llm_message, app_state, OpenAIModel::GPT5mr)
+                .await
+            {
+                Ok(result) => {
+                    info!("User raw query clarified successfully (OpenAI fallback)");
+                    result
+                }
+                Err(err) => {
+                    error!("Both Google and OpenAI failed to clarify query: {}", err);
+                    user_raw_query.to_string()
+                }
+            }
         }
-    }
+    };
+
+    Ok(clarified_query)
 }

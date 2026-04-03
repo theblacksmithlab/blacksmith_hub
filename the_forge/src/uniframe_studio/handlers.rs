@@ -1,16 +1,16 @@
 use crate::uniframe_studio::local_utils::{send_idea_email, verify_turnstile_token};
-use ::core::utils::uniframe_studio::heleket_client::{HeleketClient, HeleketConfig};
+use blacksmith_core::utils::uniframe_studio::heleket_client::{HeleketClient, HeleketConfig};
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
-use core::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
-use core::models::uniframe_studio::payment_models::{TopUpRequest, TopUpResponse};
-use core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
-use core::models::uniframe_studio::uniframe_studio::{
+use blacksmith_core::models::uniframe_studio::accounting_models::{ProcessingType, UserBalance};
+use blacksmith_core::models::uniframe_studio::payment_models::{TopUpRequest, TopUpResponse};
+use blacksmith_core::models::uniframe_studio::uniframe_studio::ReviewUploadResponse;
+use blacksmith_core::models::uniframe_studio::uniframe_studio::{
     ApiError, DubbingPipelinePrepareRequest, DubbingPipelinePrepareResponse,
     DubbingPipelineRequest, DubbingPipelineResponse, DubbingPipelineStatus, SubmitIdeaRequest,
     SubmitIdeaResponse, UserJob,
 };
-use core::state::uniframe_studio::app_state::UniframeStudioAppState;
+use blacksmith_core::state::uniframe_studio::app_state::UniframeStudioAppState;
 use http::StatusCode;
 use sqlx::Row;
 use std::sync::Arc;

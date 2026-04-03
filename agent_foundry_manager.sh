@@ -58,7 +58,7 @@ redeploy_agent() {
     docker compose stop $agent
     docker compose rm -f $agent
 
-    IMAGE_ID=$(docker images -q blacksmith-core_${agent})
+    IMAGE_ID=$(docker images -q blacksmith_hub-${agent})
     if [[ -n "$IMAGE_ID" ]]; then
         print_message "${YELLOW}" "2. Removing old $agent image: $IMAGE_ID"
         docker rmi -f "$IMAGE_ID"
@@ -102,7 +102,7 @@ full_redeploy_agent() {
     docker compose stop $agent
     docker compose rm -f $agent
 
-    IMAGE_ID=$(docker images -q blacksmith-core_${agent})
+    IMAGE_ID=$(docker images -q blacksmith_hub-${agent})
     if [[ -n "$IMAGE_ID" ]]; then
         print_message "${YELLOW}" "2. Removing old $agent image: $IMAGE_ID"
         docker rmi -f "$IMAGE_ID"

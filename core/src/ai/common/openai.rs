@@ -1,4 +1,4 @@
-use crate::models::common::ai::LlmModel;
+use crate::models::common::ai::OpenAIModel;
 use crate::state::llm_client_init_trait::OpenAIClientInit;
 use anyhow::Result;
 use async_openai::types::ResponseFormat::JsonObject;
@@ -10,13 +10,13 @@ use std::sync::Arc;
 use tiktoken_rs::cl100k_base;
 use tracing::info;
 
-pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
+pub async fn raw_openai_processing_json<T: OpenAIClientInit + Send + Sync>(
     system_role: &str,
     request: &str,
     app_state: Arc<T>,
-    model: LlmModel,
+    model: OpenAIModel,
 ) -> Result<String> {
-    let llm_client = app_state.get_llm_client().clone();
+    let openai_client = app_state.get_openai_client().clone();
 
     let mut builder = CreateChatCompletionRequestArgs::default();
     builder.model(model.as_str());
@@ -44,7 +44,7 @@ pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
 
     let llm_request = builder.build()?;
 
-    let response = llm_client.chat().create(llm_request).await?;
+    let response = openai_client.chat().create(llm_request).await?;
 
     if let Some(choice) = response.choices.get(0) {
         let content = choice
@@ -58,13 +58,13 @@ pub async fn raw_llm_processing_json<T: OpenAIClientInit + Send + Sync>(
     }
 }
 
-pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
+pub async fn raw_openai_processing<T: OpenAIClientInit + Send + Sync>(
     system_role: &str,
     request: &str,
     app_state: Arc<T>,
-    model: LlmModel,
+    model: OpenAIModel,
 ) -> Result<String> {
-    let llm_client = app_state.get_llm_client().clone();
+    let openai_client = app_state.get_openai_client().clone();
 
     let mut builder = CreateChatCompletionRequestArgs::default();
     builder.model(model.as_str());
@@ -90,7 +90,7 @@ pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
 
     let llm_request = builder.build()?;
 
-    let response = llm_client.chat().create(llm_request).await?;
+    let response = openai_client.chat().create(llm_request).await?;
 
     if let Some(choice) = response.choices.get(0) {
         let content = choice
@@ -104,25 +104,54 @@ pub async fn raw_llm_processing<T: OpenAIClientInit + Send + Sync>(
     }
 }
 
-pub async fn tokenize_and_truncate(data: &str, max_tokens: usize) -> Result<String> {
+pub async fn tokenize_and_truncate(
+    data: &str,
+    max_tokens: usize,
+    keep_end: bool,
+) -> Result<String> {
     let bpe = cl100k_base()?;
     let tokens = bpe.encode_ordinary(&*data);
     let token_count = tokens.len();
 
-    info!("Tokenize_and_truncate fn | Input tokens: {:?}", token_count);
+    let input_data_source = if keep_end == true {
+        "chat history".to_string()
+    } else {
+        "vector db retriever".to_string()
+    };
+
+    info!("Input tokens: {} from: {}", token_count, input_data_source);
 
     if token_count > max_tokens {
-        let truncated_tokens = tokens[..max_tokens].to_vec();
+        let truncated_tokens = if keep_end {
+            tokens[token_count - max_tokens..].to_vec()
+        } else {
+            tokens[..max_tokens].to_vec()
+        };
+
         let truncated_data = bpe.decode(truncated_tokens)?;
-        let truncated_text_tokens = bpe.encode_ordinary(&*truncated_data);
-        let truncated_count = truncated_text_tokens.len();
+        let truncated_count = bpe.encode_ordinary(&truncated_data).len();
 
-        info!("Truncated input tokens: {:?}", truncated_count);
+        info!(
+            "Truncated input data: {} -> {} (keep_end: {})",
+            token_count, truncated_count, keep_end
+        );
 
-        Ok(truncated_data)
+        let result = if keep_end {
+            format!(
+                "...[начало обрезано в целях экономии контекстного окна]\n{}",
+                truncated_data
+            )
+        } else {
+            format!(
+                "{}\n[конец обрезан в целях экономии контекстного окна]...",
+                truncated_data
+            )
+        };
+
+        Ok(result)
     } else {
         info!(
-            "Input tokens {} < max_tokens, no need to truncate",
+            "Input data tokens quantity ({}) < max_tokens, no need to truncate it",
             token_count
         );
         Ok(data.to_string())

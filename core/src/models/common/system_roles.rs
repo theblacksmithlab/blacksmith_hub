@@ -88,11 +88,11 @@ impl AsRef<str> for UniframeStudioRoleType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProbiotRoleType {
-    RequestTypeDetection,
-    ClarifyRequest,
+    QueryTypeDefinition,
+    ClarifyQuery,
     MainProcessing,
-    CommonCaseRequestProcessing,
-    InvalidCaseRequestProcessing,
+    CommonCaseQueryProcessing,
+    InvalidCaseQueryProcessing,
     QueryComplexityAnalysis,
     AspectGeneration,
 }
@@ -100,11 +100,11 @@ pub enum ProbiotRoleType {
 impl ProbiotRoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            ProbiotRoleType::RequestTypeDetection => "request_type_detection",
-            ProbiotRoleType::ClarifyRequest => "clarify_request",
+            ProbiotRoleType::QueryTypeDefinition => "query_type_definition",
+            ProbiotRoleType::ClarifyQuery => "clarify_query",
             ProbiotRoleType::MainProcessing => "main_processing",
-            ProbiotRoleType::CommonCaseRequestProcessing => "common_case_request_processing",
-            ProbiotRoleType::InvalidCaseRequestProcessing => "invalid_case_request_processing",
+            ProbiotRoleType::CommonCaseQueryProcessing => "common_case_query_processing",
+            ProbiotRoleType::InvalidCaseQueryProcessing => "invalid_case_query_processing",
             ProbiotRoleType::QueryComplexityAnalysis => "query_complexity_analysis",
             ProbiotRoleType::AspectGeneration => "aspect_generation",
         }
@@ -119,11 +119,12 @@ impl AsRef<str> for ProbiotRoleType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum W3ARoleType {
-    RequestTypeDetection,
-    ClarifyRequest,
+    QueryTypeDefinition,
+    ClarifyQuery,
     MainProcessing,
-    CommonCaseRequestProcessing,
-    InvalidCaseRequestProcessing,
+    CommonCaseQueryProcessing,
+    InvalidCaseQueryProcessing,
+    SupportCaseQueryProcessing,
     TTSPreProcessing,
     QueryComplexityAnalysis,
     AspectGeneration,
@@ -132,14 +133,15 @@ pub enum W3ARoleType {
 impl W3ARoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            W3ARoleType::RequestTypeDetection => "request_type_detection_xml",
-            W3ARoleType::ClarifyRequest => "clarify_request_xml",
+            W3ARoleType::QueryTypeDefinition => "query_type_definition_xml",
+            W3ARoleType::ClarifyQuery => "clarify_query_xml",
             W3ARoleType::MainProcessing => "main_processing_xml",
-            W3ARoleType::CommonCaseRequestProcessing => "common_case_request_processing_xml",
-            W3ARoleType::InvalidCaseRequestProcessing => "invalid_case_request_processing_xml",
+            W3ARoleType::CommonCaseQueryProcessing => "common_case_query_processing_xml",
+            W3ARoleType::InvalidCaseQueryProcessing => "invalid_case_query_processing_xml",
             W3ARoleType::TTSPreProcessing => "tts_pre_processing",
             W3ARoleType::QueryComplexityAnalysis => "query_complexity_analysis_xml",
             W3ARoleType::AspectGeneration => "aspect_generation_xml",
+            W3ARoleType::SupportCaseQueryProcessing => "support_case_query_processing_xml",
         }
     }
 }
@@ -181,10 +183,10 @@ impl AsRef<str> for TheViperRoomRoleType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlacksmithLabRoleType {
-    ClarifyRequest,
-    RequestTypeDetection,
-    CommonCaseRequestProcessing,
-    InvalidCaseRequestProcessing,
+    ClarifyQuery,
+    QueryTypeDefinition,
+    CommonCaseQueryProcessing,
+    InvalidCaseQueryProcessing,
     TTSPreProcessing,
     MainProcessing,
     QueryComplexityAnalysis,
@@ -194,12 +196,10 @@ pub enum BlacksmithLabRoleType {
 impl BlacksmithLabRoleType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            BlacksmithLabRoleType::ClarifyRequest => "clarify_request",
-            BlacksmithLabRoleType::RequestTypeDetection => "request_type_detection",
-            BlacksmithLabRoleType::CommonCaseRequestProcessing => "common_case_request_processing",
-            BlacksmithLabRoleType::InvalidCaseRequestProcessing => {
-                "invalid_case_request_processing"
-            }
+            BlacksmithLabRoleType::ClarifyQuery => "clarify_query",
+            BlacksmithLabRoleType::QueryTypeDefinition => "query_type_definition",
+            BlacksmithLabRoleType::CommonCaseQueryProcessing => "common_case_query_processing",
+            BlacksmithLabRoleType::InvalidCaseQueryProcessing => "invalid_case_query_processing",
             BlacksmithLabRoleType::TTSPreProcessing => "tts_pre_processing",
             BlacksmithLabRoleType::MainProcessing => "main_processing",
             BlacksmithLabRoleType::QueryComplexityAnalysis => "query_complexity_analysis",
