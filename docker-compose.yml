@@ -190,7 +190,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
+          cpus: '2'
           memory: 4G
     restart: unless-stopped
     logging:
@@ -212,7 +212,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
+          cpus: '2'
           memory: 4G
     restart: unless-stopped
     logging:
@@ -236,7 +236,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
+          cpus: '2'
           memory: 4G
     restart: unless-stopped
     logging:
