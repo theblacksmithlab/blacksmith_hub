@@ -12,7 +12,7 @@ services:
       - "6333:6333"
       - "6334:6334"
     volumes:
-      - /root/qdrant_data:/qdrant/storage
+      - /var/www/blacksmith_hub/qdrant_data:/qdrant/storage
     restart: unless-stopped
     logging:
       driver: "json-file"
