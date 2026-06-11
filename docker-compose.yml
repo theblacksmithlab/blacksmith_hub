@@ -1,4 +1,10 @@
 networks:
+  default:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: "172.18.0.0/16"
+        - subnet: "fd00::/80"
   uniframe-network:
     driver: bridge
     driver_opts:
@@ -66,7 +72,6 @@ services:
       dockerfile: infra/docker/Dockerfile.probiot_bot
     env_file:
       - .env
-    network_mode: host
     volumes:
       - /root/projects/whisper.cpp/models:/app/whisper.cpp/models
     deploy:
@@ -87,7 +92,6 @@ services:
       dockerfile: infra/docker/Dockerfile.groot_bot
     env_file:
       - .env
-    network_mode: host
     volumes:
       - /root/projects/whisper.cpp/models:/app/whisper.cpp/models
       - ./common_res/groot_bot:/app/common_res/groot_bot
@@ -115,7 +119,6 @@ services:
       dockerfile: infra/docker/Dockerfile.the_viper_room_bot
     env_file:
       - .env
-    network_mode: host
     volumes:
       - ./common_res/the_viper_room:/app/common_res/the_viper_room
       - ./common_res/messages/the_viper_room_bot:/app/common_res/messages/the_viper_room_bot
@@ -140,7 +143,6 @@ services:
       dockerfile: infra/docker/Dockerfile.stat_bot
     env_file:
       - .env
-    network_mode: host
     volumes:
       - ./common_res/messages/common:/app/common_res/messages/common
       - ./common_res/local_db:/app/common_res/local_db
@@ -162,7 +164,6 @@ services:
       dockerfile: infra/docker/Dockerfile.agent_davon
     env_file:
       - .env
-    network_mode: host
     volumes:
       - ./common_res/agent_davon:/app/common_res/agent_davon
       - ./common_res/messages/common:/app/common_res/messages/common
