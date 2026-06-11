@@ -95,8 +95,7 @@ async fn main() -> Result<()> {
     }
 
     let qdrant_client = Arc::new(
-        Qdrant::from_url(&env::var("QDRANT_CLOUD_URL")?)
-            .api_key(env::var("QDRANT_API_KEY")?)
+        Qdrant::from_url(&env::var("QDRANT_LOCAL_URL")?)
             .build()?,
     );
 
