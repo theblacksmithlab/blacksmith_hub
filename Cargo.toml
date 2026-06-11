@@ -28,7 +28,7 @@ grammers-session = "0.7.0"
 
 # Database & Storage
 sqlx = { version = "0.8.2", features = ["sqlite", "runtime-tokio", "migrate"] }
-qdrant-client = "1.13.0"
+qdrant-client = "1.18.0"
 
 # AI Services
 async-openai = "0.28.0"
