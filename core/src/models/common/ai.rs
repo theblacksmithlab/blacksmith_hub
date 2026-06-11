@@ -60,14 +60,14 @@ impl AnthropicModel {
 #[derive(Debug, Display, Clone, Copy)]
 pub enum GoogleModel {
     Flash, // gemini-3-flash (latest)
-    Pro,   // gemini-3-pro (latest)
+    Pro,   // gemini-3.1-pro (latest)
 }
 
 impl GoogleModel {
     pub fn as_str(&self) -> &'static str {
         match self {
             GoogleModel::Flash => "gemini-3-flash-preview",
-            GoogleModel::Pro => "gemini-3-pro-preview",
+            GoogleModel::Pro => "gemini-3.1-pro-preview",
         }
     }
 }
