@@ -1,9 +1,6 @@
 networks:
   default:
     enable_ipv6: true
-    ipam:
-      config:
-        - subnet: "fd00::/80"
   uniframe-network:
     driver: bridge
     driver_opts:
