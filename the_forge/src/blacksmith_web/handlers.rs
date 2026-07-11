@@ -13,6 +13,7 @@ use blacksmith_core::models::blacksmith_web::blacksmith_web::{
 };
 use blacksmith_core::models::common::ai::OpenAIModel;
 use blacksmith_core::models::common::app_name::AppName;
+use blacksmith_core::models::common::link_variant::LinkVariant;
 use blacksmith_core::models::common::system_roles::{AppsSystemRoles, BlacksmithLabRoleType, W3ARoleType};
 use blacksmith_core::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use blacksmith_core::utils::common::get_system_role_or_fallback;
@@ -41,14 +42,21 @@ pub(crate) async fn handle_blacksmith_web_user_request(
 
     let user_id = request.user_id;
     let request_text = request.text;
+    let link_variant = LinkVariant::from_opt(request.link_variant.as_deref());
 
     info!(
-        "App-Source: {} | Got text message from user: {}: {}",
-        app_name, user_id, request_text
+        "App-Source: {} | Link-Variant: {:?} | Got text message from user: {}: {}",
+        app_name, link_variant, user_id, request_text
     );
 
-    let (response, extra_data) =
-        default_message_handler(&request_text, blacksmith_web_app_state, &user_id, &app_name).await;
+    let (response, extra_data) = default_message_handler(
+        &request_text,
+        blacksmith_web_app_state,
+        &user_id,
+        &app_name,
+        link_variant,
+    )
+    .await;
 
     info!(
         "\n==============================================================================\n\n\

@@ -7,7 +7,8 @@ use crate::message_processing_flow::clarify_request::clarify_query;
 use crate::message_processing_flow::generate_aspects::generate_aspects;
 use crate::models::common::ai::{GoogleModel, OpenAIModel};
 use crate::models::common::app_name::AppName;
-use crate::models::common::qdrant_collection_manager::AppsCollections;
+use crate::models::common::link_variant::LinkVariant;
+use crate::models::common::qdrant_collection_manager::collection_names_for_app;
 use crate::models::common::query_type::QueryType;
 use crate::models::common::system_roles::{AppsSystemRoles, W3ARoleType};
 use crate::models::common::system_roles::{BlacksmithLabRoleType, ProbiotRoleType};
@@ -36,6 +37,7 @@ pub async fn process_user_query<
     user_raw_query: &str,
     app_state: Arc<T>,
     app_name: AppName,
+    link_variant: LinkVariant,
 ) -> Result<(String, HashMap<String, String>)> {
     add_user_message_to_cache(app_state.clone(), user_id, user_raw_query).await;
 
@@ -81,6 +83,7 @@ pub async fn process_user_query<
                 app_state,
                 &post_processed_temp_cache,
                 app_name.clone(),
+                link_variant,
             )
             .await?;
 
@@ -121,11 +124,10 @@ pub async fn handle_special_case_query<
     app_state: Arc<T>,
     current_cache: &str,
     app_name: AppName,
+    link_variant: LinkVariant,
 ) -> Result<(String, HashMap<String, String>)> {
-    let collection_names: Vec<String> = AppsCollections::all_collections_for_app(app_name.clone())
-        .iter()
-        .map(|collection| collection.as_str().to_string())
-        .collect();
+    let collection_names: Vec<String> =
+        collection_names_for_app(app_name.clone(), link_variant);
 
     let max_tokens = 10000;
 

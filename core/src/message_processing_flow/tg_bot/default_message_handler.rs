@@ -1,6 +1,7 @@
 use crate::ai::common::voice_processing::transcribe_voice_message;
 use crate::message_processing_flow::message_processing_flow::process_user_query;
 use crate::models::common::app_name::AppName;
+use crate::models::common::link_variant::LinkVariant;
 use crate::models::common::system_messages::AppsSystemMessages;
 use crate::models::common::system_messages::{CommonMessages, ProbiotBotMessages};
 use crate::state::llm_client_init_trait::{GoogleClientInit, OpenAIClientInit};
@@ -98,6 +99,7 @@ where
                         &user_voice_transcribed,
                         app_state.clone(),
                         app_name.clone(),
+                        LinkVariant::Default,
                     )
                     .await
                     {
@@ -186,8 +188,14 @@ where
             )
             .await;
 
-            match process_user_query(&chat_id_as_str, text, app_state.clone(), app_name.clone())
-                .await
+            match process_user_query(
+                &chat_id_as_str,
+                text,
+                app_state.clone(),
+                app_name.clone(),
+                LinkVariant::Default,
+            )
+            .await
             {
                 Ok((llm_response, _extra_data)) => {
                     // TODO: Truncate long message to 4096 symbols

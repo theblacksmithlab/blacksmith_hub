@@ -1,6 +1,7 @@
 use crate::local_db::blacksmith_web::chat_history_storage::save_message_to_db;
 use crate::message_processing_flow::message_processing_flow::process_user_query;
 use crate::models::common::app_name::AppName;
+use crate::models::common::link_variant::LinkVariant;
 use crate::models::common::system_messages::{AppsSystemMessages, CommonMessages};
 use crate::state::blacksmith_web::app_state::BlacksmithWebAppState;
 use crate::temp_cache::temp_cache_utils::add_llm_response_to_cache;
@@ -16,6 +17,7 @@ pub async fn default_message_handler(
     app_state: Arc<BlacksmithWebAppState>,
     user_id: &str,
     app_name: &AppName,
+    link_variant: LinkVariant,
 ) -> (String, HashMap<String, String>) {
     let request_id = Uuid::new_v4();
     info!(request_id = %request_id, user_id = %user_id, "Request processing started");
@@ -32,7 +34,15 @@ pub async fn default_message_handler(
         error!("Failed to save user message to local db: {}", e);
     }
 
-    match process_user_query(user_id, request_text, app_state.clone(), app_name.clone()).await {
+    match process_user_query(
+        user_id,
+        request_text,
+        app_state.clone(),
+        app_name.clone(),
+        link_variant,
+    )
+    .await
+    {
         Ok((llm_response, extra_data)) => {
             let full_response = append_footer_if_needed(
                 &llm_response,

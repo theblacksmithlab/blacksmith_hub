@@ -6,6 +6,8 @@ pub struct BlacksmithWebUserRequest {
     pub user_id: String,
     pub text: String,
     pub app_name: String,
+    #[serde(default)]
+    pub link_variant: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
